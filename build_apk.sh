@@ -2,10 +2,10 @@
 set -e
 
 # ====== 配置 ======
-ANDROID_HOME=/data/user/work/android-sdk
+ANDROID_HOME=/workspace/android-sdk
 BUILD_TOOLS=$ANDROID_HOME/build-tools/34.0.0
 PLATFORM=$ANDROID_HOME/platforms/android-34
-JAVA_HOME=/data/user/work/jdk-17.0.12
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 PROJECT=/workspace/expense-tracker/android
 OUTPUT=/workspace/expense-tracker
 
@@ -27,7 +27,7 @@ $BUILD_TOOLS/aapt2 link \
   --min-sdk-version 21 \
   --target-sdk-version 34 \
   --version-code 1 \
-  --version-name "1.0" \
+  --version-name "2.0" \
   -A $PROJECT/app/src/main/assets \
   $PROJECT/build/res.zip
 

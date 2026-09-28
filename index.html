@@ -13,6 +13,16 @@
   --spring-smooth:cubic-bezier(0.25,0.46,0.45,0.94);
   --spring-soft:cubic-bezier(0.16,1,0.3,1);
   --spring-ios:cubic-bezier(0.175,0.885,0.32,1.275);
+  --spring-entrance:cubic-bezier(0.22,1,0.36,1);
+  --spring-exit:cubic-bezier(0.4,0,0.68,-0.06);
+  --spring-overshoot:cubic-bezier(0.68,-0.6,0.32,1.6);
+  --spring-card:cubic-bezier(0.19,1,0.22,1);
+  --spring-modal:cubic-bezier(0.32,0.72,0,1);
+  --ease-standard:cubic-bezier(0.4,0,0.2,1);
+  --t-fast:.18s;
+  --t-normal:.3s;
+  --t-slow:.45s;
+  --t-page:.42s;
 }
 /* ===== CSS Variables ===== */
 :root{
@@ -29,7 +39,7 @@ body.dk{--bg:#121212;--card:#1e1e1e;--card2:#2c2c2c;--text:#e8e8e8;--t2:#a0a0a0;
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 .tabnum{font-variant-numeric:tabular-nums}
 html{font-size:16px;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;background:var(--bg);color:var(--text);line-height:1.5;overflow-x:hidden;min-height:100vh;transition:background .3s,color .3s;-webkit-font-smoothing:antialiased}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;background:var(--bg);color:var(--text);line-height:1.5;overflow-x:hidden;min-height:100vh;transition:background-color .25s ease,color .25s ease;-webkit-font-smoothing:antialiased}
 input,button,select,textarea{font-family:inherit;font-size:inherit;outline:none;border:none;background:none}
 button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none}
@@ -37,10 +47,16 @@ a{color:inherit;text-decoration:none}
 img{max-width:100%;display:block}
 
 /* ===== App Container ===== */
-#app{max-width:480px;margin:0 auto;min-height:100vh;position:relative;overflow:hidden;padding-bottom:calc(74px + var(--safe));display:flex;flex-direction:column}
+#app{max-width:480px;margin:0 auto;height:100vh;height:100dvh;position:relative;overflow:hidden;padding-bottom:calc(74px + var(--safe));display:flex;flex-direction:column;contain:layout style}
+/* 状态栏安全区高度（透明状态栏后由顶栏 padding 吸收；不支持的设备用 24px 兜底） */
+:root{--safe-top:env(safe-area-inset-top,24px)}
 
 /* ===== Top Bar ===== */
-.top-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;position:sticky;top:0;z-index:100;background:var(--bg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transition:background .3s}
+.top-bar{display:flex;align-items:center;justify-content:space-between;padding:calc(var(--safe-top) + 10px) 20px 10px;position:sticky;top:0;z-index:100;
+  /* 液态玻璃：透明状态栏下，状态栏区域透出此毛玻璃背景，呈现「通透」质感 */
+  background:rgba(255,255,255,.5);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);
+  border-bottom:1px solid rgba(255,255,255,.25);transition:background-color .25s ease}
+body.dk .top-bar{background:rgba(25,25,30,.5);border-bottom-color:rgba(255,255,255,.08)}
 .top-bar .title{font-size:20px;font-weight:700;letter-spacing:-.3px}
 .top-bar .actions{display:flex;gap:8px;align-items:center}
 .top-bar .btn-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--t2);transition:background .2s}
@@ -48,32 +64,90 @@ img{max-width:100%;display:block}
 .top-bar .btn-icon.dk-mode{font-size:20px}
 .date-time{font-size:11px;color:var(--t2);font-weight:500;letter-spacing:.5px;opacity:.8}
 
-/* ===== Pages ===== */
-.pages{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:0 16px 16px}
-.page{display:none;animation:pageIn .3s var(--spring-soft)}
-@keyframes pageIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
-.page.active{display:block}
+/* ===== Pages：水平排列，每页独立垂直滚动，永不卸载 ===== */
+.pages{flex:1;min-height:0;display:flex;width:400%;overflow:hidden;
+  transform:translateX(0);transition:transform .32s var(--spring-entrance);will-change:transform}
+.page{flex:0 0 25%;width:25%;height:100%;overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;padding:0 16px 16px;box-sizing:border-box}
+/* 切换时不再用 display，水平 transform 即可；保留 fadeIn 供局部元素使用 */
 @keyframes fadeIn{from{opacity:0;transform:scale(.97) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
 
 /* ===== Bottom Nav ===== */
-.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:calc(100% - 16px);max-width:464px;background:var(--card);border-top:none;border-radius:16px 16px 0 0;display:flex;padding:6px 0 calc(8px + var(--safe));z-index:100;transition:background .3s,box-shadow .3s;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 -1px 12px rgba(0,0,0,.08)}
-body.dk .bottom-nav{box-shadow:0 -1px 12px rgba(0,0,0,.3)}
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:calc(100% - 16px);max-width:464px;border-radius:18px 18px 0 0;display:flex;padding:6px 0 calc(8px + var(--safe));z-index:100;transition:background .3s,box-shadow .3s;
+  /* 液态玻璃效果 */
+  background:rgba(255,255,255,.55);
+  backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);
+  border:1px solid rgba(255,255,255,.35);border-bottom:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 -1px 0 rgba(255,255,255,.1),0 -4px 24px rgba(0,0,0,.1);
+}
+body.dk .bottom-nav{background:rgba(30,30,35,.55);border-color:rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 -4px 24px rgba(0,0,0,.4)}
 .bottom-nav .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;color:var(--t2);font-size:11px;transition:color .2s;border:none;background:none;cursor:pointer}
 .bottom-nav .nav-item.active{color:var(--p)}
 .bottom-nav .nav-item .nav-icon{font-size:22px;line-height:1}
 .bottom-nav .nav-item .nav-label{font-weight:500}
 .bottom-nav .nav-item.active .nav-icon{animation:bounce .45s var(--spring-bounce)}
+/* ===== 液态玻璃指示器（紫色） ===== */
+.nav-indicator{position:absolute;top:50%;height:calc(100% - 4px);border-radius:14px;z-index:3;cursor:grab;touch-action:none;user-select:none;pointer-events:auto;
+  transition:left .5s var(--spring-bounce),width .5s var(--spring-bounce),transform .15s ease;
+  transform:translateY(-50%);
+  /* 紫色玻璃基底：更淡、更透 */
+  background:
+    linear-gradient(135deg,rgba(139,92,246,.16),rgba(99,102,241,.13) 50%,rgba(168,85,247,.12));
+  backdrop-filter:blur(16px) saturate(180%);-webkit-backdrop-filter:blur(16px) saturate(180%);
+  border:1px solid rgba(255,255,255,.45);
+  /* 多层阴影：外发光 + 内高光 + 内底部暗边（同步减弱） */
+  box-shadow:
+    0 4px 18px rgba(99,102,241,.16),
+    0 1px 4px rgba(139,92,246,.14),
+    inset 0 1px 0 rgba(255,255,255,.6),
+    inset 0 -1px 0 rgba(99,102,241,.1),
+    inset 1px 0 0 rgba(255,255,255,.2),
+    inset -1px 0 0 rgba(255,255,255,.1);
+  overflow:hidden;
+}
+/* 玻璃高光层：顶部弧形反光 */
+.nav-indicator::before{content:'';position:absolute;inset:0;border-radius:13px;pointer-events:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.35) 0%,rgba(255,255,255,.08) 30%,transparent 55%);
+}
+/* 玻璃流动高光：斜向反光条，动画移动 */
+.nav-indicator::after{content:'';position:absolute;top:-50%;left:-60%;width:50%;height:200%;pointer-events:none;
+  background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.45) 48%,rgba(255,255,255,.15) 52%,transparent 70%);
+  transform:skewX(-15deg);
+  animation:glassShine 3.5s ease-in-out infinite;
+}
+@keyframes glassShine{0%,100%{left:-60%;opacity:.6}50%{left:110%;opacity:.9}}
+/* 拖拽时：果冻变形 + 玻璃增强 */
+.nav-indicator.dragging{transition:none;cursor:grabbing;
+  backdrop-filter:blur(22px) saturate(200%);-webkit-backdrop-filter:blur(22px) saturate(200%);
+  box-shadow:
+    0 8px 28px rgba(99,102,241,.24),
+    0 2px 8px rgba(139,92,246,.18),
+    inset 0 1px 0 rgba(255,255,255,.7),
+    inset 0 -1px 0 rgba(99,102,241,.14);
+}
+body.dk .nav-indicator{background:linear-gradient(135deg,rgba(139,92,246,.22),rgba(99,102,241,.18) 50%,rgba(168,85,247,.16));border-color:rgba(255,255,255,.18)}
+body.dk .nav-indicator::before{background:linear-gradient(180deg,rgba(255,255,255,.18) 0%,rgba(255,255,255,.04) 30%,transparent 55%)}
+.bottom-nav .nav-item{position:relative;z-index:1}
 @keyframes bounce{0%,100%{transform:translateY(0)}40%{transform:translateY(-3px)}70%{transform:translateY(1px)}}
 
 /* ===== Cards ===== */
-.card{background:var(--card);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:var(--shadow);transition:background .3s,box-shadow .3s;animation:cardIn .4s var(--spring-soft) both}
-@keyframes cardIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+.card{background:rgba(255,255,255,.7);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.06);transition:transform var(--t-fast) var(--spring-card),background .3s,box-shadow .3s;animation:cardIn .4s var(--spring-card) both;will-change:transform;border:1px solid rgba(255,255,255,.06)}
+.card:active{transform:scale(.97)}
+@keyframes cardIn{from{opacity:0;transform:translateY(20px) scale(.94)}to{opacity:1;transform:translateY(0) scale(1)}}
 .card2{background:var(--card2);border-radius:var(--r);padding:14px;margin-bottom:10px;transition:background .3s}
 .section-title{font-size:14px;font-weight:600;color:var(--t2);margin:16px 0 8px;text-transform:uppercase;letter-spacing:.5px;animation:sectionIn .4s var(--spring-soft) both}
 @keyframes sectionIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
 
 /* ===== Page 1: Record ===== */
 .type-toggle{display:flex;gap:0;background:var(--card2);border-radius:var(--r);padding:3px;margin-bottom:16px}
+/* 今日收支摘要 */
+.today-summary{display:flex;align-items:center;justify-content:space-around;background:var(--card);border-radius:14px;padding:10px 16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+.ts-item{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
+.ts-label{font-size:11px;color:var(--t3)}
+.ts-value{font-size:16px;font-weight:700}
+.ts-expense{color:var(--green,#34c759)}
+.ts-income{color:var(--red,#ff3b30)}
+.ts-divider{width:1px;height:28px;background:var(--border)}
 .type-toggle button{flex:1;padding:10px;border:none;border-radius:calc(var(--r) - 2px);font-size:15px;font-weight:600;background:transparent;color:var(--t2);cursor:pointer;transition:all .3s var(--spring-bounce)}
 .type-toggle button.active{background:var(--g1);color:#fff;box-shadow:0 2px 8px rgba(99,102,241,.3)}
 
@@ -101,9 +175,10 @@ body.dk .bottom-nav{box-shadow:0 -1px 12px rgba(0,0,0,.3)}
 
 .row{display:flex;gap:10px;align-items:center;margin-bottom:12px}
 .row label{font-size:14px;color:var(--t2);white-space:nowrap;min-width:40px}
-.row input[type="date"],.row input[type="text"]{flex:1;padding:10px 12px;background:var(--card2);border-radius:10px;font-size:15px;color:var(--text);border:1px solid var(--border)}
-.row input[type="date"]:focus,.row input[type="text"]:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(99,102,241,.1)}
-.row input[type="date"]{color-scheme:light}body.dk .row input[type="date"]{color-scheme:dark}
+.row input[type="date"],.row input[type="time"],.row input[type="text"]{flex:1;padding:10px 12px;background:var(--card2);border-radius:10px;font-size:15px;color:var(--text);border:1px solid var(--border);font-family:inherit}
+.row input[type="date"]:focus,.row input[type="time"]:focus,.row input[type="text"]:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(99,102,241,.1)}
+.row input[type="date"],.row input[type="time"]{color-scheme:light}body.dk .row input[type="date"],body.dk .row input[type="time"]{color-scheme:dark}
+.row input[type="time"]::-webkit-calendar-picker-indicator{filter:invert(var(--inv,0));opacity:.6}body.dk .row input[type="time"]{--inv:1}
 .backfill-bar{display:none;align-items:center;justify-content:space-between;width:100%;padding:8px 12px;background:linear-gradient(135deg,#fff3cd,#ffe0b2);border-radius:10px;margin:10px 0;animation:fadeIn .25s var(--spring-soft)}
 body.dk .backfill-bar{background:linear-gradient(135deg,#4a3800,#5c3d00)}
 .backfill-label{font-size:12px;color:#856404;font-weight:600}
@@ -132,16 +207,19 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 .filter-tag.active{background:var(--p);color:#fff;border-color:var(--p)}
 
 .bill-list{display:flex;flex-direction:column;gap:8px}
-.bill-item{display:flex;align-items:center;padding:12px;background:var(--card);border-radius:var(--r);gap:12px;transition:transform .3s var(--spring-soft),background .2s;box-shadow:var(--shadow);will-change:transform;animation:billIn .35s var(--spring-soft) both}
+.bill-item{display:flex;align-items:center;padding:12px;background:var(--card);border-radius:var(--r);gap:12px;transition:transform var(--t-normal) var(--spring-entrance),background .2s;box-shadow:var(--shadow);will-change:transform,opacity;animation:staggerFadeUp .4s var(--spring-entrance) both}
 .bill-item:active{background:var(--card2);transform:scale(.98)}
 @keyframes billIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
-.bill-item .bill-emoji{font-size:28px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;flex-shrink:0}
+.bill-item .bill-emoji{font-size:28px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;flex-shrink:0;transition:transform var(--t-fast) var(--spring-bounce);will-change:transform}
+.bill-item .bill-emoji:active{transform:scale(.85) rotate(-12deg)}
 .bill-item .bill-info{flex:1;min-width:0}
 .bill-item .bill-cat{font-size:15px;font-weight:600}
 .bill-item .bill-meta{font-size:12px;color:var(--t2);margin-top:2px;display:flex;gap:8px;align-items:center}
-.bill-item .bill-amount{font-size:17px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right}
+.bill-item .bill-amount{font-size:17px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;animation:numberScrollIn .5s var(--spring-entrance) both}
 .bill-item .bill-amount.expense{color:var(--red)}
 .bill-item .bill-amount.income{color:var(--green)}
+.time-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:8px;background:var(--card2);font-size:11px;font-variant-numeric:tabular-nums;color:var(--t2)}
+.time-badge.recent{color:var(--p);background:rgba(99,102,241,.12)}
 .bill-item .bill-actions{display:flex;gap:4px;flex-shrink:0}
 .bill-item .bill-actions button{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--t2);background:var(--card2);transition:all .2s}
 .bill-item .bill-actions button:active{background:var(--border)}
@@ -152,7 +230,133 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 .record-count{font-size:12px;color:var(--t3);text-align:center;margin-top:12px}
 
 /* ===== Page 3: Stats ===== */
-.insight-card{padding:12px 14px;border-radius:10px;margin-bottom:8px;font-size:13px;display:flex;align-items:flex-start;gap:10px;background:var(--card);border-left:3px solid var(--p);box-shadow:var(--shadow);animation:insightIn .35s var(--spring-soft) both}
+/* 组件工具栏 */
+.widget-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px}
+.widget-view-toggle{display:flex;background:var(--card2);border-radius:10px;padding:3px}
+.wvt-btn{padding:7px 14px;border:none;border-radius:8px;font-size:13px;font-weight:600;background:transparent;color:var(--t2);cursor:pointer;transition:all .25s var(--spring-bounce)}
+.wvt-btn.active{background:var(--g1);color:#fff;box-shadow:0 2px 8px rgba(99,102,241,.3)}
+.widget-manage-btn{padding:7px 12px;border:1px solid var(--border);border-radius:10px;font-size:12px;background:var(--card);color:var(--t2);cursor:pointer;transition:all .2s}
+.widget-manage-btn:active{transform:scale(.95)}
+/* 列表视图：默认全宽 */
+#statsWidgets{display:flex;flex-direction:column;gap:0;transition:all .4s var(--spring-bounce)}
+.widget-box{display:block;transition:all .4s var(--spring-bounce)}
+.widget-box.hidden{display:none!important}
+/* "+"添加组件按钮 - 列表模式 */
+.widget-add-btn{display:flex;align-items:center;justify-content:center;padding:24px;margin-bottom:12px;border-radius:var(--r);border:2px dashed var(--border);background:var(--card2);cursor:pointer;transition:all .2s;animation:cardIn .4s var(--spring-card) both}
+.widget-add-btn:active{transform:scale(.97)}
+.add-widget-inner{display:flex;flex-direction:column;align-items:center;gap:6px}
+.add-icon-big{font-size:28px;font-weight:300;color:var(--p);line-height:1}
+.add-label{font-size:13px;color:var(--t3)}
+/* "+"添加组件按钮 - 网格模式 */
+.widget-add-btn.grid-mode{aspect-ratio:1/1;padding:0;margin:0}
+
+/* ===== 网格视图：两列小组件 - 全新设计 ===== */
+#statsWidgets.grid-view{display:grid;grid-template-columns:1fr 1fr;gap:12px;
+  transition:opacity .28s var(--spring-entrance),transform .28s var(--spring-entrance)}
+
+/* 小组件容器：毛玻璃 + 圆角 + 固定正方形 */
+#statsWidgets.grid-view .widget-box{
+  background:rgba(255,255,255,.62);
+  backdrop-filter:blur(18px) saturate(170%);-webkit-backdrop-filter:blur(18px) saturate(170%);
+  border-radius:20px;padding:0;display:flex;flex-direction:column;overflow:hidden;
+  aspect-ratio:1/1;min-height:0;
+  border:1px solid rgba(255,255,255,.55);
+  box-shadow:0 6px 24px rgba(0,0,0,.07),inset 0 1px 0 rgba(255,255,255,.6);
+  animation:widgetPop .42s var(--spring-bounce) both;
+  transition:transform .25s var(--spring-bounce),box-shadow .25s;
+}
+#statsWidgets.grid-view .widget-box:active{transform:scale(.97);box-shadow:0 2px 10px rgba(0,0,0,.08)}
+body.dk #statsWidgets.grid-view .widget-box{
+  background:rgba(40,40,48,.62);border-color:rgba(255,255,255,.12);
+  box-shadow:0 6px 24px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.08);
+}
+@keyframes widgetPop{0%{opacity:0;transform:scale(.82)}60%{opacity:1;transform:scale(1.02)}100%{opacity:1;transform:scale(1)}}
+
+/* 标题栏：不换行，固定高度 */
+#statsWidgets.grid-view .widget-box .section-title{
+  margin:0;padding:11px 14px 8px;font-size:14px;font-weight:700;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  display:flex;align-items:center;gap:5px;flex-shrink:0;
+  border-bottom:1px solid rgba(0,0,0,.05);
+}
+#statsWidgets.grid-view .widget-box .section-title span:first-child{font-size:15px}
+
+/* 内容区：可滚动 */
+#statsWidgets.grid-view .widget-box .card{
+  box-shadow:none;padding:9px 13px;margin:0;flex:1;min-height:0;
+  overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;
+  background:transparent;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+}
+#statsWidgets.grid-view .widget-box .card::-webkit-scrollbar{width:3px}
+#statsWidgets.grid-view .widget-box .card::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Chart 容器 */
+#statsWidgets.grid-view .widget-box .chart-wrap{
+  flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:4px
+}
+#statsWidgets.grid-view .widget-box canvas{max-width:100%;max-height:100%;object-fit:contain}
+
+/* mini-head */
+#statsWidgets.grid-view .widget-box .mini-head{font-size:12px;margin-bottom:5px;font-weight:600;flex-shrink:0}
+
+/* 诗歌 */
+#statsWidgets.grid-view .widget-box .poem-body{font-size:13px;line-height:1.85;flex:1;overflow-y:auto;padding:4px 0;letter-spacing:.5px}
+#statsWidgets.grid-view .widget-box .poem-foot{margin-top:6px;flex-shrink:0}
+
+/* 日历 */
+#statsWidgets.grid-view .widget-box .calendar-grid{gap:2px}
+#statsWidgets.grid-view .widget-box .cal-cell{min-height:0;padding:2px;font-size:10px}
+#statsWidgets.grid-view .widget-box .calendar-header{font-size:11px}
+#statsWidgets.grid-view .widget-box .cal-nav button{font-size:11px;padding:3px 7px}
+
+/* 饼图图例 */
+#statsWidgets.grid-view .widget-box .pie-legend{font-size:11px;line-height:1.5}
+
+/* 排行/月度对比 */
+#statsWidgets.grid-view .widget-box #ranking{font-size:11px;overflow-y:auto;flex:1}
+#statsWidgets.grid-view .widget-box #monthCompare{font-size:11px}
+
+/* 智能洞察：可滚动列表，填满方框 */
+#statsWidgets.grid-view .widget-box[data-widget="insights"]{
+  display:flex;flex-direction:column;
+}
+#statsWidgets.grid-view .widget-box #insights{overflow-y:auto;flex:1;min-height:0;padding:8px 12px}
+#statsWidgets.grid-view .widget-box .insight-card{font-size:12px;padding:9px 11px;margin-bottom:7px}
+/* 智能洞察底部"测人格"按钮固定，不被压缩 */
+#statsWidgets.grid-view .widget-box[data-widget="insights"] > div:last-child{flex-shrink:0;padding:6px 12px 10px}
+/* 心跳/星图/万花筒/声纹：.card 内的 mini-head 固定，chart-wrap 填满 */
+#statsWidgets.grid-view .widget-box .card .mini-head{flex-shrink:0}
+#statsWidgets.grid-view .widget-box .card .star-wrap,
+#statsWidgets.grid-view .widget-box .card .kaleido-wrap,
+#statsWidgets.grid-view .widget-box .card .wave-wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+#statsWidgets.grid-view .widget-box .card canvas{max-width:100%;max-height:100%}
+/* 支出分类：饼图 + 图例填满 */
+#statsWidgets.grid-view .widget-box[data-widget="pie"] .card{display:flex;flex-direction:column;align-items:stretch}
+#statsWidgets.grid-view .widget-box[data-widget="pie"] .chart-wrap{flex:1;min-height:0;padding:4px}
+#statsWidgets.grid-view .widget-box[data-widget="pie"] .pie-legend{flex-shrink:0;max-height:40%;overflow-y:auto}
+/* 消费日历：填满 */
+#statsWidgets.grid-view .widget-box[data-widget="calendar"] .card{display:flex;flex-direction:column}
+#statsWidgets.grid-view .widget-box[data-widget="calendar"] .calendar-grid{flex:1;min-height:0}
+#statsWidgets.grid-view .widget-box[data-widget="calendar"] .calendar-header{flex-shrink:0}
+#statsWidgets.grid-view .widget-box[data-widget="calendar"] .calendar-weeks{flex-shrink:0}
+/* 趋势图：填满 */
+#statsWidgets.grid-view .widget-box[data-widget="trend"] .card{display:flex;flex-direction:column}
+#statsWidgets.grid-view .widget-box[data-widget="trend"] .chart-wrap{flex:1;min-height:0}
+#statsWidgets.grid-view .widget-box[data-widget="trend"] #trendSummary{flex-shrink:0}
+
+/* 添加按钮在网格中 */
+#statsWidgets.grid-view .widget-add-btn{aspect-ratio:1/1;padding:0;margin:0}
+/* 组件管理弹窗 */
+.widget-mgr-list{display:flex;flex-direction:column;gap:8px}
+.widget-mgr-item{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--card2);border-radius:10px}
+.widget-mgr-item .wm-name{font-size:14px;font-weight:600}
+.widget-mgr-item .wm-desc{font-size:11px;color:var(--t3);margin-top:2px}
+.wm-switch{width:44px;height:24px;border-radius:12px;background:var(--border);position:relative;cursor:pointer;transition:background .25s;flex-shrink:0}
+.wm-switch.on{background:var(--g1)}
+.wm-switch::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .25s var(--spring-bounce)}
+.wm-switch.on::after{transform:translateX(20px)}
+
+.insight-card{padding:12px 14px;border-radius:10px;margin-bottom:8px;font-size:13px;display:flex;align-items:flex-start;gap:10px;background:var(--card);border-left:3px solid var(--p);box-shadow:var(--shadow);animation:staggerFadeUp .4s var(--spring-entrance) both}
 .insight-card .insight-icon{font-size:18px;flex-shrink:0;margin-top:1px}
 .insight-card .insight-text{color:var(--text);line-height:1.5}
 .insight-card.warn{border-left-color:var(--orange)}
@@ -207,7 +411,7 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 .ranking-item .rank-name{flex:1;font-weight:500}
 .ranking-item .rank-amount{font-weight:600;margin-right:8px}
 .ranking-item .rank-bar-wrap{flex:2;height:6px;background:var(--card2);border-radius:3px;overflow:hidden}
-.ranking-item .rank-bar{height:100%;border-radius:3px;transition:width .5s ease}
+.ranking-item .rank-bar{height:100%;border-radius:3px;transition:width var(--t-slow) var(--spring-entrance);animation:barGrow var(--t-slow) var(--spring-entrance) both}
 
 .tips-box{background:var(--card2);border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .2s;margin-top:8px}
 .tips-box:active{background:var(--border)}
@@ -245,7 +449,7 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 .goal-item .goal-name{font-weight:600;font-size:14px;flex:1}
 .goal-item .goal-amount{font-size:12px;color:var(--t2)}
 .goal-item .goal-bar-wrap{height:8px;background:var(--bg);border-radius:4px;overflow:hidden;margin-bottom:6px}
-.goal-item .goal-bar{height:100%;border-radius:4px;transition:width .5s ease}
+.goal-item .goal-bar{height:100%;border-radius:4px;transition:width var(--t-slow) var(--spring-entrance);animation:barGrow var(--t-slow) var(--spring-entrance) both}
 .goal-item .goal-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--t3)}
 .goal-item .goal-actions{display:flex;gap:6px;margin-top:8px}
 .goal-item .goal-actions button{padding:4px 10px;border-radius:12px;font-size:12px;background:var(--bg);color:var(--text);border:1px solid var(--border);transition:all .2s}
@@ -282,6 +486,18 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 .author-card .author-name{font-size:15px;font-weight:600;color:var(--text)}
 .author-card .author-bio{font-size:12px;color:var(--t3);margin-top:2px}
 .author-card .author-ver{font-size:11px;color:var(--t3);margin-top:2px}
+/* profile 页紧凑化：缩短整体长度，减少间距与字号 */
+#page-profile .card{padding:12px;margin-bottom:10px}
+#page-profile .profile-card{padding:12px;gap:10px}
+#page-profile .ai-entry{padding:12px;margin-bottom:10px;gap:10px}
+#page-profile .ai-title{font-size:14px}
+#page-profile .ai-sub{font-size:11px}
+#page-profile .achievements{gap:6px}
+#page-profile .menu-item{padding:11px 14px;font-size:14px}
+#page-profile .menu-icon{font-size:16px}
+#page-profile .author-card{padding:14px;margin-top:6px}
+#page-profile .author-card .author-bio{font-size:12px;line-height:1.6;margin:6px 0}
+#page-profile .section-title{margin:10px 0 6px;font-size:13px}
 .capsule-list{display:flex;flex-direction:column;gap:10px}
 .capsule-item{background:var(--card2);border-radius:12px;padding:14px;position:relative;overflow:hidden}
 .capsule-item.locked{opacity:.7}
@@ -304,14 +520,20 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 @keyframes toastOut{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-12px) scale(.9)}}
 
 /* ===== Modal ===== */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9990;display:none;align-items:center;justify-content:center;animation:fadeIn .2s ease}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9990;display:none;align-items:center;justify-content:center;animation:fadeIn .2s ease;padding:28px}
 .modal-overlay.show{display:flex}
-.modal-overlay.sheet{align-items:flex-end}
-.modal-overlay.sheet .modal{width:100%;max-width:480px;border-radius:16px 16px 0 0;max-height:80vh;overflow-y:auto;animation:slideUp .3s ease}
-.modal{background:var(--card);border-radius:var(--r);padding:20px;width:calc(100% - 40px);max-width:400px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);animation:scaleIn .25s ease}
-.modal h3{font-size:17px;font-weight:700;margin-bottom:16px;text-align:center}
-.modal .modal-close{position:absolute;top:12px;right:16px;font-size:20px;color:var(--t3);cursor:pointer;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--card2)}
-.modal .modal-close:active{background:var(--border)}
+.modal-overlay.sheet{align-items:flex-end;padding:0}
+.modal{background:var(--card);border-radius:22px;padding:0;width:min(330px,86vw);max-height:70vh;display:flex;flex-direction:column;min-height:0;box-shadow:0 24px 64px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.06);animation:scaleIn var(--t-normal) var(--spring-overshoot);overflow:hidden}
+.modal-overlay.sheet .modal{width:100%;max-width:480px;border-radius:18px 18px 0 0;max-height:85vh;animation:slideUp var(--t-normal) var(--spring-modal)}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 8px;flex-shrink:0}
+.modal-title{font-size:16px;font-weight:700;flex:1;text-align:center;color:var(--t2)}
+.modal-close{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:var(--card2);color:var(--t2);font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;transition:background .15s,transform .15s}
+.modal-close:active{background:var(--border);transform:scale(.9)}
+.modal-body{padding:6px 18px 18px;overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;animation:fadeIn .3s ease}
+.modal-body h3{font-size:17px;font-weight:700;margin:8px 0 16px;text-align:center}
+.modal-body::-webkit-scrollbar{width:4px}
+.modal-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.modal-body::-webkit-scrollbar-track{background:transparent}
 .modal-overlay.closing{animation:fadeOut .25s var(--spring-smooth) forwards}
 .modal-overlay.closing.sheet .modal{animation:slideDown .25s var(--spring-smooth) forwards}
 @keyframes fadeOut{from{opacity:1}to{opacity:0}}
@@ -320,6 +542,23 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 @keyframes scaleIn{from{opacity:0;transform:scale(.82)}60%{transform:scale(1.04)}to{opacity:1;transform:scale(1)}}
 .celebrate-particle{position:fixed;pointer-events:none;z-index:99999;font-size:20px;animation:particleUp 1s ease-out forwards}
 @keyframes particleUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-80px) scale(.3) rotate(20deg)}}
+/* 碎银飞溅：记账成功的金币爆裂 */
+.coin-ring{position:fixed;pointer-events:none;z-index:99998;border:2.5px solid #ffd700;border-radius:50%;box-shadow:0 0 16px rgba(255,215,0,.5);animation:coinRing .65s ease-out forwards}
+@keyframes coinRing{0%{opacity:.85;transform:scale(.2)}100%{opacity:0;transform:scale(3.6)}}
+.celebrate-particle.burst{animation:coinBurst 1s var(--spring-soft) forwards}
+@keyframes coinBurst{
+  0%{opacity:1;transform:translate(0,0) scale(.3) rotate(0)}
+  45%{opacity:1;transform:translate(var(--bx),var(--by)) scale(1.25) rotate(200deg)}
+  100%{opacity:0;transform:translate(var(--bx2),var(--by2)) scale(.5) rotate(420deg)}
+}
+
+/* ===== Extended Animation Keyframes ===== */
+@keyframes staggerFadeUp{from{opacity:0;transform:translateY(24px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes numberScrollIn{from{opacity:0;transform:translateY(8px);filter:blur(4px)}to{opacity:1;transform:translateY(0);filter:blur(0)}}
+@keyframes chartGrowIn{from{opacity:0;transform:scale(.7)}60%{transform:scale(1.05)}to{opacity:1;transform:scale(1)}}
+@keyframes barGrow{from{width:0;opacity:0}to{opacity:1}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.08);opacity:.85}}
 
 /* AI Report */
 .score-ring{display:flex;justify-content:center;margin:16px 0}
@@ -364,16 +603,58 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
   .cat-item .cat-emoji{font-size:20px}
   .amount-input-wrap input{font-size:34px;width:160px}
 }
+
+/* ===== 碎银创想：数据·诗·心跳·星辰 ===== */
+.poem-card{position:relative;overflow:hidden;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%);color:#f0e6d2;border:none}
+.poem-card::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 85% 15%,rgba(255,215,0,.14),transparent 45%),radial-gradient(circle at 10% 90%,rgba(99,102,241,.18),transparent 50%);pointer-events:none}
+.poem-head{display:flex;align-items:center;gap:8px;position:relative}
+.poem-badge{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#ffd700,#daa520);color:#1a1a2e;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:"Songti SC",serif;box-shadow:0 0 12px rgba(255,215,0,.4)}
+.poem-title{font-size:14px;font-weight:600;color:#ffd700;letter-spacing:1.5px}
+.poem-body{font-family:"STKaiti","KaiTi","Songti SC","PingFang SC",serif;font-size:17px;line-height:2.1;color:#f5f0e0;margin:14px 0 6px;text-align:center;position:relative;letter-spacing:2px;text-shadow:0 0 14px rgba(255,215,0,.18)}
+.poem-body .poem-line{display:block;animation:poemLineIn .6s var(--spring-entrance) both}
+.poem-body .poem-line:nth-child(2){animation-delay:.12s}
+.poem-body .poem-line:nth-child(3){animation-delay:.24s}
+.poem-body .poem-line:nth-child(4){animation-delay:.36s}
+@keyframes poemLineIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.poem-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;position:relative}
+.poem-meta{font-size:10px;color:rgba(245,240,224,.5);letter-spacing:.3px}
+.poem-refresh{font-size:12px;color:#ffd700;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.3);padding:4px 12px;border-radius:12px;transition:all .2s}
+.poem-refresh:active{transform:scale(.92);background:rgba(255,215,0,.2)}
+.mini-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:14px;font-weight:600}
+.mini-sub{font-size:11px;color:var(--t3);font-weight:400}
+.heartbeat-legend{display:flex;align-items:center;gap:14px;justify-content:center;margin-top:8px;font-size:11px;color:var(--t2)}
+.hb-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle}
+.hb-up{background:#ff453a;box-shadow:0 0 6px rgba(255,69,58,.5)}.hb-calm{background:#34c759}
+.star-card{background:linear-gradient(160deg,#0b1026 0%,#1a1a3e 70%,#0d1b2a 100%);border:none;color:#cdd6f0;overflow:hidden}
+.star-wrap{display:flex;justify-content:center}
+.star-meta{text-align:center;font-size:11px;color:rgba(205,214,240,.6);margin-top:8px;letter-spacing:.5px}
+/* 碎银时钟：记账页顶部小彩蛋 */
+.coin-clock{display:flex;align-items:center;gap:12px;padding:12px 14px;background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.08));border-radius:14px;margin-bottom:12px;border:1px solid rgba(99,102,241,.15);position:relative;overflow:hidden}
+.coin-clock::before{content:'';position:absolute;right:-30px;top:-30px;width:100px;height:100px;background:radial-gradient(circle,rgba(255,215,0,.1),transparent 70%);pointer-events:none}
+.coin-clock-face{position:relative;width:50px;height:50px;border-radius:50%;background:var(--card);box-shadow:inset 0 0 0 2px var(--p),0 2px 10px rgba(99,102,241,.2);flex-shrink:0}
+.coin-clock-hand{position:absolute;left:50%;bottom:50%;width:2px;border-radius:1px;transform-origin:bottom center;background:var(--p)}
+.coin-clock-hand.hour{height:14px;margin-left:-1px;transition:transform .5s var(--spring-smooth)}
+.coin-clock-hand.minute{height:19px;margin-left:-1px;background:var(--p2);transition:transform .5s var(--spring-smooth)}
+.coin-clock-hand.second{height:21px;margin-left:-0.5px;width:1px;background:var(--red);transition:transform .2s linear}
+.coin-clock-center{position:absolute;left:50%;top:50%;width:5px;height:5px;background:var(--p);border-radius:50%;transform:translate(-50%,-50%);z-index:2}
+.coin-clock-info{flex:1;min-width:0;position:relative;z-index:1}
+.coin-clock-time{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2;letter-spacing:.5px}
+.coin-clock-date{font-size:11px;color:var(--t2);margin-top:2px;font-variant-numeric:tabular-nums}
+.coin-clock-sub{font-size:10px;color:var(--t3);margin-top:1px}
+.coin-clock-coin{position:absolute;right:-2px;top:-2px;font-size:12px;animation:coinFloat 2s ease-in-out infinite}
+@keyframes coinFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+.coin-clock-poem{position:absolute;right:12px;top:50%;transform:translateY(-50%);max-width:38%;text-align:right;font-size:11px;line-height:1.6;color:var(--p2);font-family:"STKaiti","KaiTi",serif;opacity:.85;pointer-events:none;letter-spacing:1px}
+/* 碎银万花筒 & 声纹 */
+.kaleido-card{background:linear-gradient(160deg,#1a0a2e 0%,#16213e 100%);border:none;color:#fff;overflow:hidden}
+.wave-card{background:linear-gradient(135deg,#001f3f 0%,#003366 100%);border:none;color:#e0e7ff}
+.kaleido-wrap,.wave-wrap{display:flex;justify-content:center}
 </style>
 </head>
 <body>
 <div id="app">
   <!-- Top Bar -->
   <div class="top-bar">
-    <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px">
-      <div class="title" id="pageTitle">碎银记</div>
-      <div class="date-time" id="dateTime"></div>
-    </div>
+    <div class="title" id="pageTitle">碎银记</div>
     <div class="actions">
       <button class="btn-icon dk-mode" onclick="App.toggleDark()" title="深色模式">🌙</button>
     </div>
@@ -383,9 +664,37 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
   <div class="pages" id="pages">
     <!-- Page 1: Record -->
     <div class="page active" id="page-record">
+      <!-- 今日收支摘要 -->
+      <div class="today-summary">
+        <div class="ts-item">
+          <span class="ts-label">今日支出</span>
+          <span class="ts-value ts-expense" id="todayExpense">¥0.00</span>
+        </div>
+        <div class="ts-divider"></div>
+        <div class="ts-item">
+          <span class="ts-label">今日收入</span>
+          <span class="ts-value ts-income" id="todayIncome">¥0.00</span>
+        </div>
+      </div>
       <div class="type-toggle">
         <button class="expense active" onclick="App.setType('expense')">支出</button>
         <button class="income" onclick="App.setType('income')">收入</button>
+      </div>
+      <!-- 碎银时钟：实时时钟 + 日期 + 诗句 + NTP校准 -->
+      <div class="coin-clock">
+        <div class="coin-clock-face">
+          <div class="coin-clock-hand hour" id="ccHour"></div>
+          <div class="coin-clock-hand minute" id="ccMinute"></div>
+          <div class="coin-clock-hand second" id="ccSecond"></div>
+          <div class="coin-clock-center"></div>
+          <span class="coin-clock-coin">🪙</span>
+        </div>
+        <div class="coin-clock-info">
+          <div class="coin-clock-time" id="ccTime">--:--:--</div>
+          <div class="coin-clock-date" id="ccDate"></div>
+          <div class="coin-clock-sub" id="ccSub">碎银流动中…</div>
+        </div>
+        <div class="coin-clock-poem" id="ccPoem"></div>
       </div>
       <div class="budget-reminder" id="budgetReminder" style="display:none"></div>
       <div class="amount-input-wrap">
@@ -397,6 +706,8 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
       <div class="row">
         <label>日期</label>
         <input type="date" id="inputDate" max="">
+        <label style="min-width:32px;margin-left:4px">时间</label>
+        <input type="time" id="inputTime" style="max-width:100px" value="">
       </div>
       <div class="backfill-bar" id="recordBackfillBar" style="display:none">
         <span class="backfill-label" id="recordBackfillLabel"></span>
@@ -432,33 +743,109 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 
     <!-- Page 3: Stats -->
     <div class="page" id="page-stats">
-      <div class="section-title">智能洞察</div>
-      <div id="insights"></div>
-      <div style="text-align:center;margin-bottom:8px">
-        <button style="font-size:13px;color:var(--p);background:none;border:none;cursor:pointer;padding:6px 14px;border-radius:20px;border:1px solid var(--p);transition:all .2s" onclick="App.showPersonality()" onmousedown="this.style.transform='scale(.95)'" onmouseup="this.style.transform=''" onmouseleave="this.style.transform=''">🎭 测测你的消费人格</button>
+      <!-- 组件工具栏：视图切换 + 管理组件 -->
+      <div class="widget-toolbar">
+        <div class="widget-view-toggle">
+          <button class="wvt-btn active" data-view="list" onclick="App.setStatsView('list')">☰ 列表</button>
+          <button class="wvt-btn" data-view="grid" onclick="App.setStatsView('grid')">▦ 组件</button>
+        </div>
+        <button class="widget-manage-btn" onclick="App.showWidgetManager()">⚙ 管理组件</button>
       </div>
-      <div class="section-title">月度对比</div>
-      <div class="card" id="monthCompare"></div>
-      <div class="section-title">支出分类</div>
-      <div class="card"><div class="chart-wrap"><canvas id="pieChart" width="200" height="200"></canvas></div><div id="pieLegend" class="pie-legend"></div></div>
-      <div class="section-title">消费日历</div>
-      <div class="card">
-        <div class="calendar-header">
-          <span class="cal-title" id="calTitle"></span>
-          <div class="cal-nav">
-            <button onclick="App.calMonth--;App.renderCalendar()">◀</button>
-            <button onclick="App.calMonth=new Date().getMonth();App.calYear=new Date().getFullYear();App.renderCalendar()">今</button>
-            <button onclick="App.calMonth++;App.renderCalendar()">▶</button>
+      <div id="statsWidgets">
+        <!-- 智能洞察 -->
+        <div class="widget-box" data-widget="insights">
+          <div class="section-title">智能洞察</div>
+          <div id="insights"></div>
+          <div style="text-align:center;margin-bottom:8px">
+            <button style="font-size:13px;color:var(--p);background:none;border:none;cursor:pointer;padding:6px 14px;border-radius:20px;border:1px solid var(--p);transition:all .2s" onclick="App.showPersonality()" onmousedown="this.style.transform='scale(.95)'" onmouseup="this.style.transform=''" onmouseleave="this.style.transform=''">🎭 测测你的消费人格</button>
           </div>
         </div>
-        <div class="calendar-weeks"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
-        <div class="calendar-grid" id="calendarGrid"></div>
-        <div style="text-align:center;font-size:11px;color:var(--t3);margin-top:10px;padding-bottom:4px">📅 点击日期查看详情或补记</div>
+        <!-- 碎银诗歌 -->
+        <div class="widget-box" data-widget="poem">
+          <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+            <span>✨ 碎银创想</span>
+            <span style="font-size:11px;color:var(--t3);font-weight:400">数据·诗·心跳·星辰</span>
+          </div>
+          <div class="card poem-card">
+            <div class="poem-head">
+              <span class="poem-badge">诗</span>
+              <span class="poem-title" id="poemTitle">碎银吟</span>
+            </div>
+            <div class="poem-body" id="poemBody"></div>
+            <div class="poem-foot">
+              <span class="poem-meta" id="poemMeta"></span>
+              <button class="poem-refresh" onclick="App.renderPoem()">换一首 ↻</button>
+            </div>
+          </div>
+        </div>
+        <!-- 财务心跳 -->
+        <div class="widget-box" data-widget="heartbeat">
+          <div class="card">
+            <div class="mini-head"><span>💓 财务心跳</span><span class="mini-sub" id="heartbeatSub">最近14天</span></div>
+            <div class="chart-wrap"><canvas id="heartbeatCanvas" width="340" height="120"></canvas></div>
+            <div class="heartbeat-legend"><span><span class="hb-dot hb-up"></span>支出跳动</span><span><span class="hb-dot hb-calm"></span>平静结余</span></div>
+          </div>
+        </div>
+        <!-- 消费星图 -->
+        <div class="widget-box" data-widget="starmap">
+          <div class="card star-card">
+            <div class="mini-head" style="color:#cdd6f0"><span>🌌 消费星图</span><span class="mini-sub" style="color:rgba(205,214,240,.5)">你的专属财务星座</span></div>
+            <div class="star-wrap"><canvas id="starCanvas" width="340" height="220"></canvas></div>
+            <div class="star-meta" id="starMeta"></div>
+          </div>
+        </div>
+        <!-- 碎银万花筒 -->
+        <div class="widget-box" data-widget="kaleido">
+          <div class="card kaleido-card">
+            <div class="mini-head" style="color:#fff"><span>🌀 碎银万花筒</span><span class="mini-sub" style="color:rgba(255,255,255,.5)">每一笔都是一瓣花</span></div>
+            <div class="kaleido-wrap"><canvas id="kaleidoCanvas" width="340" height="220"></canvas></div>
+          </div>
+        </div>
+        <!-- 消费声纹 -->
+        <div class="widget-box" data-widget="waveform">
+          <div class="card wave-card">
+            <div class="mini-head" style="color:#e0e7ff"><span>🎵 消费声纹</span><span class="mini-sub" style="color:rgba(224,231,255,.5)">7日心跳波形</span></div>
+            <div class="wave-wrap"><canvas id="waveCanvas" width="340" height="120"></canvas></div>
+          </div>
+        </div>
+        <!-- 月度对比 -->
+        <div class="widget-box" data-widget="monthcompare">
+          <div class="section-title">月度对比</div>
+          <div class="card" id="monthCompare"></div>
+        </div>
+        <!-- 支出分类 -->
+        <div class="widget-box" data-widget="pie">
+          <div class="section-title">支出分类</div>
+          <div class="card"><div class="chart-wrap"><canvas id="pieChart" width="200" height="200"></canvas></div><div id="pieLegend" class="pie-legend"></div></div>
+        </div>
+        <!-- 消费日历 -->
+        <div class="widget-box" data-widget="calendar">
+          <div class="section-title">消费日历</div>
+          <div class="card">
+            <div class="calendar-header">
+              <span class="cal-title" id="calTitle"></span>
+              <div class="cal-nav">
+                <button onclick="App.calMonth--;App.renderCalendar()">◀</button>
+                <button onclick="App.calMonth=new Date().getMonth();App.calYear=new Date().getFullYear();App.renderCalendar()">今</button>
+                <button onclick="App.calMonth++;App.renderCalendar()">▶</button>
+              </div>
+            </div>
+            <div class="calendar-weeks"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+            <div style="text-align:center;font-size:11px;color:var(--t3);margin-top:10px;padding-bottom:4px">📅 点击日期查看详情或补记</div>
+          </div>
+        </div>
+        <!-- 趋势 -->
+        <div class="widget-box" data-widget="trend">
+          <div class="section-title">趋势</div>
+          <div class="card"><div class="chart-wrap"><canvas id="trendChart" width="340" height="200"></canvas></div><div id="trendSummary" style="font-size:12px;color:var(--t2);text-align:center;margin-top:8px"></div></div>
+        </div>
+        <!-- 支出排行 -->
+        <div class="widget-box" data-widget="ranking">
+          <div class="section-title">支出排行</div>
+          <div class="card" id="ranking"></div>
+        </div>
       </div>
-      <div class="section-title">趋势</div>
-      <div class="card"><div class="chart-wrap"><canvas id="trendChart" width="340" height="200"></canvas></div><div id="trendSummary" style="font-size:12px;color:var(--t2);text-align:center;margin-top:8px"></div></div>
-      <div class="section-title">支出排行</div>
-      <div class="card" id="ranking"></div>
       <div class="tips-box" id="tipsBox" onclick="App.nextTip()">
         <span class="tips-icon">💡</span>
         <span class="tips-text" id="tipsText"></span>
@@ -498,6 +885,9 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
       <div class="menu-item" onclick="App.showCapsule()">
         <span class="menu-icon">📮</span><span class="menu-text">时间胶囊</span><span class="menu-arrow">›</span>
       </div>
+      <div class="menu-item" onclick="App.drawFortune()">
+        <span class="menu-icon">🎋</span><span class="menu-text">今日碎银签</span><span class="menu-right" id="fortuneLabel" style="font-size:12px;color:var(--t3)"></span><span class="menu-arrow">›</span>
+      </div>
       <div class="menu-item" onclick="App.showShareAndExport()">
         <span class="menu-icon">📤</span><span class="menu-text">分享、报表与导出</span><span class="menu-arrow">›</span>
       </div>
@@ -509,8 +899,8 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
       </div>
       <div class="author-card">
         <div class="author-name">🎓 我不要芒果</div>
-        <div class="author-bio" style="line-height:1.8;font-size:13px;color:var(--t2);margin:8px 0">刚刚走完高考的独木桥，<br>在漫长的暑假里，用代码打磨了这个小工具。<br>没有KPI，没有投资人，<br>只有一颗想让你用得顺手的心。<br>如果它帮你省下了一杯奶茶钱，<br>不妨请我喝一杯 ☕</div>
-        <div class="author-ver">碎银记 v1.4 · 持续更新中</div>
+        <div class="author-bio" style="line-height:1.7;color:var(--t2)">计算机专业大一在读，课余用代码打磨的小工具。<br>没有 KPI 与投资人，只想让你用得顺手。<br>若帮你省下一杯奶茶钱，不妨请我喝一杯 ☕</div>
+        <div class="author-ver">碎银记 v2.0 · 持续更新中</div>
         <div class="donate-entry" onclick="App.showDonateModal()">🧋 请作者喝杯奶茶</div>
       </div>
     </div>
@@ -518,6 +908,7 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 
   <!-- Bottom Nav -->
   <div class="bottom-nav">
+    <div class="nav-indicator" id="navIndicator"></div>
     <button class="nav-item active" data-page="record" onclick="App.switchPage('record')">
       <span class="nav-icon">✏️</span><span class="nav-label">记</span>
     </button>
@@ -677,11 +1068,36 @@ const App={
         if(s.darkMode==='follow')this.setDarkMode('follow',null);
       });
     }
-    // Date
+    // ESC 关闭弹窗
+    document.addEventListener('keydown',e=>{
+      if(e.key==='Escape'){
+        const o=document.getElementById('modalOverlay');
+        if(o&&o.classList.contains('show'))this.closeModal();
+      }
+    });
+    // Date & Time
     const today=new Date().toISOString().slice(0,10);
     document.getElementById('inputDate').value=today;
     document.getElementById('inputDate').max=today;
     document.getElementById('inputDate').addEventListener('change',()=>this.checkBackfill());
+    // Time auto-calibration
+    this._syncNTP();  // 启动时校准
+    setInterval(()=>this._syncNTP(),60000);  // 每分钟校准一次
+    const now=new Date(Date.now()+(this._ntpOffset||0));
+    const hh=String(now.getHours()).padStart(2,'0');
+    const mm=String(now.getMinutes()).padStart(2,'0');
+    const timeEl=document.getElementById('inputTime');
+    if(timeEl)timeEl.value=hh+':'+mm;
+    this._timeManual=false;
+    if(timeEl)timeEl.addEventListener('change',()=>{this._timeManual=true});
+    this._timeTimer=setInterval(()=>{
+      if(!this._timeManual&&this.curPage==='record'){
+        const n=new Date(Date.now()+(this._ntpOffset||0));
+        const h=String(n.getHours()).padStart(2,'0');
+        const m=String(n.getMinutes()).padStart(2,'0');
+        if(timeEl)timeEl.value=h+':'+m;
+      }
+    },30000);
     // User
     this.renderUser();
     // Tips
@@ -691,9 +1107,12 @@ const App={
     this.renderMoodSelector();
     this.renderRecordPage();
     this.updateBudgetReminder();
+    this.updateTodaySummary();
     this.renderBills();
     this.renderProfile();
     this.switchPage('record');
+    this.initNavDrag();
+    this.initSwipe();
     this.updateDateTime();
     var self=this;
     self._dtTimer=setInterval(function(){self.updateDateTime()},1000);
@@ -705,79 +1124,256 @@ const App={
 
   // ===== Welcome Announcement =====
   _showWelcome(){
-    const ver='1.4.0';
+    const ver='2.0.0';
     const s=this.getSettings();
     if(s.welcomeVer===ver)return;
     setTimeout(()=>{
       this.showModal(
-        '<div style="text-align:center;margin-bottom:16px">'+
-        '<div style="font-size:56px;margin-bottom:8px;animation:bounce .6s var(--spring-bounce)">✨</div>'+
-        '<h3 style="margin-bottom:4px;font-size:20px">欢迎使用碎银记</h3>'+
-        '<div style="font-size:12px;color:var(--t2);margin-top:2px">记好每一笔碎银，遇见更好的自己</div>'+
+        '<div style="text-align:center;padding:4px 0 14px">'+
+        '<div style="font-size:48px;margin-bottom:6px;animation:bounce .6s var(--spring-bounce)">🪙</div>'+
+        '<div style="font-size:19px;font-weight:700">嗨，欢迎来到碎银记</div>'+
+        '<div style="font-size:12px;color:var(--t2);margin-top:4px">从今天起，和你的钱好好相处 🌱</div>'+
         '</div>'+
-        '<div style="background:var(--card2);border-radius:12px;padding:16px;font-size:13px;line-height:1.9;color:var(--t2)">'+
-        '<div style="margin-bottom:12px">'+
-        '你好呀，我是 <b style="color:var(--p)">我不要芒果</b>，<br>'+
-        '一个刚走完高考的准大学生。<br>'+
-        '暑假闲来无事，便想做一个干净好看的记账工具，<br>'+
-        '不塞广告、不卖数据、不搞花里胡哨的会员——<br>'+
-        '就是安安静静，陪你记好每一笔碎银。<br>'+
-        '希望这个小东西，能让你的生活多一份从容。'+
-        '</div>'+
-        '<div style="background:var(--bg);border-radius:10px;padding:12px;margin:12px 0">'+
-        '<div style="font-weight:700;color:var(--text);margin-bottom:8px;font-size:14px">🛡️ 你的隐私，我来守护</div>'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">'+
-        '<div><span style="color:var(--green);font-weight:700">✓</span> 所有数据仅存本地</div>'+
-        '<div><span style="color:var(--green);font-weight:700">✓</span> 零服务器交互</div>'+
-        '<div><span style="color:var(--green);font-weight:700">✓</span> 不收集任何信息</div>'+
-        '<div><span style="color:var(--green);font-weight:700">✓</span> 无广告无追踪</div>'+
+
+        '<div style="background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.08));border-radius:14px;padding:13px 14px;margin-bottom:12px;border:1px solid rgba(99,102,241,.12)">'+
+        '<div style="font-size:13px;line-height:1.9">'+
+        '我是 <b style="color:var(--p)">我不要芒果</b> 🥭<br>'+
+        '计算机专业大一学生，<br>'+
+        '课余时间敲代码做了这个小工具。<br>'+
+        '没有广告，没有会员，不卖数据——<br>'+
+        '所有碎银只住在你的手机里 🏠<br>'+
+        '愿它陪你把日子过得明明白白 ☕'+
         '</div></div>'+
-        '<div style="background:var(--bg);border-radius:10px;padding:12px;margin:12px 0">'+
-        '<div style="font-weight:700;color:var(--text);margin-bottom:8px;font-size:14px">✨ 这些功能，等你探索</div>'+
-        '<div style="font-size:12px;line-height:2">'+
-        '📊 消费统计 · 趋势一目了然<br>'+
-        '🤖 AI 理财顾问 · 健康评分<br>'+
-        '🎯 存钱目标 · 进度可视化<br>'+
-        '📷 截图识别 · 快速记账<br>'+
-        '🧠 智能文字导入 · 粘贴即记<br>'+
-        '🏆 成就系统 · 坚持就是胜利<br>'+
-        '📅 消费日历 · 热力图回溯'+
+
+        '<div style="background:var(--card2);border-radius:12px;padding:11px 13px;margin-bottom:12px">'+
+        '<div style="font-weight:700;color:var(--green);font-size:13px;margin-bottom:7px">🛡️ 隐私放一百个心</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 8px;font-size:12px;color:var(--t2)">'+
+        '<div>✓ 数据只存本地</div><div>✓ 不上传服务器</div>'+
+        '<div>✓ 不收集信息</div><div>✓ 无广告追踪</div>'+
         '</div></div>'+
-        '</div>'+
-        '<div style="text-align:center;margin-top:12px;font-size:12px;color:var(--t3);line-height:1.6">'+
-        '如果它替你省下了一杯奶茶的钱，<br>'+
-        '不如请我也喝一杯 🧋<br>'+
-        '<span style="color:var(--p)">你的支持，是最好的鼓励</span></div>',
-        'sheet'
+
+        '<div style="background:var(--card2);border-radius:12px;padding:11px 13px;margin-bottom:12px">'+
+        '<div style="font-weight:700;font-size:13px;margin-bottom:7px">✨ 它能帮你做这些</div>'+
+        '<div style="font-size:12px;line-height:2;color:var(--t2)">'+
+        '📊 消费统计 · 钱花哪了一眼看清<br>'+
+        '🤖 AI 理财顾问 · 给财务打分<br>'+
+        '🎯 存钱目标 · 进度慢慢涨<br>'+
+        '📷 截图识别 · 拍一下就记好<br>'+
+        '🧠 文字导入 · 粘贴自动识别<br>'+
+        '🏆 成就系统 · 记账也能拿徽章<br>'+
+        '📅 消费日历 · 每日热力图'+
+        '</div></div>'+
+
+        '<div style="background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(139,92,246,.1));border-radius:12px;padding:11px 13px;margin-bottom:12px;border:1px solid rgba(99,102,241,.15)">'+
+        '<div style="font-weight:700;color:var(--p);font-size:13px;margin-bottom:7px">🆕 v2.0 新鲜出炉</div>'+
+        '<div style="font-size:12px;line-height:2;color:var(--t2)">'+
+        '🪙 碎银时钟 · 时间日期加诗句<br>'+
+        '🌐 NTP 校时 · 记账分秒不差<br>'+
+        '🎋 碎银签 · 每日一签问财运<br>'+
+        '⚡ 深浅色秒切 · 告别卡顿'+
+        '</div></div>'+
+
+        '<div style="text-align:center;font-size:11px;color:var(--t3);line-height:1.7;padding:2px 0 6px">'+
+        '省下一杯奶茶钱的话 🧋<br>'+
+        '也请我喝一杯呀～<br>'+
+        '<span style="color:var(--p)">你的支持，是我的动力 ✨</span>'+
+        '</div>'
       );
       s.welcomeVer=ver;
       this.saveSettings(s);
     },600);
   },
 
-  // ===== Page Switching =====
+  // ===== Page Switching：水平 transform 偏移，页面永不卸载 =====
+  PAGE_ORDER:['record','bills','stats','profile'],
   switchPage(page){
+    if(this.curPage!==page)this.haptic('tab');
+    // 离开统计页时停止碎银创想动画，避免后台空转
+    if(this.curPage!=='stats'&&page!=='stats'){
+      if(this._starRAF){cancelAnimationFrame(this._starRAF);this._starRAF=null;}
+      if(this._hbRAF){cancelAnimationFrame(this._hbRAF);this._hbRAF=null;}
+      if(this._kaleidoRAF){cancelAnimationFrame(this._kaleidoRAF);this._kaleidoRAF=null;}
+      if(this._waveRAF){cancelAnimationFrame(this._waveRAF);this._waveRAF=null;}
+    }
     this.curPage=page;
-    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-    document.getElementById('page-'+page).classList.add('active');
+    // 水平偏移切换页面（4 页，每页 25%）
+    const idx=this.PAGE_ORDER.indexOf(page);
+    const pagesEl=document.getElementById('pages');
+    if(pagesEl){
+      pagesEl.style.transition='transform .32s var(--spring-entrance)';
+      pagesEl.style.transform='translateX(-'+(idx*25)+'%)';
+    }
+    // 更新 dock 激活态
     document.querySelectorAll('.bottom-nav .nav-item').forEach(n=>n.classList.remove('active'));
-    document.querySelector('.nav-item[data-page="'+page+'"]').classList.add('active');
+    const activeItem=document.querySelector('.nav-item[data-page="'+page+'"]');
+    if(activeItem)activeItem.classList.add('active');
+    this.positionNavIndicator(page);
     const titles={record:'碎银记',bills:'账单',stats:'统计',profile:'我的'};
     document.getElementById('pageTitle').textContent=titles[page];
     this.updateDateTime();
+    // 渲染对应页面内容（页面不卸载，scrollTop 天然保留）
     if(page==='record')this.renderRecordPage();
     if(page==='bills')this.renderBills();
     if(page==='stats')this.renderStats();
     if(page==='profile')this.renderProfile();
-    // Scroll to top
-    document.getElementById('pages').scrollTop=0;
+  },
+  // 启动左右滑动切换：手指水平 swipe 实时移动页面 + 紫色指示器跟随
+  initSwipe(){
+    const pagesEl=document.getElementById('pages');
+    if(!pagesEl||pagesEl._swBound)return;
+    pagesEl._swBound=true;
+    const ORDER=this.PAGE_ORDER;
+    let startX=0,startY=0,curX=0,curY=0,dragging=false,vertical=false;
+    let startIndLeft=0,tabWidth=0,startOffset=0;
+    const ind=()=>document.getElementById('navIndicator');
+    const nav=()=>document.querySelector('.bottom-nav');
+
+    pagesEl.addEventListener('touchstart',e=>{
+      if(e.touches.length!==1)return;
+      const t=e.touches[0];
+      startX=t.clientX;startY=t.clientY;curX=startX;curY=startY;
+      dragging=false;vertical=false;
+      const i=ind();if(i){startIndLeft=parseFloat(i.style.left)||0;}
+      const n=nav();if(n){tabWidth=n.getBoundingClientRect().width/4;}
+      // 记录当前 pages 的 transform 偏移量（百分比转像素）
+      const idx=ORDER.indexOf(this.curPage);
+      startOffset=-idx*25;
+    },{passive:true});
+
+    pagesEl.addEventListener('touchmove',e=>{
+      if(e.touches.length!==1)return;
+      const t=e.touches[0];
+      curX=t.clientX;curY=t.clientY;
+      const dx=curX-startX,dy=curY-startY;
+      if(!dragging&&!vertical){
+        // 判定方向：水平位移明显大于垂直，才认为是横滑
+        if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)*1.3){
+          dragging=true;
+        }else if(Math.abs(dy)>10){
+          vertical=true;
+        }
+      }
+      if(dragging){
+        e.preventDefault();
+        const rect=pagesEl.getBoundingClientRect();
+        // 单页宽度 = pages 总宽 / 4；dx 占单页宽度的比例 × 25% 得到 translateX 偏移
+        const pageWidth=rect.width/4;
+        const offsetPct=(dx/pageWidth)*25;
+        let offset=startOffset+offsetPct;
+        // 边界橡皮筋
+        const idx=ORDER.indexOf(this.curPage);
+        if(idx===0&&offset>0)offset=offset*0.3;
+        if(idx===ORDER.length-1&&offset<-(ORDER.length-1)*25)offset=(-(ORDER.length-1)*25)+(offset+(ORDER.length-1)*25)*0.3;
+        pagesEl.style.transition='none';
+        pagesEl.style.transform='translateX('+offset+'%)';
+        // 紫色指示器跟随
+        const i=ind();if(i){
+          i.style.transition='none';
+          let indOffset=dx/tabWidth*(tabWidth-6);
+          if(idx===0&&indOffset>0)indOffset*=0.3;
+          if(idx===ORDER.length-1&&indOffset<0)indOffset*=0.3;
+          i.style.left=(startIndLeft+indOffset)+'px';
+        }
+      }
+    },{passive:false});
+
+    const onEnd=()=>{
+      if(!dragging)return;
+      dragging=false;
+      const dx=curX-startX;
+      const idx=ORDER.indexOf(this.curPage);
+      const rect=pagesEl.getBoundingClientRect();
+      const pageWidth=rect.width/4;
+      const threshold=Math.max(30,pageWidth*0.18);
+      let target=idx;
+      if(dx<-threshold&&idx<ORDER.length-1)target=idx+1;
+      else if(dx>threshold&&idx>0)target=idx-1;
+      // 吸附到目标页
+      pagesEl.style.transition='';
+      pagesEl.style.transform='translateX(-'+(target*25)+'%)';
+      const i=ind();if(i)i.style.transition='';
+      this.switchPage(ORDER[target]);
+    };
+    pagesEl.addEventListener('touchend',onEnd);
+    pagesEl.addEventListener('touchcancel',onEnd);
+  },
+  // 定位液态玻璃指示器到指定页面
+  positionNavIndicator(page){
+    const ind=document.getElementById('navIndicator');
+    const item=document.querySelector('.nav-item[data-page="'+page+'"]');
+    if(!ind||!item)return;
+    const nav=item.parentElement;
+    const navRect=nav.getBoundingClientRect();
+    const itemRect=item.getBoundingClientRect();
+    ind.style.left=(itemRect.left-navRect.left+3)+'px';
+    ind.style.width=(itemRect.width-6)+'px';
+  },
+  // 液态玻璃指示器拖拽：按住指示器拖动，松手吸附到最近页面
+  initNavDrag(){
+    const nav=document.querySelector('.bottom-nav');
+    const ind=document.getElementById('navIndicator');
+    if(!nav||!ind)return;
+    let dragging=false,moved=false,startX=0,startLeft=0,lastX=0,lastT=0,velX=0;
+    const onDown=e=>{
+      dragging=true;moved=false;
+      startX=e.clientX;
+      startLeft=parseFloat(ind.style.left)||0;
+      lastX=startX;lastT=Date.now();velX=0;
+      ind.classList.add('dragging');
+      ind.style.transform='translateY(-50%) scaleY(.92)';
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    const onMove=e=>{
+      if(!dragging)return;
+      const x=e.clientX;
+      const dx=x-startX;
+      if(Math.abs(dx)>4)moved=true;
+      const now=Date.now();
+      const dt=Math.max(now-lastT,1);
+      velX=(x-lastX)/dt;
+      lastX=x;lastT=now;
+      let newLeft=startLeft+dx;
+      const navRect=nav.getBoundingClientRect();
+      const w=parseFloat(ind.style.width)||60;
+      const minLeft=3,maxLeft=navRect.width-w-3;
+      newLeft=Math.max(minLeft,Math.min(maxLeft,newLeft));
+      ind.style.left=newLeft+'px';
+      // 果冻效果：按速度拉伸
+      const stretch=Math.max(-0.2,Math.min(0.2,velX*0.012));
+      ind.style.transform='translateY(-50%) scaleX('+(1+stretch)+') scaleY('+(1-stretch*0.6)+')';
+      e.preventDefault();
+    };
+    const onUp=()=>{
+      if(!dragging)return;
+      dragging=false;
+      ind.classList.remove('dragging');
+      ind.style.transform='translateY(-50%)';
+      const items=Array.from(nav.querySelectorAll('.nav-item'));
+      const indRect=ind.getBoundingClientRect();
+      const indCenter=indRect.left+indRect.width/2;
+      let nearest=items[0],minDist=Infinity;
+      items.forEach(it=>{
+        const r=it.getBoundingClientRect();
+        const c=r.left+r.width/2;
+        const d=Math.abs(c-indCenter);
+        if(d<minDist){minDist=d;nearest=it;}
+      });
+      const page=nearest.dataset.page;
+      if(page&&page!==this.curPage){
+        this.switchPage(page);
+      }else{
+        this.positionNavIndicator(this.curPage);
+      }
+    };
+    ind.addEventListener('pointerdown',onDown);
+    window.addEventListener('pointermove',onMove,{passive:false});
+    window.addEventListener('pointerup',onUp);
+    window.addEventListener('pointercancel',onUp);
   },
   updateDateTime(){
-    const el=document.getElementById('dateTime');
-    if(!el)return;
-    if(this.curPage!=='record'){el.style.display='none';return}
-    el.style.display='block';
-    const now=new Date();
+    // 使用 NTP 校准后的准确时间
+    const now=new Date(Date.now()+(this._ntpOffset||0));
     const weekdays=['周日','周一','周二','周三','周四','周五','周六'];
     const y=now.getFullYear();
     const m=String(now.getMonth()+1).padStart(2,'0');
@@ -786,7 +1382,65 @@ const App={
     const hh=String(now.getHours()).padStart(2,'0');
     const mm=String(now.getMinutes()).padStart(2,'0');
     const ss=String(now.getSeconds()).padStart(2,'0');
-    el.textContent=y+'年'+m+'月'+d+'日 '+w+' '+hh+':'+mm+':'+ss;
+    // 碎银时钟：指针转动 + 日期 + 今日支出 + 诗句
+    const ccHour=document.getElementById('ccHour');
+    const ccMinute=document.getElementById('ccMinute');
+    const ccSecond=document.getElementById('ccSecond');
+    const ccTime=document.getElementById('ccTime');
+    const ccDate=document.getElementById('ccDate');
+    const ccSub=document.getElementById('ccSub');
+    const ccPoem=document.getElementById('ccPoem');
+    if(ccHour&&ccMinute&&ccSecond){
+      const h=now.getHours()%12;
+      const minuteDeg=now.getMinutes()*6;
+      const hourDeg=h*30+now.getMinutes()*0.5;
+      const secondDeg=now.getSeconds()*6;
+      ccHour.style.transform='rotate('+hourDeg+'deg)';
+      ccMinute.style.transform='rotate('+minuteDeg+'deg)';
+      ccSecond.style.transform='rotate('+secondDeg+'deg)';
+      if(ccTime)ccTime.textContent=hh+':'+mm+':'+ss;
+      if(ccDate)ccDate.textContent=y+'年'+m+'月'+d+'日 '+w;
+      if(ccSub){
+        const today=now.toISOString().slice(0,10);
+        const todayExp=this.getRecords().filter(r=>r.date.startsWith(today)&&r.type==='expense').reduce((s,r)=>s+r.amt,0);
+        ccSub.textContent=todayExp>0?('今日已花 ¥'+todayExp.toFixed(1)):'今日尚未记账';
+      }
+      if(ccPoem){
+        const poems=['一寸光阴一寸金','劝君惜取少年时','碎银几两，可解万种慌张','人间烟火气，最抚凡人心','记账一时爽，一直记账一直爽','积少成多，聚沙成塔'];
+        const idx=Math.floor(now.getHours()/4);
+        ccPoem.textContent=poems[idx%poems.length];
+      }
+    }
+  },
+
+  // ===== NTP 网络时间校准 =====
+  _ntpOffset:0,
+  _syncNTP(){
+    // 浏览器/WebView 无法直接 UDP NTP，改用 HTTP 时间 API 获取精准时间
+    const urls=[
+      'https://worldtimeapi.org/api/timezone/Asia/Shanghai',
+      'https://timeapi.io/api/Time/current/zone?timeZone=Asia/Shanghai'
+    ];
+    const tryFetch=(i)=>{
+      if(i>=urls.length){console.log('[NTP] 时间同步失败，使用本地时间');return;}
+      const t0=Date.now();
+      fetch(urls[i],{cache:'no-store'})
+        .then(r=>r.json())
+        .then(data=>{
+          const t1=Date.now();
+          let serverTime=null;
+          if(data.datetime)serverTime=new Date(data.datetime).getTime();
+          else if(data.dateTime)serverTime=new Date(data.dateTime).getTime();
+          else if(data.time)serverTime=new Date(data.date+'T'+data.time).getTime();
+          if(serverTime){
+            const rtt=t1-t0;
+            this._ntpOffset=Math.round(serverTime-(t0+rtt/2));
+            console.log('[NTP] 已校准，偏差 '+this._ntpOffset+'ms');
+          }else throw new Error('no time field');
+        })
+        .catch(()=>tryFetch(i+1));
+    };
+    tryFetch(0);
   },
 
   // ===== Backfill Detection =====
@@ -817,13 +1471,14 @@ const App={
 
   // ===== Dark Mode =====
   toggleDark(){
+    this.haptic('toggle');
     document.body.classList.toggle('dk');
     const s=this.getSettings();
     s.darkMode='manual';
     s.dark=document.body.classList.contains('dk');
     this.saveSettings(s);
     this.updateDarkModeUI();
-    if(this.curPage==='stats')this.renderStats();
+    // Canvas 使用硬编码颜色，无需随主题重绘，避免切换卡顿
   },
   updateDarkModeUI(){
     const s=this.getSettings();
@@ -963,19 +1618,27 @@ const App={
     const o=document.getElementById('modalOverlay');
     const c=document.getElementById('modalContent');
     o.className='modal-overlay show'+(type==='sheet'?' sheet':'');
-    c.innerHTML='<button class="modal-close" onclick="App.closeModal()" style="position:sticky;top:0;float:right;z-index:1">✕</button>'+html;
-    if(type==='sheet')c.style.position='relative';
-    else c.style.position='';
+    // 提取 h3 作为标题（如果有的话），否则用默认
+    const titleMatch=html.match(/<h3[^>]*>([\s\S]*?)<\/h3>/);
+    const title=titleMatch?titleMatch[1].trim():'';
+    const bodyHtml=titleMatch?html.replace(/<h3[^>]*>[\s\S]*?<\/h3>/,''):html;
+    c.innerHTML='<div class="modal-header">'+
+      '<span class="modal-title">'+title+'</span>'+
+      '<button class="modal-close" onclick="App.closeModal()">✕</button>'+
+      '</div><div class="modal-body">'+bodyHtml+'</div>';
+    document.body.style.overflow='hidden';
   },
   closeModal(){
     const o=document.getElementById('modalOverlay');
     if(!o.classList.contains('show'))return;
     o.classList.add('closing');
+    document.body.style.overflow='';
     setTimeout(()=>{o.classList.remove('show','closing')},200);
   },
 
   // ===== Record Page =====
   setType(t){
+    if(this.curType!==t)this.haptic('toggle');
     // Save current amount before switching
     this.savedAmounts[this.curType]=document.getElementById('inputAmount').value||'';
     this.curType=t;
@@ -989,6 +1652,7 @@ const App={
     this.renderQuickAmounts();
     this.renderMoodSelector();
     this.updateBudgetReminder();
+    this.updateTodaySummary();
   },
   updateBudgetReminder(){
     const el=document.getElementById('budgetReminder');
@@ -1011,6 +1675,17 @@ const App={
     }
     el.style.display='block';
   },
+  updateTodaySummary(){
+    const expEl=document.getElementById('todayExpense');
+    const incEl=document.getElementById('todayIncome');
+    if(!expEl||!incEl)return;
+    const today=new Date(Date.now()+(this._ntpOffset||0)).toISOString().slice(0,10);
+    const recs=this.getRecords().filter(r=>r.date===today);
+    const exp=recs.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amt,0);
+    const inc=recs.filter(r=>r.type==='income').reduce((s,r)=>s+r.amt,0);
+    expEl.textContent='¥'+exp.toFixed(2);
+    incEl.textContent='¥'+inc.toFixed(2);
+  },
   renderMoodSelector(){
     const box=document.getElementById('moodSelector');
     if(!box)return;
@@ -1019,6 +1694,7 @@ const App={
   },
   setMood(m){
     this.curMood=this.curMood===m?null:m;
+    this.haptic('light');
     const selector=document.getElementById('moodSelector');
     if(!selector)return;
     selector.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
@@ -1037,9 +1713,13 @@ const App={
     return['1','20','50','100'];
   },
   addQuickAmount(val){
+    this.haptic('light');
     const input=document.getElementById('inputAmount');
     const cur=parseFloat(input.value)||0;
     input.value=(cur+val).toFixed(2);
+    // Pulse the input
+    input.parentElement.style.transform='scale(1.03)';
+    setTimeout(function(){if(input.parentElement)input.parentElement.style.transform='';},200);
   },
   renderQuickAmounts(){
     const amts=this.getQuickAmounts();
@@ -1059,6 +1739,7 @@ const App={
   },
   selectCat(k){
     this.curCat=k;
+    this.haptic('select');
     document.querySelectorAll('.cat-item').forEach(el=>el.classList.remove('selected'));
     const target=document.querySelector('.cat-item[onclick*="'+k+'"]');
     if(target)target.classList.add('selected');
@@ -1067,26 +1748,30 @@ const App={
 
   submitRecord(){
     const amt=parseFloat(document.getElementById('inputAmount').value);
-    if(!amt||amt<=0){this.showToast('请输入金额');return}
-    if(!this.curCat){this.showToast('请选择分类');return}
+    if(!amt||amt<=0){this.haptic('error');this.showToast('请输入金额');return}
+    if(!this.curCat){this.haptic('error');this.showToast('请选择分类');return}
     const date=document.getElementById('inputDate').value;
     const note=document.getElementById('inputNote').value.trim();
+    const timeEl=document.getElementById('inputTime');
+    const recordTime=timeEl&&timeEl.value?timeEl.value:new Date(Date.now()+(this._ntpOffset||0)).toTimeString().slice(0,5);
     const records=this.getRecords();
     const ts=Date.now();
 
     if(this.editId!==null){
       const idx=records.findIndex(r=>r.id===this.editId);
       if(idx>=0){
-        records[idx]={...records[idx],amt,cat:this.curCat,date,note,type:this.curType,mood:this.curMood};
+        records[idx]={...records[idx],amt,cat:this.curCat,date,note,type:this.curType,mood:this.curMood,time:recordTime};
         this.saveRecords(records);
+        this.haptic('success');
         this.showToast('已更新 ✅');
       }
       this.editId=null;
       document.getElementById('btnSubmit').textContent='记一笔';
     }else{
-      const record={id:'r_'+ts,amt,cat:this.curCat,date,note,type:this.curType,mood:this.curMood,time:new Date().toTimeString().slice(0,5),ts};
+      const record={id:'r_'+ts,amt,cat:this.curCat,date,note,type:this.curType,mood:this.curMood,time:recordTime,ts};
       records.push(record);
       this.saveRecords(records);
+      this.haptic('success');
       this.showToast('记好了 ✓');
       this._celebrateAnim();
       // 情感化鼓励
@@ -1104,12 +1789,19 @@ const App={
     document.getElementById('inputNote').value='';
     this.curCat=null;
     this.curMood=null;
-    document.getElementById('inputDate').value=new Date().toISOString().slice(0,10);
+    document.getElementById('inputDate').value=new Date(Date.now()+(this._ntpOffset||0)).toISOString().slice(0,10);
+    // Reset time to current (NTP校准)
+    const n=new Date(Date.now()+(this._ntpOffset||0));
+    const nh=String(n.getHours()).padStart(2,'0');
+    const nm=String(n.getMinutes()).padStart(2,'0');
+    if(timeEl)timeEl.value=nh+':'+nm;
+    this._timeManual=false;
     document.getElementById('recordBackfillBar').style.display='none';
     document.querySelectorAll('#moodSelector button').forEach(b=>b.classList.remove('active'));
     this.renderRecordPage();
     this.updateBudgetReminder();
     this.renderAchievements();
+    this.updateTodaySummary();
   },
 
   renderRecordPage(){
@@ -1131,6 +1823,12 @@ const App={
     document.getElementById('inputAmount').value=data.amt;
     document.getElementById('inputNote').value=data.note||'';
     document.getElementById('inputDate').value=data.date;
+    // Restore time field
+    const timeEl=document.getElementById('inputTime');
+    if(timeEl&&data.time){
+      timeEl.value=data.time;
+      this._timeManual=true;
+    }
     this.setType(data.type);
     this.selectCat(data.cat);
     if(data.mood)this.setMood(data.mood);
@@ -1193,11 +1891,12 @@ const App={
       list.innerHTML=filtered.map((r,idx)=>{
         const cat=this.getCatData(r.cat);
         const moodIcon=r.mood?MOODS[r.mood]:'';
-        const delay=Math.min(idx*40,600);
+        const delay=Math.min(idx*35,500);
+        const timeBadge=this.formatTimeBadge(r.date,r.time);
         return '<div class="bill-item" style="animation-delay:'+delay+'ms" onclick="App.enterEditById(\''+r.id+'\')">'+
           '<div class="bill-emoji" style="background:'+cat.bg+'">'+cat.i+'</div>'+
           '<div class="bill-info"><div class="bill-cat">'+cat.n+'</div>'+
-          '<div class="bill-meta"><span>'+r.date+'</span>'+(r.note?'<span>'+App.escapeHtml(r.note)+'</span>':'')+(moodIcon?'<span>'+moodIcon+'</span>':'')+'</div></div>'+
+          '<div class="bill-meta"><span>'+timeBadge+'</span>'+(r.note?'<span>'+App.escapeHtml(r.note)+'</span>':'')+(moodIcon?'<span>'+moodIcon+'</span>':'')+'</div></div>'+
           '<div class="bill-amount '+(r.type==='expense'?'expense':'income')+'">'+(r.type==='expense'?'-':'+')+r.amt.toFixed(2)+'</div>'+
           '<div class="bill-actions" onclick="event.stopPropagation()">'+
           '<button onclick="App.enterEditById(\''+r.id+'\')" title="编辑">✏️</button>'+
@@ -1207,26 +1906,120 @@ const App={
     document.getElementById('recordCount').textContent=filtered.length+' 条';
   },
   _celebrateAnim(){
-    const emojis=['✨','🎉','💰','⭐','💜','🌟'];
     const btn=document.querySelector('#btnSubmit');
     if(!btn)return;
     const rect=btn.getBoundingClientRect();
-    for(let i=0;i<5;i++){
+    const cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+    // 金币光环：从按钮中心扩散
+    const ring=document.createElement('div');
+    ring.className='coin-ring';
+    ring.style.left=(cx-rect.width/2)+'px';
+    ring.style.top=(cy-rect.height/2)+'px';
+    ring.style.width=rect.width+'px';
+    ring.style.height=rect.height+'px';
+    document.body.appendChild(ring);
+    setTimeout(()=>ring.remove(),700);
+    // 碎银飞溅：金币向上扇形爆裂
+    const coins=['💰','🪙','✨','⭐','💫','🪙'];
+    const n=14;
+    for(let i=0;i<n;i++){
       const el=document.createElement('div');
-      el.className='celebrate-particle';
-      el.textContent=emojis[Math.floor(Math.random()*emojis.length)];
-      el.style.left=(rect.left+rect.width/2-10+Math.random()*40-20)+'px';
-      el.style.top=rect.top+'px';
-      el.style.animationDelay=(i*80)+'ms';
+      el.className='celebrate-particle burst';
+      el.textContent=coins[Math.floor(Math.random()*coins.length)];
+      const ang=-Math.PI+(i/(n-1))*Math.PI;       // 从左到上的扇形
+      const dist=55+Math.random()*70;
+      const bx=Math.cos(ang)*dist;
+      const by=Math.sin(ang)*dist;                // 负值=向上
+      el.style.left=(cx-10)+'px';
+      el.style.top=(cy-10)+'px';
+      el.style.setProperty('--bx',bx+'px');
+      el.style.setProperty('--by',by+'px');
+      el.style.setProperty('--bx2',(bx*1.35)+'px');
+      el.style.setProperty('--by2',(by*1.35+45)+'px');
+      el.style.animationDelay=(i*28)+'ms';
+      el.style.fontSize=(15+Math.random()*9)+'px';
       document.body.appendChild(el);
-      setTimeout(()=>el.remove(),1200);
+      setTimeout(()=>el.remove(),1250);
     }
   },
   escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML},
+
+  // ===== Time Formatting & Calibration =====
+  formatTimeBadge(dateStr,timeStr){
+    if(!dateStr)return '';
+    const today=new Date().toISOString().slice(0,10);
+    const isToday=dateStr===today;
+    const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
+    const isYesterday=dateStr===yesterday;
+    const parts=dateStr.split('-');
+    const shortDate=parseInt(parts[1])+'/'+parseInt(parts[2]);
+
+    if(timeStr){
+      if(isToday){
+        // Relative time for today's records
+        const now=new Date();
+        const [h,m]=timeStr.split(':').map(Number);
+        const recordTime=new Date();
+        recordTime.setHours(h,m,0,0);
+        const diff=now-recordTime;
+        const mins=Math.floor(diff/60000);
+        if(mins<1)return '<span class="time-badge recent"><span class="time-icon">⏱</span>刚刚</span>';
+        if(mins<60)return '<span class="time-badge recent"><span class="time-icon">⏱</span>'+mins+'分钟前</span>';
+        const hours=Math.floor(mins/60);
+        if(hours<24)return '<span class="time-badge recent"><span class="time-icon">⏱</span>'+hours+'小时前</span>';
+      }
+      if(isYesterday)return '<span class="time-badge">昨天 '+timeStr+'</span>';
+      return '<span class="time-badge">'+shortDate+' '+timeStr+'</span>';
+    }
+    if(isToday)return '<span class="time-badge recent">今天</span>';
+    if(isYesterday)return '<span class="time-badge">昨天</span>';
+    return '<span class="time-badge">'+shortDate+'</span>';
+  },
+
+  // ===== Haptic Feedback =====
+  haptic(type){
+    if(!navigator.vibrate)return;
+    const patterns={
+      success:[8],
+      error:[30,30,30],
+      light:[5],
+      medium:[12],
+      heavy:[20],
+      select:[7],
+      tab:[5],
+      toggle:[10]
+    };
+    const p=patterns[type]||patterns.light;
+    try{navigator.vibrate(p)}catch(e){}
+  },
+
+  // ===== Number Scrolling Animation =====
+  animateNumber(el,start,end,duration){
+    if(!el)return;
+    const startTime=performance.now();
+    const animate=(now)=>{
+      const elapsed=now-startTime;
+      const progress=Math.min(elapsed/duration,1);
+      // Easing: ease-out-cubic
+      const eased=1-Math.pow(1-progress,3);
+      const current=start+(end-start)*eased;
+      if(end>=100){
+        el.textContent='¥'+Math.round(current);
+      }else if(end>=10){
+        el.textContent='¥'+current.toFixed(0);
+      }else{
+        el.textContent='¥'+current.toFixed(2);
+      }
+      if(progress<1)requestAnimationFrame(animate);
+      else el.textContent='¥'+(end>=100?Math.round(end):end>=10?end.toFixed(0):end.toFixed(2));
+    };
+    requestAnimationFrame(animate);
+  },
   deleteRecord(id){
     const records=this.getRecords();
     const idx=records.findIndex(r=>r.id===id);
     if(idx<0)return;
+    this.haptic('medium');
     const deleted=records.splice(idx,1)[0];
     this.saveRecords(records);
     this.renderBills();
@@ -1242,8 +2035,133 @@ const App={
   },
 
   // ===== Stats Page =====
+  STATS_WIDGETS:[
+    {id:'insights',name:'智能洞察',icon:'💡',desc:'AI消费分析与理财建议'},
+    {id:'poem',name:'碎银诗歌',icon:'📜',desc:'把本月花销写成一首诗'},
+    {id:'heartbeat',name:'财务心跳',icon:'💓',desc:'最近14天支出心跳图'},
+    {id:'starmap',name:'消费星图',icon:'🌌',desc:'你的专属财务星座'},
+    {id:'kaleido',name:'碎银万花筒',icon:'🌀',desc:'消费类别旋转成花'},
+    {id:'waveform',name:'消费声纹',icon:'🎵',desc:'7日消费心跳波形'},
+    {id:'monthcompare',name:'月度对比',icon:'📊',desc:'本月与上月对比'},
+    {id:'pie',name:'支出分类',icon:'🥧',desc:'分类占比饼图'},
+    {id:'calendar',name:'消费日历',icon:'📅',desc:'每日花销热力图'},
+    {id:'trend',name:'趋势图',icon:'📈',desc:'周度支出趋势'},
+    {id:'ranking',name:'支出排行',icon:'🏆',desc:'分类消费排行榜'},
+  ],
+  getEnabledWidgets(){
+    const s=this.getSettings();
+    if(!s.statsWidgets){
+      // 默认启用常用、实用的组件，去掉万花筒/星图/声纹等花哨组件
+      return ['insights','pie','calendar','trend','ranking','monthcompare'];
+    }
+    return s.statsWidgets;
+  },
+  applyWidgetVisibility(){
+    const enabled=this.getEnabledWidgets();
+    document.querySelectorAll('.widget-box').forEach(box=>{
+      const id=box.dataset.widget;
+      box.classList.toggle('hidden',!enabled.includes(id));
+    });
+    // 应用视图模式
+    const s=this.getSettings();
+    const view=s.statsView||'list';
+    const container=document.getElementById('statsWidgets');
+    if(container){
+      container.classList.toggle('grid-view',view==='grid');
+    }
+    document.querySelectorAll('.wvt-btn').forEach(b=>{
+      b.classList.toggle('active',b.dataset.view===view);
+    });
+    // 更新或添加"+"按钮
+    this.updateAddWidgetButton();
+  },
+  updateAddWidgetButton(){
+    const container=document.getElementById('statsWidgets');
+    if(!container)return;
+    let addBtn=container.querySelector('.widget-add-btn');
+    if(!addBtn){
+      addBtn=document.createElement('div');
+      addBtn.className='widget-add-btn';
+      addBtn.innerHTML='<div class="add-widget-inner"><span class="add-icon-big">+</span><span class="add-label">添加组件</span></div>';
+      addBtn.onclick=()=>this.showWidgetManager();
+      container.appendChild(addBtn);
+    }
+    // 网格视图下显示为正方形，列表视图下显示为横向条
+    const s=this.getSettings();
+    const view=s.statsView||'list';
+    addBtn.classList.toggle('grid-mode',view==='grid');
+  },
+  setStatsView(view){
+    const s=this.getSettings();
+    s.statsView=view;
+    this.saveSettings(s);
+    // 切换动画：先缩出，再切换视图，再缩入；用 CSS transition 实现丝滑过渡
+    const container=document.getElementById('statsWidgets');
+    if(container){
+      container.style.transition='opacity .2s var(--spring-exit),transform .2s var(--spring-exit)';
+      container.style.opacity='0';
+      container.style.transform='scale(.94)';
+      setTimeout(()=>{
+        this.applyWidgetVisibility();
+        // 触发回流后切到缩入动画，并给每个 widget 加 stagger 错开入场
+        requestAnimationFrame(()=>{
+          container.style.transition='opacity .34s var(--spring-entrance),transform .34s var(--spring-entrance)';
+          container.style.opacity='1';
+          container.style.transform='scale(1)';
+          const boxes=container.querySelectorAll('.widget-box:not(.hidden)');
+          boxes.forEach((b,i)=>{
+            b.style.animation='none';
+            void b.offsetWidth; // 重排以重启动画
+            b.style.animation='widgetPop .42s var(--spring-bounce) both';
+            b.style.animationDelay=(i*45)+'ms';
+          });
+        });
+      },180);
+    }else{
+      this.applyWidgetVisibility();
+    }
+    this.haptic('tab');
+  },
+  showWidgetManager(){
+    const enabled=this.getEnabledWidgets();
+    let html='<div style="margin-bottom:12px;font-size:12px;color:var(--t2)">选择你想在统计页展示的组件</div>';
+    html+='<div class="widget-mgr-list">';
+    this.STATS_WIDGETS.forEach(w=>{
+      const on=enabled.includes(w.id);
+      html+='<div class="widget-mgr-item">'+
+        '<div><div class="wm-name">'+w.icon+' '+w.name+'</div>'+
+        '<div class="wm-desc">'+w.desc+'</div></div>'+
+        '<div class="wm-switch '+(on?'on':'')+'" onclick="App.toggleWidget(\''+w.id+'\')"></div>'+
+        '</div>';
+    });
+    html+='</div>';
+    html+='<div style="text-align:center;margin-top:14px"><button class="btn-primary" style="padding:10px 24px;font-size:14px" onclick="App.closeModal()">完成</button></div>';
+    this.showModal(html);
+  },
+  toggleWidget(id){
+    const s=this.getSettings();
+    // 以当前已启用的组件为基础（未设置时用默认常用组件，而非全部）
+    let enabled=this.getEnabledWidgets().slice();
+    if(enabled.includes(id)){
+      enabled=enabled.filter(x=>x!==id);
+    }else{
+      enabled.push(id);
+    }
+    s.statsWidgets=enabled;
+    this.saveSettings(s);
+    this.applyWidgetVisibility();
+    // 更新弹窗里的开关状态
+    const sw=document.querySelector('.wm-switch[onclick*="'+id+'"]');
+    if(sw)sw.classList.toggle('on');
+  },
   renderStats(){
+    this.applyWidgetVisibility();
     this.renderInsights();
+    this.renderPoem();
+    this.renderHeartbeat();
+    this.renderStarMap();
+    this.renderKaleidoscope();
+    this.renderWaveform();
     this.renderMonthCompare();
     this.renderPieChart();
     this.renderCalendar();
@@ -1351,7 +2269,10 @@ const App={
       const pct=((diff/lastTotal)*100).toFixed(1);
       const cls=diff>0?'up':'down';
       const arrow=diff>0?'↑':'↓';
-      c.innerHTML='<div class="month-compare"><div class="mc-amount">本月 ¥'+total.toFixed(2)+'</div><div class="mc-pct '+cls+'">较上月 '+arrow+' '+Math.abs(pct)+'% ('+(diff>0?'+':'')+diff.toFixed(2)+'元)</div></div>';
+      c.innerHTML='<div class="month-compare"><div class="mc-amount">本月 ¥0</div><div class="mc-pct '+cls+'">较上月 '+arrow+' '+Math.abs(pct)+'% ('+(diff>0?'+':'')+diff.toFixed(2)+'元)</div></div>';
+      // Animate number
+      const amtEl=c.querySelector('.mc-amount');
+      if(amtEl)this.animateNumber(amtEl,0,total,800);
     }
   },
 
@@ -1365,7 +2286,6 @@ const App={
     canvas.width=size*dpr;canvas.height=size*dpr;
     canvas.style.width=size+'px';canvas.style.height=size+'px';
     ctx.scale(dpr,dpr);
-    ctx.clearRect(0,0,size,size);
 
     const records=this.getRecords();
     const thisMonth=new Date().toISOString().slice(0,7);
@@ -1378,6 +2298,7 @@ const App={
     const isDark=document.body.classList.contains('dk');
 
     if(total===0){
+      ctx.clearRect(0,0,size,size);
       ctx.fillStyle=isDark?'#636366':'#aeaeb2';
       ctx.font='14px -apple-system,PingFang SC,sans-serif';
       ctx.textAlign='center';
@@ -1395,47 +2316,69 @@ const App={
       entries=top.concat([['_other',otherAmt]]);
     }
 
-    // Draw donut
-    let startAngle=-Math.PI/2;
-    entries.forEach(([k,amt])=>{
-      const isOther=k==='_other';
-      const color=isOther?(isDark?'#636366':'#c7c7cc'):(this.getCatData(k).c||'#999');
-      const slice=amt/total*Math.PI*2;
-      ctx.beginPath();
-      ctx.moveTo(cx,cy);
-      ctx.arc(cx,cy,r,startAngle,startAngle+slice);
-      ctx.closePath();
-      ctx.fillStyle=color;
-      ctx.fill();
-      startAngle+=slice;
-    });
-
-    // Center hole
-    ctx.beginPath();
-    ctx.arc(cx,cy,40,0,Math.PI*2);
-    ctx.fillStyle=isDark?'#1e1e1e':'#fff';
-    ctx.fill();
-    ctx.fillStyle=isDark?'#e8e8e8':'#1c1c1e';
-    ctx.font='bold 16px -apple-system,PingFang SC,sans-serif';
-    ctx.textAlign='center';
-    ctx.fillText('¥'+total.toFixed(0),cx,cy-3);
-    ctx.fillStyle=isDark?'#a0a0a0':'#86868b';
-    ctx.font='10px -apple-system,PingFang SC,sans-serif';
-    ctx.fillText('本月支出',cx,cy+12);
-
-    // Render legend
+    // Render legend immediately with stagger animation
     let legendHtml='';
-    entries.forEach(([k,amt])=>{
+    entries.forEach(([k,amt],i)=>{
       const isOther=k==='_other';
       const cat=isOther?{i:'📦',n:'其他',c:isDark?'#636366':'#c7c7cc'}:this.getCatData(k);
       const pct=(amt/total*100).toFixed(0);
-      legendHtml+='<div class="pie-legend-item">';
+      const delay=Math.min(i*50,300);
+      legendHtml+='<div class="pie-legend-item" style="animation:staggerFadeUp .4s var(--spring-entrance) both;animation-delay:'+delay+'ms">';
       legendHtml+='<span class="pie-legend-dot" style="background:'+cat.c+'"></span>';
       legendHtml+='<span class="pie-legend-name">'+cat.i+' '+cat.n+'</span>';
       legendHtml+='<span class="pie-legend-pct">'+pct+'%</span>';
       legendHtml+='</div>';
     });
     legendEl.innerHTML=legendHtml;
+
+    // Animate donut chart with progressive draw
+    if(this._pieAnim)cancelAnimationFrame(this._pieAnim);
+    const startTime=performance.now();
+    const animDuration=700;
+    const drawPie=(progress)=>{
+      ctx.clearRect(0,0,size,size);
+      let startAngle=-Math.PI/2;
+      const totalAngle=Math.PI*2*progress;
+      entries.forEach(([k,amt])=>{
+        const isOther=k==='_other';
+        const color=isOther?(isDark?'#636366':'#c7c7cc'):(this.getCatData(k).c||'#999');
+        const slice=amt/total*Math.PI*2;
+        const drawAngle=Math.min(slice,totalAngle-(startAngle+Math.PI/2));
+        if(drawAngle<=0)return;
+        ctx.beginPath();
+        ctx.moveTo(cx,cy);
+        ctx.arc(cx,cy,r,startAngle,startAngle+drawAngle);
+        ctx.closePath();
+        ctx.fillStyle=color;
+        ctx.fill();
+        startAngle+=slice;
+      });
+      // Center hole
+      ctx.beginPath();
+      ctx.arc(cx,cy,40,0,Math.PI*2);
+      ctx.fillStyle=isDark?'#1e1e1e':'#fff';
+      ctx.fill();
+      // Center text
+      ctx.fillStyle=isDark?'#e8e8e8':'#1c1c1e';
+      ctx.font='bold 16px -apple-system,PingFang SC,sans-serif';
+      ctx.textAlign='center';
+      ctx.fillText('¥'+(total*progress).toFixed(0),cx,cy-3);
+      ctx.fillStyle=isDark?'#a0a0a0':'#86868b';
+      ctx.font='10px -apple-system,PingFang SC,sans-serif';
+      ctx.fillText('本月支出',cx,cy+12);
+    };
+    const animFrame=(now)=>{
+      const elapsed=now-startTime;
+      const progress=Math.min(elapsed/animDuration,1);
+      const eased=1-Math.pow(1-progress,3);
+      drawPie(eased);
+      if(progress<1){
+        this._pieAnim=requestAnimationFrame(animFrame);
+      }else{
+        this._pieAnim=null;
+      }
+    };
+    this._pieAnim=requestAnimationFrame(animFrame);
 
     }catch(e){console.warn('pie chart error',e)}
   },
@@ -1489,7 +2432,8 @@ const App={
       let amtHtml='';
       if(net>0)amtHtml='<span class="cal-amt-inc">净赚+'+net.toFixed(0)+'</span>';
       else if(net<0)amtHtml='<span class="cal-amt-exp">-'+Math.abs(net).toFixed(0)+'</span>';
-      html+='<div class="calendar-cell'+(isToday?' today':'')+'" style="'+bg+'" onclick="App.showDayDetail(\''+dateStr+'\')">'+
+      const calDelay=Math.min(d*8,200);
+      html+='<div class="calendar-cell'+(isToday?' today':'')+'" style="'+bg+';animation:staggerFadeUp .3s var(--spring-entrance) both;animation-delay:'+calDelay+'ms" onclick="App.showDayDetail(\''+dateStr+'\')">'+
         '<span>'+d+'</span>'+(amtHtml?'<span class="cal-amt">'+amtHtml+'</span>':'')+'</div>';
     }
     document.getElementById('calendarGrid').innerHTML=html;
@@ -1541,7 +2485,7 @@ const App={
         html+='<div class="day-detail-cat" style="background:'+cat.bg+';color:'+cat.c+'">'+cat.i+'</div>';
         html+='<div class="day-detail-info">';
         html+='<div class="day-detail-catname">'+cat.n+(r.note?' · '+this.escapeHtml(r.note):'')+(moodIcon?' '+moodIcon:'')+'</div>';
-        html+='<div style="font-size:11px;color:var(--t3)">'+(r.type==='expense'?'支出':'收入')+'</div>';
+        html+='<div style="font-size:11px;color:var(--t3)">'+(r.type==='expense'?'支出':'收入')+(r.time?' · '+r.time:'')+'</div>';
         html+='</div>';
         html+='<div class="day-detail-amt" style="color:'+(r.type==='expense'?'var(--red)':'var(--green)')+'">'+(r.type==='expense'?'-':'+')+'¥'+r.amt.toFixed(2)+'</div>';
         html+='<div class="day-detail-edit">✏️</div>';
@@ -1681,17 +2625,113 @@ const App={
       }
     };
 
-    drawLine(expData,'#ff3b30','rgba(255,59,48,0.1)');
-    drawLine(incData,'#34c759','rgba(52,199,89,0.1)');
-
-    // Legend
-    ctx.fillStyle='#ff3b30';ctx.fillRect(pad.left,10,8,8);
-    ctx.fillStyle=isDark?'#fff':'#1c1c1e';
-    ctx.font='11px -apple-system,PingFang SC,sans-serif';
-    ctx.textAlign='left';
-    ctx.fillText('支出',pad.left+12,18);
-    ctx.fillStyle='#34c759';ctx.fillRect(pad.left+60,10,8,8);
-    ctx.fillText('收入',pad.left+72,18);
+    // Animated draw
+    if(this._trendAnim)cancelAnimationFrame(this._trendAnim);
+    const trendStart=performance.now();
+    const trendDuration=800;
+    const animateTrend=(now)=>{
+      const elapsed=now-trendStart;
+      const progress=Math.min(elapsed/trendDuration,1);
+      const eased=1-Math.pow(1-progress,2);
+      ctx.clearRect(0,0,w,h);
+      // Grid
+      ctx.strokeStyle=isDark?'#38383a':'#e5e5ea';
+      ctx.lineWidth=0.5;
+      for(let i=0;i<=4;i++){
+        const y=pad.top+ph*(i/4);
+        ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(w-pad.right,y);ctx.stroke();
+        ctx.fillStyle=isDark?'#98989d':'#86868b';
+        ctx.font='10px -apple-system,PingFang SC,sans-serif';
+        ctx.textAlign='right';
+        ctx.fillText('¥'+(maxVal*(1-i/4)).toFixed(0),pad.left-6,y+4);
+      }
+      // X labels
+      ctx.fillStyle=isDark?'#98989d':'#86868b';
+      ctx.font='11px -apple-system,PingFang SC,sans-serif';
+      ctx.textAlign='center';
+      monthLabels.forEach((l,i)=>{
+        const x=pad.left+pw*i/(monthLabels.length-1);
+        ctx.fillText(l,x,h-pad.bottom+16);
+      });
+      // Draw lines progressively
+      const drawAnimLine=(data,color,fillColor)=>{
+        const visiblePoints=Math.ceil(data.length*eased);
+        if(visiblePoints<1)return;
+        const partialData=data.slice(0,visiblePoints);
+        const partialProgress=(data.length*eased)%1;
+        if(partialProgress>0&&visiblePoints<data.length){
+          const lastIdx=visiblePoints-1;
+          if(lastIdx>=0){
+            const nextV=data[lastIdx]+(data[visiblePoints]-data[lastIdx])*partialProgress;
+            partialData[partialData.length-1]=nextV;
+          }
+        }
+        // Area fill
+        ctx.beginPath();
+        partialData.forEach((v,i)=>{
+          const x=pad.left+pw*i/(data.length-1);
+          const y=pad.top+ph*(1-v/maxVal);
+          if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+        });
+        ctx.lineTo(pad.left+pw*(partialData.length-1)/(data.length-1),h-pad.bottom);
+        ctx.lineTo(pad.left,h-pad.bottom);
+        ctx.closePath();
+        const grad=ctx.createLinearGradient(0,pad.top,0,h-pad.bottom);
+        grad.addColorStop(0,fillColor);
+        grad.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=grad;
+        ctx.fill();
+        // Line
+        ctx.strokeStyle=color;
+        ctx.lineWidth=2.5;
+        ctx.lineJoin='round';
+        ctx.beginPath();
+        partialData.forEach((v,i)=>{
+          const x=pad.left+pw*i/(data.length-1);
+          const y=pad.top+ph*(1-v/maxVal);
+          if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+        });
+        ctx.stroke();
+        // Dots
+        partialData.forEach((v,i)=>{
+          const x=pad.left+pw*i/(data.length-1);
+          const y=pad.top+ph*(1-v/maxVal);
+          ctx.beginPath();ctx.arc(x,y,3.5,0,Math.PI*2);
+          ctx.fillStyle=color;ctx.fill();
+          ctx.strokeStyle=isDark?'#1e1e1e':'#fff';ctx.lineWidth=1.5;ctx.stroke();
+        });
+      };
+      drawAnimLine(expData,'#ff3b30','rgba(255,59,48,0.1)');
+      drawAnimLine(incData,'#34c759','rgba(52,199,89,0.1)');
+      // Legend
+      ctx.fillStyle='#ff3b30';ctx.fillRect(pad.left,10,8,8);
+      ctx.fillStyle=isDark?'#fff':'#1c1c1e';
+      ctx.font='11px -apple-system,PingFang SC,sans-serif';
+      ctx.textAlign='left';
+      ctx.fillText('支出',pad.left+12,18);
+      ctx.fillStyle='#34c759';ctx.fillRect(pad.left+60,10,8,8);
+      ctx.fillText('收入',pad.left+72,18);
+      if(progress<1){
+        this._trendAnim=requestAnimationFrame(animateTrend);
+      }else{
+        this._trendAnim=null;
+        // Draw last point values
+        const drawLastValue=(data)=>{
+          const lastV=data[data.length-1];
+          if(lastV>0){
+            const lx=pad.left+pw;
+            const ly=pad.top+ph*(1-lastV/maxVal);
+            ctx.fillStyle=isDark?'#e8e8e8':'#1c1c1e';
+            ctx.font='bold 10px -apple-system,PingFang SC,sans-serif';
+            ctx.textAlign='center';
+            ctx.fillText('¥'+lastV.toFixed(0),lx,ly-10);
+          }
+        };
+        drawLastValue(expData);
+        drawLastValue(incData);
+      }
+    };
+    this._trendAnim=requestAnimationFrame(animateTrend);
 
     // Summary
     const lastExp=expData[expData.length-1],prevExp=expData[expData.length-2]||0;
@@ -1721,8 +2761,314 @@ const App={
     c.innerHTML=entries.map(([k,amt],i)=>{
       const cat=this.getCatData(k);
       const pct=total>0?(amt/total*100):0;
-      return '<div class="ranking-item"><span class="rank-emoji">'+cat.i+'</span><span class="rank-name">'+cat.n+'</span><span class="rank-amount">¥'+amt.toFixed(2)+'</span><div class="rank-bar-wrap"><div class="rank-bar" style="width:'+pct+'%;background:'+cat.c+'"></div></div></div>';
+      const delay=Math.min(i*60,400);
+      return '<div class="ranking-item" style="animation:staggerFadeUp .4s var(--spring-entrance) both;animation-delay:'+delay+'ms"><span class="rank-emoji">'+cat.i+'</span><span class="rank-name">'+cat.n+'</span><span class="rank-amount">¥'+amt.toFixed(2)+'</span><div class="rank-bar-wrap"><div class="rank-bar" style="width:'+pct+'%;background:'+cat.c+'"></div></div></div>';
     }).join('');
+  },
+
+  /* ===== 碎银创想：诗歌 / 心跳 / 星图 ===== */
+  poemSeed:0,
+  renderPoem(){
+    const body=document.getElementById('poemBody');
+    const title=document.getElementById('poemTitle');
+    const meta=document.getElementById('poemMeta');
+    if(!body)return;
+    const records=this.getRecords();
+    const now=new Date();
+    const m=now.toISOString().slice(0,7);
+    const mr=records.filter(r=>r.date.startsWith(m));
+    const exp=mr.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amt,0);
+    const inc=mr.filter(r=>r.type==='income').reduce((s,r)=>s+r.amt,0);
+    const net=inc-exp,cnt=mr.length;
+    const catT={};mr.filter(r=>r.type==='expense').forEach(r=>catT[r.cat]=(catT[r.cat]||0)+r.amt);
+    const top=Object.entries(catT).sort((a,b)=>b[1]-a[1])[0];
+    const catName=top?this.getCatData(top[0]).n:'日常';
+    let mood;
+    if(cnt===0)mood='empty';
+    else if(net>0&&exp<inc*0.6)mood='thrifty';
+    else if(net>=0)mood='balanced';
+    else if(inc>0&&exp>inc*1.3)mood='splurge';
+    else mood='busy';
+    const banks={
+      thrifty:[
+        '碎银入袋未敢轻，{cat}几笔记分明。\n月底盘点犹有剩，笑邀月光共一瓶。',
+        '杯水车薪亦自珍，{cat}散去总留痕。\n结余添得新绿意，胜似春风叩柴门。',
+        '一毫一厘皆辛苦，{cat}花销记入簿。\n今月盈余三两许，换取心安抵万户。'
+      ],
+      balanced:[
+        '{cat}花销恰如风，{n}笔账目记从容。\n收支相抵方为道，碎银在握暖心胸。',
+        '日升月落账不偏，{cat}几笔亦坦然。\n有出有入寻常事，碎银记里见平安。',
+        '不为奢靡不为悭，{cat}用度在中间。\n{n}笔流水皆成句，写就平凡好月圆。'
+      ],
+      splurge:[
+        '{cat}挥金如流水，月终盘点泪沾衣。\n劝君莫负碎银意，留得余力待春归。',
+        '一掷千金爽一时，{cat}账单惹人思。\n下月但愿勤持家，碎银重聚未为迟。',
+        '{cat}花去太多金，月底空余对月吟。\n记此一课存长智，来日方知节制心。'
+      ],
+      busy:[
+        '日日{cat}不曾休，碎银散尽又添筹。\n纵使忙中无闲暇，记账一刻是良谋。',
+        '{cat}频频入账簿，{n}笔流水写忙碌。\n碎银虽散痕未散，岁末翻看皆是路。',
+        '忙里偷闲记一笔，{cat}花销不糊涂。\n纵然日子如走马，碎银痕里见归途。'
+      ],
+      empty:[
+        '碎银未记空对月，本月清光亦皎洁。\n待到花开记账时，再来吟诵此一阕。',
+        '账簿新翻无字痕，{cat}未记待时辰。\n且将月光先收好，来日记起再加温。'
+      ]
+    };
+    const arr=banks[mood]||banks.balanced;
+    const idx=(this.poemSeed+cnt+(top?top[0].length:0))%arr.length;
+    this.poemSeed=(this.poemSeed+1)%arr.length;
+    const poem=arr[idx].replace(/{cat}/g,catName).replace(/{n}/g,cnt).replace(/{amt}/g,top?Math.round(top[1]):0);
+    const moodName={thrifty:'节俭',balanced:'从容',splurge:'挥霍',busy:'忙碌',empty:'初醒'}[mood];
+    title.textContent='碎银吟 · '+moodName+'篇';
+    body.innerHTML=poem.split('\n').map(l=>'<span class="poem-line">'+l+'</span>').join('');
+    meta.textContent=(now.getMonth()+1)+'月 · 共'+cnt+'笔 · '+(net>=0?'净结余':'净支出')+'¥'+Math.abs(net).toFixed(0)+' · 数据即诗';
+  },
+
+  _hbRAF:null,
+  renderHeartbeat(){
+    const canvas=document.getElementById('heartbeatCanvas');
+    if(!canvas)return;
+    const ctx=canvas.getContext('2d');
+    const dpr=window.devicePixelRatio||1;
+    const w=340,h=120;
+    canvas.width=w*dpr;canvas.height=h*dpr;
+    canvas.style.width=w+'px';canvas.style.height=h+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    const records=this.getRecords();
+    const days=[];
+    const now=new Date();now.setHours(0,0,0,0);
+    for(let i=13;i>=0;i--){
+      const d=new Date(now);d.setDate(d.getDate()-i);
+      const ds=d.toISOString().slice(0,10);
+      days.push(records.filter(r=>r.date.startsWith(ds)&&r.type==='expense').reduce((s,r)=>s+r.amt,0));
+    }
+    const maxE=Math.max(...days,1);
+    const pad=12,cw=w-pad*2,ch=h-pad*2,midY=pad+ch/2,step=cw/(days.length-1);
+    const pts=[];
+    for(let i=0;i<days.length;i++){
+      const x=pad+i*step;
+      if(days[i]===0){pts.push([x,midY]);}
+      else{
+        const spike=Math.min((days[i]/maxE)*ch*0.42,ch*0.42);
+        pts.push([x,midY],[x+step*0.18,midY-spike],[x+step*0.3,midY+spike*0.45],[x+step*0.5,midY]);
+      }
+    }
+    if(this._hbRAF)cancelAnimationFrame(this._hbRAF);
+    let prog=0;const total=pts.length;
+    const draw=(p)=>{
+      ctx.clearRect(0,0,w,h);
+      ctx.strokeStyle='rgba(255,69,58,.08)';ctx.lineWidth=1;
+      for(let i=0;i<=4;i++){const y=pad+ch/4*i;ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(w-pad,y);ctx.stroke();}
+      const n=Math.max(1,Math.floor(total*p));
+      ctx.lineJoin='round';ctx.lineCap='round';
+      ctx.strokeStyle='rgba(255,69,58,.22)';ctx.lineWidth=8;
+      ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);
+      for(let i=1;i<n&&i<total;i++)ctx.lineTo(pts[i][0],pts[i][1]);ctx.stroke();
+      ctx.strokeStyle='#ff453a';ctx.lineWidth=2.4;
+      ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);
+      for(let i=1;i<n&&i<total;i++)ctx.lineTo(pts[i][0],pts[i][1]);ctx.stroke();
+      if(n>0&&n<total){
+        const pt=pts[Math.max(0,n-1)];
+        ctx.fillStyle='rgba(255,69,58,.35)';ctx.beginPath();ctx.arc(pt[0],pt[1],7,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(pt[0],pt[1],3.2,0,Math.PI*2);ctx.fill();
+      }
+      ctx.fillStyle='#34c759';
+      for(let i=0;i<days.length;i++){if(days[i]===0){ctx.beginPath();ctx.arc(pad+i*step,midY,2.5,0,Math.PI*2);ctx.fill();}}
+      if(p<1){prog=Math.min(1,prog+0.05);this._hbRAF=requestAnimationFrame(()=>draw(prog));}
+    };
+    draw(prog);
+    const sub=document.getElementById('heartbeatSub');
+    if(sub)sub.textContent='14天 · 峰值¥'+maxE.toFixed(0);
+  },
+
+  _starRAF:null,
+  renderStarMap(){
+    const canvas=document.getElementById('starCanvas');
+    if(!canvas)return;
+    const ctx=canvas.getContext('2d');
+    const dpr=window.devicePixelRatio||1;
+    const w=340,h=220;
+    canvas.width=w*dpr;canvas.height=h*dpr;
+    canvas.style.width=w+'px';canvas.style.height=h+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    if(this._starRAF)cancelAnimationFrame(this._starRAF);
+    const records=this.getRecords();
+    const now=new Date();
+    const m=now.toISOString().slice(0,7);
+    const mr=records.filter(r=>r.date.startsWith(m)&&r.type==='expense');
+    const catT={};mr.forEach(r=>catT[r.cat]=(catT[r.cat]||0)+r.amt);
+    const entries=Object.entries(catT).sort((a,b)=>b[1]-a[1]);
+    if(entries.length===0){
+      ctx.clearRect(0,0,w,h);
+      ctx.fillStyle='rgba(205,214,240,.7)';ctx.font='12px sans-serif';ctx.textAlign='center';
+      ctx.fillText('本月暂无支出，星空尚未点亮',w/2,h/2);
+      const meta=document.getElementById('starMeta');if(meta)meta.textContent='记一笔账，星辰便会亮起';
+      return;
+    }
+    const maxA=entries[0][1];
+    const cx=w/2,cy=h/2;
+    const stars=entries.map((e,i)=>{
+      const cat=this.getCatData(e[0]);
+      const ratio=e[1]/maxA;
+      const angle=(i/entries.length)*Math.PI*2+(e[0].charCodeAt(0)%7)*0.4;
+      const dist=48+ratio*55+(i%2)*14;
+      return{x:cx+Math.cos(angle)*dist,y:cy+Math.sin(angle)*dist*0.72,r:2+ratio*6.5,cat:cat.n,col:cat.c,amt:e[1],tw:Math.random()*Math.PI*2,ts:0.5+Math.random()*1.2};
+    });
+    const t=Math.min(stars.length,4);
+    let frame=0;
+    const render=()=>{
+      ctx.clearRect(0,0,w,h);
+      const g=ctx.createRadialGradient(cx,cy,10,cx,cy,w*0.6);
+      g.addColorStop(0,'rgba(99,102,241,.12)');g.addColorStop(1,'rgba(11,16,38,0)');
+      ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+      ctx.fillStyle='rgba(255,255,255,.25)';
+      for(let i=0;i<40;i++){
+        const sx=((i*53)%w),sy=((i*89)%h);
+        ctx.beginPath();ctx.arc(sx,sy,(i%3)*0.4+0.3,0,Math.PI*2);ctx.fill();
+      }
+      ctx.strokeStyle='rgba(150,170,255,.28)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+      ctx.beginPath();
+      for(let i=0;i<t;i++){const s=stars[i];if(i===0)ctx.moveTo(s.x,s.y);else ctx.lineTo(s.x,s.y);}
+      ctx.stroke();ctx.setLineDash([]);
+      stars.forEach(s=>{
+        const tw=0.6+0.4*Math.sin(frame*0.05*s.ts+s.tw);
+        const gg=ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,s.r*4);
+        gg.addColorStop(0,s.col);gg.addColorStop(0.3,'rgba(255,255,255,.5)');gg.addColorStop(1,'rgba(11,16,38,0)');
+        ctx.globalAlpha=tw*0.55;ctx.fillStyle=gg;
+        ctx.beginPath();ctx.arc(s.x,s.y,s.r*4,0,Math.PI*2);ctx.fill();
+        ctx.globalAlpha=1;
+        ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(s.x,s.y,Math.max(1,s.r*tw),0,Math.PI*2);ctx.fill();
+        if(s.r>4){ctx.fillStyle='rgba(205,214,240,.85)';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillText(s.cat,s.x,s.y-s.r-6);}
+      });
+      frame++;
+      this._starRAF=requestAnimationFrame(render);
+    };
+    render();
+    const meta=document.getElementById('starMeta');
+    if(meta){const names=entries.slice(0,3).map(e=>this.getCatData(e[0]).n).join('·');meta.textContent='本月共'+entries.length+'颗星 · 主星：'+names;}
+  },
+
+  /* ===== 碎银万花筒：消费类别旋转成花 ===== */
+  _kaleidoRAF:null,
+  renderKaleidoscope(){
+    const canvas=document.getElementById('kaleidoCanvas');
+    if(!canvas)return;
+    const ctx=canvas.getContext('2d');
+    const dpr=window.devicePixelRatio||1;
+    const w=340,h=220;
+    canvas.width=w*dpr;canvas.height=h*dpr;
+    canvas.style.width=w+'px';canvas.style.height=h+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    if(this._kaleidoRAF)cancelAnimationFrame(this._kaleidoRAF);
+    const records=this.getRecords();
+    const now=new Date(),m=now.toISOString().slice(0,7);
+    const catT={};
+    records.filter(r=>r.date.startsWith(m)&&r.type==='expense').forEach(r=>catT[r.cat]=(catT[r.cat]||0)+r.amt);
+    const entries=Object.entries(catT).sort((a,b)=>b[1]-a[1]);
+    const total=entries.reduce((s,e)=>s+e[1],0)||1;
+    const cx=w/2,cy=h/2;
+    let angle=0;
+    const render=()=>{
+      ctx.clearRect(0,0,w,h);
+      const g=ctx.createRadialGradient(cx,cy,5,cx,cy,w*0.7);
+      g.addColorStop(0,'rgba(139,92,246,.18)');g.addColorStop(1,'rgba(26,10,46,0)');
+      ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+      if(entries.length===0){
+        ctx.fillStyle='rgba(255,255,255,.7)';ctx.font='13px sans-serif';ctx.textAlign='center';
+        ctx.fillText('记一笔账，万花筒便会绽放',cx,cy);
+        this._kaleidoRAF=requestAnimationFrame(render);return;
+      }
+      const petals=Math.min(entries.length,8);
+      const baseR=70;
+      ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);
+      for(let i=0;i<petals;i++){
+        const [cat,amt]=entries[i];
+        const catData=this.getCatData(cat);
+        const ratio=amt/total;
+        const petalLen=baseR+ratio*60;
+        const petalW=12+ratio*22;
+        const a=(i/petals)*Math.PI*2;
+        ctx.save();ctx.rotate(a);
+        const pg=ctx.createLinearGradient(0,0,0,-petalLen);
+        pg.addColorStop(0,catData.c);pg.addColorStop(1,'rgba(255,255,255,.3)');
+        ctx.fillStyle=pg;
+        ctx.globalAlpha=0.75;
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.bezierCurveTo(petalW*0.6,-petalLen*0.3,petalW*0.6,-petalLen*0.7,0,-petalLen);
+        ctx.bezierCurveTo(-petalW*0.6,-petalLen*0.7,-petalW*0.6,-petalLen*0.3,0,0);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
+      // 中心碎银
+      const cg=ctx.createRadialGradient(cx,cy,0,cx,cy,22);
+      cg.addColorStop(0,'#ffd700');cg.addColorStop(0.6,'#daa520');cg.addColorStop(1,'rgba(218,165,32,0)');
+      ctx.fillStyle=cg;ctx.beginPath();ctx.arc(cx,cy,22,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#1a0a2e';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('碎银',cx,cy);
+      angle+=0.006;
+      this._kaleidoRAF=requestAnimationFrame(render);
+    };
+    render();
+  },
+
+  /* ===== 碎银声纹：7日消费心跳波形 ===== */
+  _waveRAF:null,
+  renderWaveform(){
+    const canvas=document.getElementById('waveCanvas');
+    if(!canvas)return;
+    const ctx=canvas.getContext('2d');
+    const dpr=window.devicePixelRatio||1;
+    const w=340,h=120;
+    canvas.width=w*dpr;canvas.height=h*dpr;
+    canvas.style.width=w+'px';canvas.style.height=h+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    if(this._waveRAF)cancelAnimationFrame(this._waveRAF);
+    const records=this.getRecords();
+    const days=[];
+    const now=new Date();now.setHours(0,0,0,0);
+    for(let i=6;i>=0;i--){
+      const d=new Date(now);d.setDate(d.getDate()-i);
+      const ds=d.toISOString().slice(0,10);
+      days.push(records.filter(r=>r.date.startsWith(ds)&&r.type==='expense').reduce((s,r)=>s+r.amt,0));
+    }
+    const maxA=Math.max(...days,1);
+    const midY=h/2;
+    let phase=0;
+    const render=()=>{
+      ctx.clearRect(0,0,w,h);
+      // 网格线
+      ctx.strokeStyle='rgba(0,255,200,.06)';ctx.lineWidth=1;
+      for(let i=0;i<=4;i++){const y=20+i*20;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
+      // 波形
+      const barW=w/days.length;
+      const pts=[];
+      for(let i=0;i<days.length;i++){
+        const x=i*barW+barW/2;
+        const amp=(days[i]/maxA)*40;
+        for(let j=0;j<barW;j+=2){
+          const t=j/barW;
+          const wave=Math.sin(t*Math.PI*4+phase+i*0.5)*amp*Math.sin(t*Math.PI);
+          pts.push([x-barW/2+j,midY+wave]);
+        }
+      }
+      // 发光层
+      ctx.shadowBlur=12;ctx.shadowColor='#00ffcc';
+      ctx.strokeStyle='rgba(0,255,200,.5)';ctx.lineWidth=6;ctx.lineJoin='round';
+      ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();
+      ctx.shadowBlur=0;
+      ctx.strokeStyle='#00ffcc';ctx.lineWidth=2;
+      ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();
+      // 峰值点
+      days.forEach((d,i)=>{
+        if(d>0){const x=i*barW+barW/2;ctx.fillStyle='#00ffcc';ctx.beginPath();ctx.arc(x,midY,3,0,Math.PI*2);ctx.fill();}
+      });
+      phase+=0.08;
+      this._waveRAF=requestAnimationFrame(render);
+    };
+    render();
   },
 
   nextTip(){
@@ -1928,6 +3274,13 @@ const App={
     this.renderAchievements();
     this.renderGoals();
     this.renderBudgetLabel();
+    // 碎银签状态
+    const fl=document.getElementById('fortuneLabel');
+    if(fl){
+      const s=this.getSettings();
+      const today=new Date().toISOString().slice(0,10);
+      fl.textContent=s.fortuneDate===today?s.fortuneLevel:'未抽';
+    }
   },
 
   renderUser(){
@@ -2148,7 +3501,7 @@ const App={
     const monthTotal=records.filter(r=>r.date.startsWith(thisMonth)&&r.type==='expense').reduce((s,r)=>s+r.amt,0);
     const streak=this.checkStreak(records);
     const text='✨ 推荐一个超好用的记账APP「碎银记」\n\n'+
-      '一个刚高考完的学生写的，免费无广告，数据全在本地，隐私超安全！\n\n'+
+      '一个计算机大一学生写的，免费无广告，数据全在本地，隐私超安全！\n\n'+
       '我已经坚持记账 '+streak+' 天，累计 '+totalRecords+' 笔 💪\n'+
       '本月支出 ¥'+monthTotal.toFixed(2)+'，每一笔都清清楚楚\n\n'+
       '功能超多：AI理财分析、消费日历、存钱目标、成就系统、截图导入...\n'+
@@ -2257,7 +3610,7 @@ const App={
     ctx.fillStyle='#aeaeb2';ctx.font='11px -apple-system,PingFang SC,sans-serif';
     ctx.fillText(enc,300,590);
     ctx.fillStyle='#c7c7cc';ctx.font='10px -apple-system,PingFang SC,sans-serif';
-    ctx.fillText('碎银记 · 一个高考生写的记账APP',300,608);
+    ctx.fillText('碎银记 · 一个计算机大一学生写的记账APP',300,608);
 
     // Footer
     ctx.fillStyle='#aeaeb2';ctx.font='13px -apple-system,PingFang SC,sans-serif';ctx.textAlign='center';
@@ -2723,6 +4076,39 @@ const App={
     this.showModal(html,'sheet');
   },
 
+  // ===== 碎银签：每日财运签 =====
+  drawFortune(){
+    const today=new Date().toISOString().slice(0,10);
+    const s=this.getSettings();
+    if(s.fortuneDate===today&&s.fortuneText){
+      this._showFortune(s.fortuneText,s.fortuneLevel,true);
+      return;
+    }
+    const fortunes=[
+      {lvl:'上上签',t:'碎银入袋，日进斗金。今日理财大吉，记账必有回响。',c:'#ffd700'},
+      {lvl:'上签',t:'积少成多，聚沙成塔。今日开销有度，余额笑开颜。',c:'#34c759'},
+      {lvl:'中签',t:'收支平衡，不偏不倚。按部就班记账，稳中有进。',c:'#007aff'},
+      {lvl:'下签',t:'钱包告急，三思后行。今日消费需谨慎，莫让碎银空溜走。',c:'#ff9500'},
+    ];
+    const idx=Math.floor(Math.random()*fortunes.length);
+    const f=fortunes[idx];
+    s.fortuneDate=today;s.fortuneText=f.t;s.fortuneLevel=f.lvl;
+    this.saveSettings(s);
+    const fl=document.getElementById('fortuneLabel');
+    if(fl)fl.textContent=f.lvl;
+    this._showFortune(f.t,f.lvl,false);
+  },
+  _showFortune(text,lvl,opened){
+    const html='<div style="text-align:center;padding:8px 0">'+
+      '<div style="font-size:48px;margin-bottom:8px">🎋</div>'+
+      '<div style="font-size:22px;font-weight:700;color:var(--p);margin-bottom:4px">碎银签</div>'+
+      '<div style="display:inline-block;padding:4px 16px;border-radius:20px;background:var(--card2);font-size:14px;font-weight:600;margin:8px 0">'+lvl+'</div>'+
+      '<div style="font-size:15px;line-height:1.8;color:var(--text);margin:12px 0;padding:0 8px">'+text+'</div>'+
+      '<div style="font-size:11px;color:var(--t3);margin-top:8px">'+(opened?'（今日已抽签，明日再来）':'每日一签，助你理财')+'</div>'+
+      '</div>';
+    this.showModal(html);
+  },
+
   // ===== Time Capsule =====
   getCapsules(){try{return JSON.parse(localStorage.getItem('xzb_capsules')||'[]')}catch(e){return[]}},
   saveCapsules(c){localStorage.setItem('xzb_capsules',JSON.stringify(c))},
@@ -2857,9 +4243,9 @@ const App={
     const html='<h3>🧋 请我喝杯奶茶吧</h3>'+
       '<div style="text-align:center;color:var(--t2);font-size:13px;line-height:1.8;margin-bottom:14px;padding:14px;background:var(--card2);border-radius:12px">'+
       '嗨，我是 <b style="color:var(--p)">我不要芒果</b><br>'+
-      '一个刚高考完、正在过暑假的学生 🎓<br><br>'+
+      '一个计算机专业的大一在读学生 🎓<br><br>'+
       '碎银记是我一个人写的，<br>'+
-      '没有团队，没有公司，只有一台电脑和满腔热情。<br>'+
+      '没有团队，没有公司，只有一台电脑和对编程的热爱。<br>'+
       '做这件事的初衷很简单——<br>'+
       '市面上的记账APP广告太多、功能太杂，<br>'+
       '我想做一个 <b>真正干净、好用、尊重隐私</b> 的工具。<br><br>'+

@@ -3,9 +3,12 @@ package com.xiaozhangben.app;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.view.View;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -30,6 +33,18 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // 透明状态栏：让内容延伸到状态栏下方，状态栏图标为深色（适配浅色背景）
+        // 实现类似抖音的「通透」效果：状态栏区域透出页面/玻璃顶栏背景
+        try {
+            View decor = getWindow().getDecorView();
+            int vis = View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                vis |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            }
+            decor.setSystemUiVisibility(vis);
+            getWindow().setStatusBarColor(Color.TRANSPARENT);
+        } catch (Exception ignored) {}
 
         webView = new WebView(this);
         setContentView(webView);
