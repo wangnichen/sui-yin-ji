@@ -1,0 +1,22 @@
+# 签名材料：严禁入库（含历史提交）
+*.keystore
+*.jks
+*.keystore.old
+keystore.properties
+local.properties
+
+# 构建产物
+*.apk
+*.idsig
+android/build/
+dist/
+# build_apk.sh 构建前自动从根目录 index.html 同步而来（见 v2.6 修复记录）
+android/app/src/main/assets/index.html
+
+# 大体积 LLM 权重（获取与放置方式见 android/app/src/main/assets/offline-ai/README.md）
+android/app/src/main/assets/offline-ai/llm/*.gguf
+
+# 本地环境
+.env
+.DS_Store
+node_modules/
