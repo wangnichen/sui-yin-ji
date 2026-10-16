@@ -6,6 +6,28 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>碎银记</title>
+<script>
+/* 存量数据迁移：旧版 WebView 以 file:// 源存储 localStorage，端侧离线 AI（Web Worker）需要 http 源承载。
+   首次升级启动时把 localStorage 导出给原生层并切换到本地 http 源，再原样导入，确保存量数据不丢失。 */
+(function(){
+  try{
+    if(!window.Native)return;
+    if(location.protocol==='file:'){
+      if(typeof Native.legacyExport!=='function')return;
+      var d={},i,k;
+      for(i=0;i<localStorage.length;i++){k=localStorage.key(i);d[k]=localStorage.getItem(k);}
+      Native.legacyExport(JSON.stringify(d));
+    }else if(typeof Native.legacyImport==='function'){
+      var s=Native.legacyImport();
+      if(s){
+        var o=JSON.parse(s);
+        for(var kk in o)if(Object.prototype.hasOwnProperty.call(o,kk))localStorage.setItem(kk,o[kk]);
+        if(typeof Native.legacyImportDone==='function')Native.legacyImportDone();
+      }
+    }
+  }catch(e){console.warn('[迁移]',e);}
+})();
+</script>
 <style>
 /* ===== iOS Spring Animation System ===== */
 :root{
@@ -32,8 +54,38 @@
   --red:#ff3b30;--green:#34c759;--blue:#007aff;--orange:#ff9500;
   --border:#e5e5ea;--r:14px;--g1:linear-gradient(135deg,#6366f1,#8b5cf6);
   --shadow:0 1px 3px rgba(0,0,0,.06);--safe:env(safe-area-inset-bottom,20px);
+  /* ===== 液态玻璃·紫色主题（参考 AndroidLiquidGlass SDF 折射） ===== */
+  --glass-bg:rgba(139,92,246,.07);           /* 极淡紫色基底，体现主题色 */
+  --glass-bg-strong:rgba(139,92,246,.11);   /* 稍强紫色（弹层/输入框） */
+  --glass-blur:blur(13px) saturate(165%);     /* 基底模糊（13px 已足够玻璃感，比 20px 省约 1/3 采样） */
+  --glass-edge-blur:blur(20px) saturate(200%);/* 边缘折射环备用 */
+  --glass-edge:14px;                         /* 折射区域厚度（refractionHeight） */
+  --glass-border:rgba(139,92,246,.20);        /* 紫色描边 */
+  --glass-border-strong:rgba(139,92,246,.30); /* 强化描边 */
+  --glass-highlight:rgba(255,255,255,.6);     /* 顶部高光 */
+  --glass-shadow:0 8px 22px rgba(99,102,241,.10);
+  --glass-inset-top:inset 0 1px 0 rgba(255,255,255,.65);
+  --glass-inset-bottom:inset 0 -1px 0 rgba(139,92,246,.12);
+  --glass-contact:inset 0 0 0 1px rgba(99,102,241,.06);/* 边缘接触暗环，增加深度 */
+
+  /* ===== 液态玻璃·光学参数（AndroidLiquidGlass SDF 折射 / 菲涅尔 / 色散） =====
+     这几个变量统一驱动玻璃的"光学层"，降级时只需在 body 上去掉 .lg class，布局完全不变 */
+  --lg-rim:.62;             /* 菲涅尔边缘高光强度（0~1），越大边缘越亮 */
+  --lg-blur-sm:blur(9px) saturate(150%);  /* 低配设备用的更轻模糊 */
 }
-body.dk{--bg:#121212;--card:#1e1e1e;--card2:#2c2c2c;--text:#e8e8e8;--t2:#a0a0a0;--t3:#666;--border:#3a3a3a;--shadow:0 1px 3px rgba(0,0,0,.4);}
+body.dk{--bg:#121212;--card:#1e1e1e;--card2:#2c2c2c;--text:#e8e8e8;--t2:#a0a0a0;--t3:#82828f;--border:#3a3a3a;--shadow:0 1px 3px rgba(0,0,0,.4);
+  --glass-bg:rgba(139,92,246,.11);
+  --glass-bg-strong:rgba(139,92,246,.15);
+  --glass-edge-blur:blur(38px) saturate(220%);
+  --glass-edge:14px;
+  --glass-border:rgba(139,92,246,.28);
+  --glass-border-strong:rgba(139,92,246,.38);
+  --glass-highlight:rgba(255,255,255,.18);
+  --glass-shadow:0 8px 24px rgba(0,0,0,.5);
+  --glass-inset-top:inset 0 1px 0 rgba(255,255,255,.14);
+  --glass-inset-bottom:inset 0 -1px 0 rgba(139,92,246,.18);
+  --glass-contact:inset 0 0 0 1px rgba(139,92,246,.08);
+}
 
 /* ===== Reset & Base ===== */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -47,117 +99,245 @@ a{color:inherit;text-decoration:none}
 img{max-width:100%;display:block}
 
 /* ===== App Container ===== */
-#app{max-width:480px;margin:0 auto;height:100vh;height:100dvh;position:relative;overflow:hidden;padding-bottom:calc(74px + var(--safe));display:flex;flex-direction:column;contain:layout style}
+#app{max-width:480px;margin:0 auto;height:100vh;height:100dvh;position:relative;overflow:hidden;overflow:clip;padding-bottom:calc(74px + var(--safe));display:flex;flex-direction:column;contain:layout style}
 /* 状态栏安全区高度（透明状态栏后由顶栏 padding 吸收；不支持的设备用 24px 兜底） */
 :root{--safe-top:env(safe-area-inset-top,24px)}
 
 /* ===== Top Bar ===== */
-.top-bar{display:flex;align-items:center;justify-content:space-between;padding:calc(var(--safe-top) + 10px) 20px 10px;position:sticky;top:0;z-index:100;
-  /* 液态玻璃：透明状态栏下，状态栏区域透出此毛玻璃背景，呈现「通透」质感 */
-  background:rgba(255,255,255,.5);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);
-  border-bottom:1px solid rgba(255,255,255,.25);transition:background-color .25s ease}
-body.dk .top-bar{background:rgba(25,25,30,.5);border-bottom-color:rgba(255,255,255,.08)}
+.top-bar{display:flex;align-items:center;justify-content:space-between;padding:calc(var(--safe-top) + 8px) 20px 8px;position:relative;z-index:100;flex-shrink:0;
+  /* 液态玻璃：淡紫色毛玻璃 + 折射感（饱和压到 130%：与 Dock 同源，
+     过高会把背景极光拉成一条艳色带） */
+  background:var(--glass-bg);backdrop-filter:blur(18px) saturate(130%);-webkit-backdrop-filter:blur(18px) saturate(130%);
+  border-bottom:1px solid var(--glass-border);
+  box-shadow:var(--glass-inset-bottom),0 1px 0 rgba(255,255,255,.65);
+  transition:background-color .25s ease}
+body.dk .top-bar{background:var(--glass-bg);border-bottom-color:var(--glass-border);backdrop-filter:blur(18px) saturate(130%) brightness(.9);-webkit-backdrop-filter:blur(18px) saturate(130%) brightness(.9)}
 .top-bar .title{font-size:20px;font-weight:700;letter-spacing:-.3px}
 .top-bar .actions{display:flex;gap:8px;align-items:center}
 .top-bar .btn-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--t2);transition:background .2s}
-.top-bar .btn-icon:active{background:var(--card2)}
+.top-bar .btn-icon:active{background:var(--glass-bg)}
 .top-bar .btn-icon.dk-mode{font-size:20px}
 .date-time{font-size:11px;color:var(--t2);font-weight:500;letter-spacing:.5px;opacity:.8}
 
 /* ===== Pages：水平排列，每页独立垂直滚动，永不卸载 ===== */
 .pages{flex:1;min-height:0;display:flex;width:400%;overflow:hidden;
-  transform:translateX(0);transition:transform .32s var(--spring-entrance);will-change:transform}
+  transform:translateX(0);transition:transform .32s var(--spring-entrance);will-change:transform;
+  /* 关键：垂直方向交给浏览器原生滚动，绝不被 JS 拦截 */
+  touch-action:pan-y}
 .page{flex:0 0 25%;width:25%;height:100%;overflow-y:auto;overflow-x:hidden;
-  -webkit-overflow-scrolling:touch;padding:0 16px 16px;box-sizing:border-box}
+  -webkit-overflow-scrolling:touch;padding:10px 16px 90px;box-sizing:border-box;position:relative;overscroll-behavior:contain;
+  /* 布局隔离：四页同时在 DOM 里，让每页的布局计算彼此独立，
+     切页 transform 只移动四个独立的层（不用 paint，避免把卡片外溢阴影/扫光裁掉） */
+  contain:layout;
+  touch-action:pan-y}
+/* 后台页关掉玻璃模糊：backdrop-filter 是最贵的 GPU 开销，
+   后台页被裁在视口外本来就看不见，关掉省电又不影响观感 */
+.page:not(.active) .card,
+.page:not(.active) .card2,
+.page:not(.active) .section-title,
+.page:not(.active) .today-summary,
+.page:not(.active) .type-toggle,
+.page:not(.active) .profile-card{backdrop-filter:none;-webkit-backdrop-filter:none}
 /* 切换时不再用 display，水平 transform 即可；保留 fadeIn 供局部元素使用 */
 @keyframes fadeIn{from{opacity:0;transform:scale(.97) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+/* 后台页暂停常驻动画（4 页永不卸载，避免无谓的合成层每帧计算） */
+.page:not(.active) .coin-clock-coin,
+.page:not(.active) .wg-shine{animation-play-state:paused}
+/* 底部 dock 上方模糊渐隐层：内容接近悬浮胶囊时自然虚化过渡 */
+#app::after{content:'';position:absolute;left:0;right:0;bottom:calc(54px + var(--safe));height:44px;
+  background:linear-gradient(to bottom,transparent 0%,var(--bg) 90%);
+  pointer-events:none;z-index:50}
 
-/* ===== Bottom Nav ===== */
-.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:calc(100% - 16px);max-width:464px;border-radius:18px 18px 0 0;display:flex;padding:6px 0 calc(8px + var(--safe));z-index:100;transition:background .3s,box-shadow .3s;
-  /* 液态玻璃效果 */
-  background:rgba(255,255,255,.55);
-  backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);
-  border:1px solid rgba(255,255,255,.35);border-bottom:none;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.6),inset 0 -1px 0 rgba(255,255,255,.1),0 -4px 24px rgba(0,0,0,.1);
-}
-body.dk .bottom-nav{background:rgba(30,30,35,.55);border-color:rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 -4px 24px rgba(0,0,0,.4)}
-.bottom-nav .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;color:var(--t2);font-size:11px;transition:color .2s;border:none;background:none;cursor:pointer}
-.bottom-nav .nav-item.active{color:var(--p)}
-.bottom-nav .nav-item .nav-icon{font-size:22px;line-height:1}
-.bottom-nav .nav-item .nav-label{font-weight:500}
-.bottom-nav .nav-item.active .nav-icon{animation:bounce .45s var(--spring-bounce)}
-/* ===== 液态玻璃指示器（极透紫色玻璃） ===== */
-.nav-indicator{position:absolute;top:50%;height:calc(100% - 4px);border-radius:14px;z-index:3;cursor:grab;touch-action:none;user-select:none;pointer-events:auto;
-  transition:left .5s var(--spring-bounce),width .5s var(--spring-bounce),transform .15s ease;
-  transform:translateY(-50%);
-  /* 极透玻璃基底：几乎透明，仅留极淡紫色调 */
-  background:
-    linear-gradient(135deg,rgba(139,92,246,.07),rgba(99,102,241,.05) 50%,rgba(168,85,247,.06));
-  backdrop-filter:blur(20px) saturate(200%);-webkit-backdrop-filter:blur(20px) saturate(200%);
-  /* 紫色描边 + 白色高光边，营造通透玻璃边缘 */
-  border:1px solid rgba(139,92,246,.22);
+/* ===== Bottom Nav：悬浮玻璃胶囊（酷安/Apple 液态玻璃风格） ===== */
+.bottom-nav{position:fixed;bottom:calc(4px + var(--safe));left:50%;transform:translateX(-50%);width:calc(100% - 24px);max-width:464px;border-radius:26px;display:flex;padding:6px 6px;z-index:100;transition:background .3s,box-shadow .3s;touch-action:none;-webkit-user-select:none;user-select:none;
+  /* 悬浮白色玻璃胶囊：透出页面后方内容，非纯色块 */
+  background:rgba(255,255,255,.78);
+  backdrop-filter:blur(16px) saturate(112%);-webkit-backdrop-filter:blur(16px) saturate(112%);
+  border:1px solid rgba(255,255,255,.75);
   box-shadow:
-    0 2px 12px rgba(99,102,241,.10),
-    0 1px 3px rgba(139,92,246,.08),
-    inset 0 1px 0 rgba(255,255,255,.7),
-    inset 0 -1px 0 rgba(139,92,246,.12),
-    inset 1px 0 0 rgba(255,255,255,.3),
-    inset -1px 0 0 rgba(255,255,255,.15);
+    0 8px 28px rgba(60,60,90,.16),
+    0 2px 8px rgba(60,60,90,.08),
+    inset 0 1px 0 rgba(255,255,255,.95),
+    inset 0 -1px 2px rgba(255,255,255,.5);
   overflow:hidden;
 }
-/* 玻璃高光层：顶部弧形反光（更强） */
-.nav-indicator::before{content:'';position:absolute;inset:0;border-radius:13px;pointer-events:none;
+/* 边缘折射环已移除：Dock 是横向长条，14px 宽的渐变环沿四周走一圈，在两端圆角处
+   会被渲染成一条明显的"渐变长方形描边"，像多贴了一层框。玻璃感改由 ::after 角落高光
+   + 内阴影 + 半透明白底承担，视觉更干净 */
+.bottom-nav>*{position:relative;z-index:1}
+/* 深色模式：背景与页面底色同系且更通透、边框和高光环压到很淡——Dock 直接融进背景，不再是一条突兀的深色带 */
+body.dk .bottom-nav{background:rgba(18,18,18,.5);border-color:rgba(255,255,255,.1);box-shadow:0 2px 10px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.1)}
+/* 液态玻璃：角落 specular 光斑（bloom）——浅深两层折射渐变 */
+.bottom-nav::after{content:'';position:absolute;inset:0;border-radius:26px;pointer-events:none;z-index:0;
   background:
-    linear-gradient(180deg,rgba(255,255,255,.45) 0%,rgba(255,255,255,.12) 28%,transparent 50%),
-    linear-gradient(135deg,rgba(255,255,255,.15) 0%,transparent 40%);
-}
-/* 玻璃流动高光：斜向反光条，动画移动 */
-.nav-indicator::after{content:'';position:absolute;top:-50%;left:-60%;width:50%;height:200%;pointer-events:none;
-  background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.5) 48%,rgba(255,255,255,.18) 52%,transparent 70%);
-  transform:skewX(-15deg);
-  animation:glassShine 3.2s ease-in-out infinite;
-}
-@keyframes glassShine{0%,100%{left:-60%;opacity:.5}50%{left:110%;opacity:.85}}
-/* 拖拽时：玻璃增强 */
-.nav-indicator.dragging{transition:none;cursor:grabbing;
-  backdrop-filter:blur(26px) saturate(220%);-webkit-backdrop-filter:blur(26px) saturate(220%);
-  background:linear-gradient(135deg,rgba(139,92,246,.10),rgba(99,102,241,.08) 50%,rgba(168,85,247,.09));
-  border-color:rgba(139,92,246,.32);
+    radial-gradient(130% 70% at 18% -10%,rgba(255,255,255,.40),transparent 55%),
+    radial-gradient(120% 60% at 85% 112%,rgba(255,255,255,.16),transparent 60%)}
+/* （旧 @supports 折射检测已删除：@supports 对 backdrop-filter:url() 存在假阳性——
+   浏览器会声称支持却整条声明作废，导致"折射"静默失效。现改为 JS 实测后加 body.lg-refract，
+   详见文件底部「液态玻璃 v2 光学层」区块。） */
+.bottom-nav .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 0;color:var(--t2);font-size:11px;transition:color .25s;border:none;background:none;cursor:pointer;position:relative;z-index:1;border-radius:20px}
+.bottom-nav .nav-item.active{color:var(--p);z-index:4}
+.bottom-nav .nav-item .nav-icon{font-size:21px;line-height:1;transition:transform .3s var(--spring-bounce)}
+.bottom-nav .nav-item .nav-label{font-weight:600}
+.bottom-nav .nav-item.active .nav-icon{animation:bounce .5s var(--spring-bounce)}
+/* ===== 果冻液态玻璃指示器（Apple/酷安质感：白玻璃 + 折射 + Q弹） ===== */
+/* 玻璃块浮在 Tab 上层（保持可拖拽），但把选中的图标/文字再抬高一层，避免被玻璃糊成一片白 */
+.nav-indicator{position:absolute;top:50%;height:calc(100% - 6px);border-radius:20px;z-index:3;cursor:grab;touch-action:none;user-select:none;pointer-events:auto;
+  transition:left .55s var(--spring-bounce),width .55s var(--spring-bounce);
+  transform:translateY(-50%);transform-origin:center center;will-change:transform;
+  /* 淡紫玻璃：白玻璃打底 + 紫调水洗，亮度始终高于所在 Dock，不再发灰发黑 */
+  background:linear-gradient(160deg,rgba(255,255,255,.86),rgba(243,240,255,.74) 46%,rgba(224,214,255,.80));
+  backdrop-filter:blur(12px) saturate(130%);-webkit-backdrop-filter:blur(12px) saturate(130%);
+  border:1px solid rgba(255,255,255,.80);
   box-shadow:
-    0 6px 22px rgba(99,102,241,.16),
-    0 2px 6px rgba(139,92,246,.12),
-    inset 0 1px 0 rgba(255,255,255,.75),
-    inset 0 -1px 0 rgba(139,92,246,.16),
-    inset 1px 0 0 rgba(255,255,255,.35),
-    inset -1px 0 0 rgba(255,255,255,.18);
+    0 6px 16px rgba(139,110,214,.18),
+    0 2px 5px rgba(139,110,214,.11),
+    inset 0 1px 0 rgba(255,255,255,.98),
+    inset 0 -3px 9px rgba(167,139,250,.26),
+    inset 2px 0 5px rgba(255,255,255,.70),
+    inset -2px 0 5px rgba(224,214,255,.55);
+  overflow:hidden;
 }
-body.dk .nav-indicator{background:linear-gradient(135deg,rgba(139,92,246,.12),rgba(99,102,241,.10) 50%,rgba(168,85,247,.11));border-color:rgba(139,92,246,.28)}
-body.dk .nav-indicator::before{background:linear-gradient(180deg,rgba(255,255,255,.22) 0%,rgba(255,255,255,.05) 28%,transparent 50%)}
+/* 边缘折射环：纯高光环，不再叠加第二层 backdrop-filter（省一层 GPU 模糊） */
+.nav-indicator::before{content:'';position:absolute;inset:0;padding:9px;border-radius:19px;pointer-events:none;z-index:1;
+  background:linear-gradient(150deg,rgba(255,255,255,.34),rgba(255,255,255,.04) 45%,rgba(255,255,255,.20));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;opacity:.85;
+  box-shadow:inset 0 0 12px rgba(255,255,255,.38)}
+/* 玻璃流动高光已整体移除：循环扫过的反光条会在卡片/Dock 上形成一条生硬的长方形横条，浅深色都难看 */
+/* 果冻挤压回弹：切换 Tab 时 squash & stretch，Q弹果冻感 */
+.nav-indicator.jelly{animation:jellySquish .62s var(--spring-smooth)}
+@keyframes jellySquish{
+  0%{transform:translateY(-50%) scaleX(1) scaleY(1)}
+  22%{transform:translateY(-50%) scaleX(1.24) scaleY(.76)}
+  45%{transform:translateY(-50%) scaleX(.86) scaleY(1.16)}
+  65%{transform:translateY(-58%) scaleX(1.08) scaleY(.93)}
+  82%{transform:translateY(-47%) scaleX(.96) scaleY(1.04)}
+  100%{transform:translateY(-50%) scaleX(1) scaleY(1)}
+}
+/* 拖拽时：玻璃增强 + 压扁果冻 */
+.nav-indicator.dragging{transition:none;cursor:grabbing;animation:none;
+  backdrop-filter:blur(14px) saturate(150%);-webkit-backdrop-filter:blur(14px) saturate(150%);
+  background:linear-gradient(165deg,rgba(255,255,255,.62),rgba(255,255,255,.32));
+  box-shadow:
+    0 10px 26px rgba(60,60,90,.22),
+    inset 0 1px 0 rgba(255,255,255,1),
+    inset 0 -2px 5px rgba(99,102,241,.10);
+}
+body.dk .nav-indicator{background:linear-gradient(160deg,rgba(255,255,255,.30),rgba(226,214,255,.20) 55%,rgba(255,255,255,.26));border-color:rgba(255,255,255,.34);
+  box-shadow:0 6px 18px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.46),inset 0 -3px 9px rgba(167,139,250,.26)}
+body.dk .nav-indicator::before{box-shadow:inset 0 0 12px rgba(255,255,255,.25)}
 .bottom-nav .nav-item{position:relative;z-index:1}
 @keyframes bounce{0%,100%{transform:translateY(0)}40%{transform:translateY(-3px)}70%{transform:translateY(1px)}}
 
-/* ===== Cards ===== */
-.card{background:rgba(255,255,255,.7);backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.06);transition:transform var(--t-fast) var(--spring-card),background .3s,box-shadow .3s;animation:cardIn .4s var(--spring-card) both;will-change:transform;border:1px solid rgba(255,255,255,.06)}
+/* ===== 液态玻璃增强层：极光背景 / 顶栏折射光线 / 按钮流光 / 选中脉冲 ===== */
+/* 背景极光：三团缓慢漂移的柔光，玻璃卡片透出它们才真正有“液态”流动感
+   纯 radial-gradient + transform（零 filter 模糊），只走合成层，滚动不吃帧 */
+.bg-aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.bg-aurora i{position:absolute;display:block;border-radius:50%;transform:translateZ(0);will-change:transform}
+.bg-aurora i:nth-child(1){width:80vmax;height:80vmax;left:-28vmax;top:-32vmax;
+  background:radial-gradient(closest-side,rgba(147,110,255,.58),rgba(147,110,255,.30) 42%,rgba(147,110,255,0) 73%);
+  animation:auroraA 34s ease-in-out infinite alternate}
+.bg-aurora i:nth-child(2){width:66vmax;height:66vmax;right:-26vmax;top:20vh;
+  background:radial-gradient(closest-side,rgba(96,165,250,.44),rgba(96,165,250,.21) 45%,rgba(96,165,250,0) 75%);
+  animation:auroraB 42s ease-in-out infinite alternate}
+.bg-aurora i:nth-child(3){width:60vmax;height:60vmax;left:-12vmax;bottom:-34vmax;
+  background:radial-gradient(closest-side,rgba(244,114,182,.24),rgba(244,114,182,.11) 46%,rgba(244,114,182,0) 75%);
+  animation:auroraC 38s ease-in-out infinite alternate}
+@keyframes auroraA{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(15vw,11vh,0) scale(1.15)}}
+@keyframes auroraB{from{transform:translate3d(0,0,0) scale(1.07)}to{transform:translate3d(-13vw,-9vh,0) scale(.92)}}
+/* 粉斑上飘幅度收窄：跑满一圈也不会飘到 Dock 下沿，否则会透过半透明 Dock
+   被 saturate 拉成一条粉色长带（用户反馈的"渐变长方框"就是它） */
+@keyframes auroraC{from{transform:translate3d(0,0,0) scale(.94)}to{transform:translate3d(17vw,-6vh,0) scale(1.06)}}
+body.dk .bg-aurora i{opacity:.66}
+@media (prefers-reduced-motion:reduce){.bg-aurora i{animation:none}}
+
+/* 顶栏：下沿一道折射高光线（左亮→中紫→右亮），滚动时玻璃变实并浮起阴影 */
+.top-bar::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1.5px;pointer-events:none;z-index:2;
+  background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.95) 15%,rgba(168,85,247,.55) 48%,rgba(255,255,255,.95) 85%,rgba(255,255,255,0));
+  opacity:.6;transition:opacity .3s}
+.top-bar.scrolled{background:rgba(255,255,255,.66);box-shadow:var(--glass-inset-bottom),0 8px 22px rgba(99,102,241,.12),0 1px 0 rgba(255,255,255,.7)}
+body.dk .top-bar.scrolled{background:rgba(26,24,40,.74);box-shadow:var(--glass-inset-bottom),0 8px 22px rgba(0,0,0,.45)}
+/* 切页时顶栏扫过一道液态反光 */
+.top-bar::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:0;z-index:1;
+  background:linear-gradient(100deg,transparent 28%,rgba(255,255,255,.78) 47%,rgba(196,181,253,.55) 56%,transparent 74%)}
+.top-bar.flare::before{animation:barFlare .78s ease-out}
+@keyframes barFlare{0%{opacity:0;transform:translateX(-72%)}28%{opacity:.95}100%{opacity:0;transform:translateX(72%)}}
+
+/* 主按钮：背景本身缓慢流动（文字始终在上层，不靠伪元素盖字） */
+.btn-primary{background:linear-gradient(105deg,var(--g1) 0%,#8b5cf6 46%,var(--g1) 100%);background-size:240% 100%;background-position:0% 50%;animation:btnFlow 8s ease-in-out infinite}
+@keyframes btnFlow{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+
+/* 分类选中：呼吸脉冲光晕，一眼看出选了哪个 */
+.cat-item.selected{animation:catGlow 2.2s ease-in-out infinite}
+@keyframes catGlow{
+  0%,100%{box-shadow:0 2px 12px rgba(99,102,241,.18),0 0 0 0 rgba(139,92,246,.34)}
+  50%{box-shadow:0 7px 20px rgba(99,102,241,.32),0 0 0 7px rgba(139,92,246,0)}}
+
+/* 次级卡 / 账单行：（原循环扫光横条已移除，只留静态玻璃底 + 折射环） */
+.card2>*,.bill-item>*{position:relative;z-index:1}
+.page:not(.active) .btn-primary{animation-play-state:paused}
+
+/* 金额输入：聚焦时底部浮起一团紫色光晕 */
+.amount-input-wrap{position:relative}
+.amount-input-wrap::before{content:'';position:absolute;left:50%;top:50%;width:300px;height:150px;z-index:-1;pointer-events:none;
+  transform:translate(-50%,-50%);background:radial-gradient(closest-side,rgba(139,92,246,.30),rgba(139,92,246,0) 76%);
+  opacity:.4;transition:opacity .35s var(--spring-soft),transform .35s var(--spring-soft)}
+.amount-input-wrap:focus-within::before{opacity:1;transform:translate(-50%,-50%) scale(1.16)}
+
+/* 章节条：极淡的斜向流光底纹（中间高光压到很低，避免渲染成一条刺眼的渐变长方形） */
+.section-title{background:linear-gradient(100deg,var(--glass-bg) 0%,rgba(255,255,255,.14) 42%,var(--glass-bg) 78%)}
+body.dk .section-title{background:linear-gradient(100deg,var(--glass-bg) 0%,rgba(255,255,255,.05) 40%,var(--glass-bg) 76%);color:var(--t2)}
+
+/* ===== Cards — 液态玻璃核心（SDF 边缘折射 + 定向高光 + 接触阴影） ===== */
+.card{position:relative;background:linear-gradient(135deg,var(--glass-highlight) 0%,rgba(255,255,255,.18) 24%,transparent 52%),linear-gradient(180deg,rgba(255,255,255,.22),transparent 28%),var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:var(--glass-shadow),var(--glass-inset-top),var(--glass-inset-bottom),var(--glass-contact);transition:transform var(--t-fast) var(--spring-card),background .3s,box-shadow .3s;animation:cardIn .4s var(--spring-card) both;border:1px solid var(--glass-border);overflow:hidden}
+/* 流动反光条已整体移除：它会在卡片上形成一条生硬的长方形横条（浅色发白、深色发灰），只留静态高光 + 折射环 */
+/* 深色主题：折射环压淡，避免卡片边缘出现生硬的白色方框 */
+body.dk .card::after,body.dk .card2::after{opacity:.4}
+/* 边缘折射环：纯高光渐变环，去掉第二层 backdrop-filter（滚动流畅度关键） */
+.card::after{content:'';position:absolute;inset:0;padding:var(--glass-edge);border-radius:var(--r);pointer-events:none;z-index:0;
+  background:linear-gradient(150deg,rgba(255,255,255,.70),rgba(255,255,255,.05) 45%,rgba(255,255,255,.34));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  opacity:.75}
+.card>*{position:relative;z-index:1}
 .card:active{transform:scale(.97)}
 @keyframes cardIn{from{opacity:0;transform:translateY(20px) scale(.94)}to{opacity:1;transform:translateY(0) scale(1)}}
-.card2{background:var(--card2);border-radius:var(--r);padding:14px;margin-bottom:10px;transition:background .3s}
-.section-title{font-size:14px;font-weight:600;color:var(--t2);margin:16px 0 8px;text-transform:uppercase;letter-spacing:.5px;animation:sectionIn .4s var(--spring-soft) both}
+.card2{position:relative;background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border-radius:var(--r);padding:14px;margin-bottom:10px;transition:background .3s;border:1px solid var(--glass-border);box-shadow:var(--glass-inset-top),var(--glass-inset-bottom),var(--glass-contact);overflow:hidden}
+.card2::after{content:'';position:absolute;inset:0;padding:10px;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(150deg,rgba(255,255,255,.62),rgba(255,255,255,.05) 45%,rgba(255,255,255,.28));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;opacity:.7}
+/* 章节标题：玻璃条——半透明底 + 毛玻璃折射 + 顶部高光
+   文字用石板灰而非 --t2 次级灰：压在淡紫玻璃上需要更强对比 */
+.section-title{font-size:14px;font-weight:600;color:#5f5d70;margin:16px 0 8px;text-transform:uppercase;letter-spacing:.5px;animation:sectionIn .4s var(--spring-soft) both;
+  padding:7px 12px;border-radius:10px;background:var(--glass-bg);border:1px solid var(--glass-border);
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+  box-shadow:var(--glass-inset-top),var(--glass-inset-bottom)}
 @keyframes sectionIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
 
 /* ===== Page 1: Record ===== */
-.type-toggle{display:flex;gap:0;background:var(--card2);border-radius:var(--r);padding:3px;margin-bottom:16px}
+.type-toggle{position:relative;display:flex;gap:0;background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:var(--r);padding:3px;margin-bottom:16px}
+/* 果冻滑块：支出在左、收入在右，切换时从一边 Q 弹滑到另一边 */
+.type-toggle .tt-slider{position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:calc(var(--r) - 2px);background:var(--g1);box-shadow:0 2px 8px rgba(99,102,241,.3);transition:transform .5s var(--spring-smooth);pointer-events:none;z-index:0}
+.type-toggle.income .tt-slider{transform:translateX(100%)}
+.type-toggle .tt-slider.jelly{animation:ttSquish .55s var(--spring-smooth)}
+@keyframes ttSquish{0%{scale:1 1}30%{scale:1.12 .84}60%{scale:.94 1.07}100%{scale:1 1}}
 /* 今日收支摘要 */
-.today-summary{display:flex;align-items:center;justify-content:space-around;background:var(--card);border-radius:14px;padding:10px 16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+.today-summary{display:flex;align-items:center;justify-content:space-around;background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:14px;padding:12px 16px;margin-bottom:12px;box-shadow:var(--glass-inset-top),var(--glass-inset-bottom)}
 .ts-item{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
-.ts-label{font-size:11px;color:var(--t3)}
-.ts-value{font-size:16px;font-weight:700}
-.ts-expense{color:var(--green,#34c759)}
-.ts-income{color:var(--red,#ff3b30)}
-.ts-divider{width:1px;height:28px;background:var(--border)}
-.type-toggle button{flex:1;padding:10px;border:none;border-radius:calc(var(--r) - 2px);font-size:15px;font-weight:600;background:transparent;color:var(--t2);cursor:pointer;transition:all .3s var(--spring-bounce)}
-.type-toggle button.active{background:var(--g1);color:#fff;box-shadow:0 2px 8px rgba(99,102,241,.3)}
+/* 今日收支：标签和金额都要一眼可读（旧版标签 #aeaeb2、金额用系统绿/红，贴在淡紫玻璃上几乎看不清） */
+.ts-label{font-size:12px;font-weight:600;color:var(--t2);letter-spacing:.2px}
+.ts-value{font-size:18px;font-weight:800;letter-spacing:.2px}
+.ts-expense{color:#0a9e4b}
+.ts-income{color:#d93a2b}
+body.dk .ts-expense{color:#32d74b}
+body.dk .ts-income{color:#ff5c52}
+.ts-divider{width:1px;height:28px;background:var(--glass-border)}
+.type-toggle button{position:relative;z-index:1;flex:1;padding:10px;border:none;border-radius:calc(var(--r) - 2px);font-size:15px;font-weight:600;background:transparent;color:var(--t2);cursor:pointer;transition:color .3s var(--spring-bounce)}
+.type-toggle button.active{background:transparent;color:#fff;box-shadow:none}
 
-.budget-reminder{font-size:12px;color:var(--t2);text-align:center;padding:6px 12px;background:var(--card2);border-radius:8px;margin-bottom:8px;animation:fadeIn .3s var(--spring-soft)}
+.budget-reminder{font-size:12px;color:var(--t2);text-align:center;padding:6px 12px;background:var(--glass-bg);border-radius:8px;margin-bottom:8px;border:1px solid var(--glass-border);animation:fadeIn .3s var(--spring-soft);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .budget-reminder.warn{color:var(--red);background:rgba(255,59,48,.08)}
 .budget-reminder.good{color:var(--green);background:rgba(52,199,89,.08)}
 .amount-input-wrap{display:flex;align-items:center;justify-content:center;padding:12px 0;margin-bottom:4px;transition:transform .3s var(--spring-soft)}
@@ -168,20 +348,20 @@ body.dk .nav-indicator::before{background:linear-gradient(180deg,rgba(255,255,25
 .amount-input-wrap input::placeholder{color:var(--t3)}
 
 .quick-amounts{display:flex;gap:8px;margin-bottom:16px}
-.quick-amounts button{flex:1;padding:8px 4px;background:var(--card2);border:1px solid var(--border);border-radius:20px;font-size:14px;font-weight:600;color:var(--text);transition:all .2s;font-variant-numeric:tabular-nums}
+.quick-amounts button{flex:1;padding:8px 4px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:20px;font-size:14px;font-weight:600;color:var(--text);transition:all .2s;font-variant-numeric:tabular-nums}
 .quick-amounts button:active{background:var(--p);color:#fff;border-color:var(--p)}
 
 .cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
-.cat-item{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;border-radius:var(--r);background:var(--card2);transition:all .35s var(--spring-bounce);border:2px solid transparent;cursor:pointer;will-change:transform;animation:catIn .35s var(--spring-soft) both}
+.cat-item{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;border-radius:var(--r);background:var(--glass-bg);border:1px solid var(--glass-border);transition:all .35s var(--spring-bounce);cursor:pointer;animation:catIn .35s var(--spring-soft) both}
 .cat-item .cat-emoji{font-size:26px;line-height:1;transition:transform .35s var(--spring-bounce)}
 .cat-item:active .cat-emoji,.cat-item.selected .cat-emoji{transform:scale(1.15)}
-.cat-item:active,.cat-item.selected{background:var(--card);border-color:var(--p);transform:scale(.95);box-shadow:0 2px 12px rgba(99,102,241,.15)}
+.cat-item:active,.cat-item.selected{background:var(--glass-bg-strong);border-color:var(--p);transform:scale(.95);box-shadow:0 2px 12px rgba(99,102,241,.15)}
 @keyframes catIn{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
 .cat-item .cat-name{font-size:11px;color:var(--t2);font-weight:500}
 
 .row{display:flex;gap:10px;align-items:center;margin-bottom:12px}
 .row label{font-size:14px;color:var(--t2);white-space:nowrap;min-width:40px}
-.row input[type="date"],.row input[type="time"],.row input[type="text"]{flex:1;padding:10px 12px;background:var(--card2);border-radius:10px;font-size:15px;color:var(--text);border:1px solid var(--border);font-family:inherit}
+.row input[type="date"],.row input[type="time"],.row input[type="text"]{flex:1;padding:10px 12px;background:var(--glass-bg);border-radius:10px;font-size:15px;color:var(--text);border:1px solid var(--glass-border);font-family:inherit}
 .row input[type="date"]:focus,.row input[type="time"]:focus,.row input[type="text"]:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(99,102,241,.1)}
 .row input[type="date"],.row input[type="time"]{color-scheme:light}body.dk .row input[type="date"],body.dk .row input[type="time"]{color-scheme:dark}
 .row input[type="time"]::-webkit-calendar-picker-indicator{filter:invert(var(--inv,0));opacity:.6}body.dk .row input[type="time"]{--inv:1}
@@ -194,29 +374,33 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 .backfill-btn:active{transform:scale(.95)}
 
 .mood-selector{display:flex;gap:8px;margin-bottom:16px}
-.mood-selector button{flex:1;padding:10px;border-radius:10px;background:var(--card2);font-size:14px;color:var(--t2);border:2px solid transparent;transition:all .2s}
-.mood-selector button.active{border-color:var(--p);color:var(--text);background:var(--card)}
+.mood-selector button{flex:1;padding:10px;border-radius:10px;background:var(--glass-bg);border:1px solid var(--glass-border);font-size:14px;color:var(--t2);transition:all .2s}
+.mood-selector button.active{border-color:var(--p);color:var(--text);background:var(--glass-bg-strong)}
 
 
-.btn-primary{width:100%;padding:14px;background:var(--g1);color:#fff;border:none;border-radius:var(--r);font-size:17px;font-weight:600;letter-spacing:.5px;transition:transform .4s var(--spring-bounce),opacity .15s,box-shadow .2s;margin-top:4px;will-change:transform;box-shadow:0 4px 14px rgba(99,102,241,.3)}
+.btn-primary{width:100%;padding:14px;background:var(--g1);color:#fff;border:none;border-radius:var(--r);font-size:17px;font-weight:600;letter-spacing:.5px;transition:transform .4s var(--spring-bounce),opacity .15s,box-shadow .2s;margin-top:4px;will-change:transform;box-shadow:0 4px 14px rgba(99,102,241,.3),inset 0 1px 0 rgba(255,255,255,.38),inset 0 -2px 4px rgba(0,0,0,.12)}
 .btn-primary:active{transform:scale(.96) translateY(1px);opacity:.85;box-shadow:0 1px 4px rgba(99,102,241,.2)}
 
 /* ===== Page 2: Bills ===== */
-.search-box{display:flex;align-items:center;gap:8px;background:var(--card2);border-radius:10px;padding:8px 14px;margin-bottom:12px;border:1.5px solid var(--border);transition:border-color .3s var(--spring-soft),box-shadow .3s var(--spring-soft)}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--glass-bg);border-radius:10px;padding:8px 14px;margin-bottom:12px;border:1px solid var(--glass-border);transition:border-color .3s var(--spring-soft),box-shadow .3s var(--spring-soft)}
 .search-box:focus-within{border-color:var(--p);box-shadow:0 0 0 3px rgba(99,102,241,.12)}
 .search-box input{flex:1;font-size:15px;color:var(--text);background:transparent}
 .search-box .search-icon{font-size:16px;color:var(--t3)}
 
 .filter-tags{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:8px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .filter-tags::-webkit-scrollbar{display:none}
-.filter-tag{padding:6px 14px;border-radius:20px;font-size:13px;font-weight:500;white-space:nowrap;background:var(--card2);color:var(--t2);border:1px solid var(--border);transition:all .2s;flex-shrink:0}
+.filter-tag{padding:6px 14px;border-radius:20px;font-size:13px;font-weight:500;white-space:nowrap;background:var(--glass-bg);color:var(--t2);border:1px solid var(--glass-border);transition:all .2s;flex-shrink:0}
 .filter-tag.active{background:var(--p);color:#fff;border-color:var(--p)}
 
-.bill-list{display:flex;flex-direction:column;gap:8px}
-.bill-item{display:flex;align-items:center;padding:12px;background:var(--card);border-radius:var(--r);gap:12px;transition:transform var(--t-normal) var(--spring-entrance),background .2s;box-shadow:var(--shadow);will-change:transform,opacity;animation:staggerFadeUp .4s var(--spring-entrance) both}
-.bill-item:active{background:var(--card2);transform:scale(.98)}
+/* 列表只叠一层毛玻璃：1500 行各带 backdrop-filter 会生成 1500 个模糊层，滚动直接掉到 5fps */
+.bill-list{display:flex;flex-direction:column;gap:8px;backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
+.bill-item{display:flex;align-items:center;padding:12px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:var(--r);gap:12px;transition:transform var(--t-normal) var(--spring-entrance),background .2s;box-shadow:var(--glass-inset-top),var(--glass-inset-bottom),var(--glass-contact);animation:staggerFadeUp .4s var(--spring-entrance) both;content-visibility:auto;contain-intrinsic-size:auto 45px}
+.bill-item:active{background:var(--glass-bg-strong);transform:scale(.98)}
 @keyframes billIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
-.bill-item .bill-emoji{font-size:28px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;flex-shrink:0;transition:transform var(--t-fast) var(--spring-bounce);will-change:transform}
+/* 注意：这里不能加 will-change——列表上千行时每行一个 emoji 会生成上千个合成层，滚动显存暴涨；
+   contain-intrinsic-size 按「内容盒」算：45 + 24 padding + 2 border = 71px，和真实行高一致，
+   跳过渲染的行不会把滚动条撑歪（曾试过 66 → 实际 92px，滚动几何会跳） */
+.bill-item .bill-emoji{font-size:28px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;flex-shrink:0;transition:transform var(--t-fast) var(--spring-bounce)}
 .bill-item .bill-emoji:active{transform:scale(.85) rotate(-12deg)}
 .bill-item .bill-info{flex:1;min-width:0}
 .bill-item .bill-cat{font-size:15px;font-weight:600}
@@ -224,11 +408,11 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 .bill-item .bill-amount{font-size:17px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;animation:numberScrollIn .5s var(--spring-entrance) both}
 .bill-item .bill-amount.expense{color:var(--red)}
 .bill-item .bill-amount.income{color:var(--green)}
-.time-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:8px;background:var(--card2);font-size:11px;font-variant-numeric:tabular-nums;color:var(--t2)}
+.time-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:8px;background:var(--glass-bg);font-size:11px;font-variant-numeric:tabular-nums;color:var(--t2)}
 .time-badge.recent{color:var(--p);background:rgba(99,102,241,.12)}
 .bill-item .bill-actions{display:flex;gap:4px;flex-shrink:0}
-.bill-item .bill-actions button{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--t2);background:var(--card2);transition:all .2s}
-.bill-item .bill-actions button:active{background:var(--border)}
+.bill-item .bill-actions button{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--t2);background:var(--glass-bg);transition:all .2s}
+.bill-item .bill-actions button:active{background:var(--glass-bg-strong)}
 
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:var(--t3)}
 .empty-state .empty-emoji{font-size:56px;margin-bottom:12px}
@@ -238,131 +422,120 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 /* ===== Page 3: Stats ===== */
 /* 组件工具栏 */
 .widget-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px}
-.widget-view-toggle{display:flex;background:var(--card2);border-radius:10px;padding:3px}
+.widget-view-toggle{display:flex;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:3px;backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);box-shadow:var(--glass-inset-top),var(--glass-inset-bottom)}
 .wvt-btn{padding:7px 14px;border:none;border-radius:8px;font-size:13px;font-weight:600;background:transparent;color:var(--t2);cursor:pointer;transition:all .25s var(--spring-bounce)}
 .wvt-btn.active{background:var(--g1);color:#fff;box-shadow:0 2px 8px rgba(99,102,241,.3)}
-.widget-manage-btn{padding:7px 12px;border:1px solid var(--border);border-radius:10px;font-size:12px;background:var(--card);color:var(--t2);cursor:pointer;transition:all .2s}
+.widget-manage-btn{padding:7px 12px;border:1px solid var(--glass-border);border-radius:10px;font-size:12px;background:var(--glass-bg);color:var(--t2);cursor:pointer;transition:all .2s;backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);box-shadow:var(--glass-inset-top)}
 .widget-manage-btn:active{transform:scale(.95)}
-/* 列表视图：默认全宽 */
-#statsWidgets{display:flex;flex-direction:column;gap:0;transition:all .4s var(--spring-bounce)}
-.widget-box{display:block;transition:all .4s var(--spring-bounce)}
+/* ===== 列表视图：全宽卡片堆叠，类似信息流 ===== */
+#statsWidgets{display:flex;flex-direction:column;gap:12px;transition:opacity .25s,transform .25s}
+.widget-box{display:block;transition:all .3s var(--spring-bounce)}
 .widget-box.hidden{display:none!important}
 /* "+"添加组件按钮 - 列表模式 */
-.widget-add-btn{display:flex;align-items:center;justify-content:center;padding:24px;margin-bottom:12px;border-radius:var(--r);border:2px dashed var(--border);background:var(--card2);cursor:pointer;transition:all .2s;animation:cardIn .4s var(--spring-card) both}
+.widget-add-btn{display:flex;align-items:center;justify-content:center;padding:20px;border-radius:var(--r);border:2px dashed var(--glass-border);background:var(--glass-bg);cursor:pointer;transition:all .2s;animation:cardIn .4s var(--spring-card) both}
 .widget-add-btn:active{transform:scale(.97)}
 .add-widget-inner{display:flex;flex-direction:column;align-items:center;gap:6px}
 .add-icon-big{font-size:28px;font-weight:300;color:var(--p);line-height:1}
 .add-label{font-size:13px;color:var(--t3)}
-/* "+"添加组件按钮 - 网格模式 */
-.widget-add-btn.grid-mode{aspect-ratio:1/1;padding:0;margin:0}
 
-/* ===== 网格视图：两列小组件 - 全新设计 ===== */
-#statsWidgets.grid-view{display:grid;grid-template-columns:1fr 1fr;gap:12px;
-  transition:opacity .28s var(--spring-entrance),transform .28s var(--spring-entrance)}
-
-/* 小组件容器：毛玻璃 + 圆角 + 固定正方形 */
+/* ===== 网格视图：紧凑仪表盘卡片，自然高度，不固定正方形 ===== */
+#statsWidgets.grid-view{display:grid;grid-template-columns:1fr 1fr;gap:10px;
+  transition:opacity .25s,transform .25s}
+/* 网格小组件：紧凑液态玻璃卡片，高度由内容决定 */
 #statsWidgets.grid-view .widget-box{
-  background:rgba(255,255,255,.62);
-  backdrop-filter:blur(18px) saturate(170%);-webkit-backdrop-filter:blur(18px) saturate(170%);
-  border-radius:20px;padding:0;display:flex;flex-direction:column;overflow:hidden;
-  aspect-ratio:1/1;min-height:0;
-  border:1px solid rgba(255,255,255,.55);
-  box-shadow:0 6px 24px rgba(0,0,0,.07),inset 0 1px 0 rgba(255,255,255,.6);
-  animation:widgetPop .42s var(--spring-bounce) both;
-  transition:transform .25s var(--spring-bounce),box-shadow .25s;
+  position:relative;
+  background:var(--glass-bg);
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+  border-radius:16px;padding:0;display:flex;flex-direction:column;overflow:hidden;
+  border:1px solid var(--glass-border);
+  box-shadow:var(--glass-inset-top),0 2px 12px rgba(99,102,241,.08);
+  animation:widgetPop .35s var(--spring-bounce) both;
+  transition:transform .2s var(--spring-bounce),box-shadow .2s;
+  min-height:120px;
 }
-#statsWidgets.grid-view .widget-box:active{transform:scale(.97);box-shadow:0 2px 10px rgba(0,0,0,.08)}
+/* 网格高光层 */
+#statsWidgets.grid-view .widget-box::before{content:'';position:absolute;inset:0;border-radius:16px;pointer-events:none;z-index:0;
+  background:linear-gradient(135deg,var(--glass-highlight) 0%,transparent 50%);opacity:.4}
+#statsWidgets.grid-view .widget-box>*{position:relative;z-index:1}
+#statsWidgets.grid-view .widget-box:active{transform:scale(.97)}
 body.dk #statsWidgets.grid-view .widget-box{
-  background:rgba(40,40,48,.62);border-color:rgba(255,255,255,.12);
-  box-shadow:0 6px 24px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.08);
+  background:var(--glass-bg);border-color:var(--glass-border);
+  box-shadow:var(--glass-inset-top),0 2px 12px rgba(0,0,0,.3);
 }
-@keyframes widgetPop{0%{opacity:0;transform:scale(.82)}60%{opacity:1;transform:scale(1.02)}100%{opacity:1;transform:scale(1)}}
+@keyframes widgetPop{0%{opacity:0;transform:scale(.9) translateY(8px)}100%{opacity:1;transform:scale(1) translateY(0)}}
 
-/* 标题栏：不换行，固定高度 */
+/* 网格标题栏：紧凑 */
 #statsWidgets.grid-view .widget-box .section-title{
-  margin:0;padding:11px 14px 8px;font-size:14px;font-weight:700;
+  margin:0;padding:10px 12px 6px;font-size:13px;font-weight:700;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  display:flex;align-items:center;gap:5px;flex-shrink:0;
-  border-bottom:1px solid rgba(0,0,0,.05);
+  display:flex;align-items:center;gap:4px;flex-shrink:0;
 }
-#statsWidgets.grid-view .widget-box .section-title span:first-child{font-size:15px}
+#statsWidgets.grid-view .widget-box .section-title span:first-child{font-size:14px}
 
-/* 内容区：可滚动 */
+/* 网格内容区：去掉滚动，让页面滚动处理 */
 #statsWidgets.grid-view .widget-box .card{
-  box-shadow:none;padding:9px 13px;margin:0;flex:1;min-height:0;
-  overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;
-  background:transparent;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  box-shadow:none;padding:8px 12px;margin:0;
+  background:transparent;
+  display:flex;flex-direction:column;gap:4px;
 }
-#statsWidgets.grid-view .widget-box .card::-webkit-scrollbar{width:3px}
-#statsWidgets.grid-view .widget-box .card::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-
-/* Chart 容器 */
+/* 网格 Chart 容器 */
 #statsWidgets.grid-view .widget-box .chart-wrap{
-  flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:4px
+  display:flex;align-items:center;justify-content:center;overflow:hidden;padding:2px;margin:2px 0;
 }
-#statsWidgets.grid-view .widget-box canvas{max-width:100%;max-height:100%;object-fit:contain}
+#statsWidgets.grid-view .widget-box canvas{max-width:100%;max-height:160px;object-fit:contain}
 
-/* mini-head */
-#statsWidgets.grid-view .widget-box .mini-head{font-size:12px;margin-bottom:5px;font-weight:600;flex-shrink:0}
+/* 网格 mini-head */
+#statsWidgets.grid-view .widget-box .mini-head{font-size:11px;margin-bottom:2px;font-weight:600;flex-shrink:0}
 
-/* 诗歌 */
-#statsWidgets.grid-view .widget-box .poem-body{font-size:13px;line-height:1.85;flex:1;overflow-y:auto;padding:4px 0;letter-spacing:.5px}
-#statsWidgets.grid-view .widget-box .poem-foot{margin-top:6px;flex-shrink:0}
+/* 网格深色卡片：保留各自深色渐变背景
+   （上方 .widget-box .card{background:transparent} 会把深色卡洗成浅玻璃底，
+    而卡内文字是米白/亮色 → 白底白字看不清，这里按原卡背景恢复） */
+#statsWidgets.grid-view .widget-box .card.poem-card{background:#16213e;border-color:rgba(255,215,0,.18)}
+#statsWidgets.grid-view .widget-box .card.kaleido-card{background:linear-gradient(160deg,#1a0a2e 0%,#16213e 100%);border-color:rgba(255,255,255,.14)}
+#statsWidgets.grid-view .widget-box .card.wave-card{background:linear-gradient(135deg,#001f3f 0%,#003366 100%);border-color:rgba(224,231,255,.2)}
 
-/* 日历 */
+/* 网格诗歌 */
+#statsWidgets.grid-view .widget-box .poem-body{font-size:12px;line-height:1.7;letter-spacing:.3px}
+#statsWidgets.grid-view .widget-box .poem-foot{margin-top:4px;flex-shrink:0}
+
+/* 网格日历 */
 #statsWidgets.grid-view .widget-box .calendar-grid{gap:2px}
 #statsWidgets.grid-view .widget-box .cal-cell{min-height:0;padding:2px;font-size:10px}
 #statsWidgets.grid-view .widget-box .calendar-header{font-size:11px}
 #statsWidgets.grid-view .widget-box .cal-nav button{font-size:11px;padding:3px 7px}
 
-/* 饼图图例 */
-#statsWidgets.grid-view .widget-box .pie-legend{font-size:11px;line-height:1.5}
+/* 网格饼图图例 */
+#statsWidgets.grid-view .widget-box .pie-legend{font-size:10px;line-height:1.4}
 
-/* 排行/月度对比 */
-#statsWidgets.grid-view .widget-box #ranking{font-size:11px;overflow-y:auto;flex:1}
+/* 网格排行/月度对比 */
+#statsWidgets.grid-view .widget-box #ranking{font-size:11px}
 #statsWidgets.grid-view .widget-box #monthCompare{font-size:11px}
+#statsWidgets.grid-view .widget-box .month-compare .mc-amount{font-size:18px}
 
-/* 智能洞察：可滚动列表，填满方框 */
-#statsWidgets.grid-view .widget-box[data-widget="insights"]{
-  display:flex;flex-direction:column;
-}
-#statsWidgets.grid-view .widget-box #insights{overflow-y:auto;flex:1;min-height:0;padding:8px 12px}
-#statsWidgets.grid-view .widget-box .insight-card{font-size:12px;padding:9px 11px;margin-bottom:7px}
-/* 智能洞察底部"测人格"按钮固定，不被压缩 */
-#statsWidgets.grid-view .widget-box[data-widget="insights"] > div:last-child{flex-shrink:0;padding:6px 12px 10px}
-/* 心跳/星图/万花筒/声纹：.card 内的 mini-head 固定，chart-wrap 填满 */
-#statsWidgets.grid-view .widget-box .card .mini-head{flex-shrink:0}
+/* 网格智能洞察 */
+#statsWidgets.grid-view .widget-box[data-widget="insights"] #insights{padding:4px 8px}
+#statsWidgets.grid-view .widget-box .insight-card{font-size:11px;padding:7px 9px;margin-bottom:5px}
+#statsWidgets.grid-view .widget-box[data-widget="insights"] > div:last-child{flex-shrink:0;padding:4px 8px 8px}
+
+/* 网格画布容器 */
 #statsWidgets.grid-view .widget-box .card .star-wrap,
 #statsWidgets.grid-view .widget-box .card .kaleido-wrap,
-#statsWidgets.grid-view .widget-box .card .wave-wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
-#statsWidgets.grid-view .widget-box .card canvas{max-width:100%;max-height:100%}
-/* 支出分类：饼图 + 图例填满 */
-#statsWidgets.grid-view .widget-box[data-widget="pie"] .card{display:flex;flex-direction:column;align-items:stretch}
-#statsWidgets.grid-view .widget-box[data-widget="pie"] .chart-wrap{flex:1;min-height:0;padding:4px}
-#statsWidgets.grid-view .widget-box[data-widget="pie"] .pie-legend{flex-shrink:0;max-height:40%;overflow-y:auto}
-/* 消费日历：填满 */
-#statsWidgets.grid-view .widget-box[data-widget="calendar"] .card{display:flex;flex-direction:column}
-#statsWidgets.grid-view .widget-box[data-widget="calendar"] .calendar-grid{flex:1;min-height:0}
-#statsWidgets.grid-view .widget-box[data-widget="calendar"] .calendar-header{flex-shrink:0}
-#statsWidgets.grid-view .widget-box[data-widget="calendar"] .calendar-weeks{flex-shrink:0}
-/* 趋势图：填满 */
-#statsWidgets.grid-view .widget-box[data-widget="trend"] .card{display:flex;flex-direction:column}
-#statsWidgets.grid-view .widget-box[data-widget="trend"] .chart-wrap{flex:1;min-height:0}
-#statsWidgets.grid-view .widget-box[data-widget="trend"] #trendSummary{flex-shrink:0}
+#statsWidgets.grid-view .widget-box .card .wave-wrap{display:flex;align-items:center;justify-content:center;min-height:80px}
+#statsWidgets.grid-view .widget-box .card canvas{max-width:100%;max-height:140px}
 
 /* 添加按钮在网格中 */
-#statsWidgets.grid-view .widget-add-btn{aspect-ratio:1/1;padding:0;margin:0}
+#statsWidgets.grid-view .widget-add-btn{min-height:120px;padding:0;margin:0}
 /* 组件管理弹窗 */
 .widget-mgr-list{display:flex;flex-direction:column;gap:8px}
-.widget-mgr-item{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--card2);border-radius:10px}
+.widget-mgr-item{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:rgba(255,255,255,.65);border:1px solid rgba(99,102,241,.14);border-radius:12px;box-shadow:0 1px 4px rgba(60,60,90,.06)}
 .widget-mgr-item .wm-name{font-size:14px;font-weight:600}
 .widget-mgr-item .wm-desc{font-size:11px;color:var(--t3);margin-top:2px}
-.wm-switch{width:44px;height:24px;border-radius:12px;background:var(--border);position:relative;cursor:pointer;transition:background .25s;flex-shrink:0}
-.wm-switch.on{background:var(--g1)}
+.wm-switch{width:44px;height:24px;border-radius:12px;background:rgba(120,120,128,.22);border:1px solid rgba(120,120,128,.18);position:relative;cursor:pointer;transition:background .25s;flex-shrink:0}
+.wm-switch.on{background:var(--g1);border-color:transparent}
 .wm-switch::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .25s var(--spring-bounce)}
 .wm-switch.on::after{transform:translateX(20px)}
 
-.insight-card{padding:12px 14px;border-radius:10px;margin-bottom:8px;font-size:13px;display:flex;align-items:flex-start;gap:10px;background:var(--card);border-left:3px solid var(--p);box-shadow:var(--shadow);animation:staggerFadeUp .4s var(--spring-entrance) both}
+.insight-card{padding:12px 14px;border-radius:10px;margin-bottom:8px;font-size:13px;display:flex;align-items:flex-start;gap:10px;background:var(--glass-bg);border:1px solid var(--glass-border);border-left:3px solid var(--p);box-shadow:var(--glass-inset-top);animation:staggerFadeUp .4s var(--spring-entrance) both}
 .insight-card .insight-icon{font-size:18px;flex-shrink:0;margin-top:1px}
 .insight-card .insight-text{color:var(--text);line-height:1.5}
 .insight-card.warn{border-left-color:var(--orange)}
@@ -388,11 +561,11 @@ body.dk #statsWidgets.grid-view .widget-box{
 .calendar-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .calendar-header .cal-title{font-size:15px;font-weight:600}
 .calendar-header .cal-nav{display:flex;gap:4px;align-items:center}
-.calendar-header .cal-nav button{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--t2);background:var(--card2);transition:all .2s}
-.calendar-header .cal-nav button:active{background:var(--border)}
+.calendar-header .cal-nav button{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--t2);background:var(--glass-bg);border:1px solid var(--glass-border);transition:all .2s}
+.calendar-header .cal-nav button:active{background:var(--glass-bg-strong)}
 .calendar-weeks{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:11px;color:var(--t3);margin-bottom:4px;padding:0 2px}
 .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.calendar-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s;position:relative;background:var(--card2);color:var(--t2);gap:1px}
+.calendar-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s;position:relative;background:var(--glass-bg);color:var(--t2);gap:1px;border:1px solid var(--glass-border)}
 .calendar-cell.today{border:2px solid var(--p);font-weight:700}
 .calendar-cell .cal-amt{font-size:8px;margin-top:1px;line-height:1.1;display:flex;flex-direction:column;gap:0}
 .cal-amt-exp{color:var(--red);font-variant-numeric:tabular-nums;font-weight:600}
@@ -404,7 +577,7 @@ body.dk #statsWidgets.grid-view .widget-box{
 .day-detail-list{display:flex;flex-direction:column;gap:2px}
 .day-detail-item{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
 .day-detail-item:last-child{border-bottom:none}
-.day-detail-item:active{background:var(--card2)}
+.day-detail-item:active{background:var(--glass-bg)}
 .day-detail-cat{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
 .day-detail-info{flex:1;min-width:0}
 .day-detail-catname{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -416,67 +589,82 @@ body.dk #statsWidgets.grid-view .widget-box{
 .ranking-item .rank-emoji{font-size:20px;width:30px;text-align:center}
 .ranking-item .rank-name{flex:1;font-weight:500}
 .ranking-item .rank-amount{font-weight:600;margin-right:8px}
-.ranking-item .rank-bar-wrap{flex:2;height:6px;background:var(--card2);border-radius:3px;overflow:hidden}
+.ranking-item .rank-bar-wrap{flex:2;height:6px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:3px;overflow:hidden}
 .ranking-item .rank-bar{height:100%;border-radius:3px;transition:width var(--t-slow) var(--spring-entrance);animation:barGrow var(--t-slow) var(--spring-entrance) both}
 
-.tips-box{background:var(--card2);border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .2s;margin-top:8px}
-.tips-box:active{background:var(--border)}
+.tips-box{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .2s;margin-top:8px}
+.tips-box:active{background:var(--glass-bg-strong)}
 .tips-box .tips-icon{font-size:20px;flex-shrink:0}
 .tips-box .tips-text{font-size:13px;color:var(--text);flex:1}
 .tips-box .tips-refresh{font-size:14px;color:var(--t3)}
 
 /* ===== Page 4: Profile ===== */
-.profile-card{display:flex;align-items:center;gap:14px;padding:18px 16px;background:linear-gradient(135deg,var(--card) 0%,var(--card2) 100%);border-radius:var(--r);box-shadow:0 2px 12px rgba(0,0,0,.04);margin-bottom:12px}
-.profile-card .avatar{width:56px;height:56px;border-radius:50%;background:var(--g1);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;flex-shrink:0;box-shadow:0 4px 12px rgba(99,102,241,.25)}
+.profile-card{display:flex;align-items:center;gap:14px;padding:18px 16px;background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:var(--r);box-shadow:var(--glass-shadow),var(--glass-inset-top),var(--glass-inset-bottom);margin-bottom:12px}
+.profile-card .avatar{width:56px;height:56px;border-radius:50%;background:var(--g1);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;flex-shrink:0;box-shadow:0 4px 12px rgba(99,102,241,.25);position:relative;cursor:pointer;overflow:hidden;transition:transform .2s var(--spring-bounce);background-size:cover;background-position:center}
+.profile-card .avatar:active{transform:scale(.94)}
+.profile-card .avatar.has-img{background-color:var(--glass-bg);color:transparent}
+/* 有头像时右下角显示小编辑点，提示可点击更换（放在内圈，避免被 overflow 裁掉） */
+.profile-card .avatar.has-img::after{content:'✎';position:absolute;right:1px;bottom:1px;width:17px;height:17px;font-size:10px;line-height:17px;text-align:center;border-radius:50%;background:var(--p);color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
 .profile-card .user-info{flex:1;min-width:0}
 .profile-card .user-name{font-size:18px;font-weight:700;color:var(--text)}
 .profile-card .user-email{font-size:12px;color:var(--t3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .profile-card .btn-sm{padding:7px 16px;border-radius:18px;font-size:13px;font-weight:600;background:var(--g1);color:#fff;border:none;transition:all .2s;box-shadow:0 2px 8px rgba(99,102,241,.2)}
 .profile-card .btn-sm:active{transform:scale(.95);box-shadow:0 1px 4px rgba(99,102,241,.15)}
 
-.ai-entry{background:var(--g1);border-radius:var(--r);padding:16px;color:#fff;display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:14px;transition:transform .2s var(--spring-bounce),opacity .2s;box-shadow:0 4px 16px rgba(99,102,241,.2)}
+.ai-entry{position:relative;overflow:hidden;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 58%,#a855f7 100%);border-radius:var(--r);padding:16px;color:#fff;display:flex;align-items:center;gap:13px;cursor:pointer;margin-bottom:14px;transition:transform .2s var(--spring-bounce),opacity .2s;box-shadow:0 6px 20px rgba(99,102,241,.32),inset 0 1px 0 rgba(255,255,255,.38),inset 0 -12px 26px rgba(28,18,88,.20);border:1px solid rgba(255,255,255,.22)}
+/* 液态玻璃：两团角落高光（流动反光条已移除，避免卡片上出现生硬的长方形横条） */
+.ai-entry::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 80% at 12% -25%,rgba(255,255,255,.45),transparent 55%),
+             radial-gradient(95% 75% at 90% 125%,rgba(255,255,255,.20),transparent 60%)}
+.ai-entry>*{position:relative;z-index:1}
 .ai-entry:active{opacity:.92;transform:scale(.98)}
-.ai-entry .ai-icon{font-size:30px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.15))}
+/* 图标：玻璃方块托底，不再用机器人 emoji */
+.ai-entry .ai-icon{width:44px;height:44px;flex-shrink:0;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:23px;
+  background:rgba(255,255,255,.20);border:1px solid rgba(255,255,255,.38);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 4px 10px rgba(28,18,88,.22)}
 .ai-entry .ai-text{flex:1}
-.ai-entry .ai-title{font-size:16px;font-weight:700}
+.ai-entry .ai-title{font-size:16px;font-weight:700;letter-spacing:.2px}
 .ai-entry .ai-sub{font-size:12px;opacity:.85;margin-top:1px}
-.ai-entry .ai-arrow{font-size:20px;opacity:.8}
+.ai-entry .ai-arrow{width:26px;height:26px;flex-shrink:0;border-radius:50%;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.30);display:flex;align-items:center;justify-content:center;font-size:17px;opacity:.95}
+/* 报告里的数据小卡：统一玻璃底 + 上下内高光 */
+.ai-tile{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:10px;text-align:center;box-shadow:var(--glass-inset-top),var(--glass-inset-bottom)}
 
 .achievements{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px}
-.ach-item{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 4px;border-radius:12px;background:var(--card2);text-align:center;transition:all .2s var(--spring-bounce)}
-.ach-item:not(.locked){background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(168,85,247,.05));border:1px solid rgba(99,102,241,.12)}
+.ach-item{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 4px;border-radius:12px;background:var(--glass-bg);border:1px solid var(--glass-border);text-align:center;transition:all .2s var(--spring-bounce)}
+.ach-item:not(.locked){background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(168,85,247,.05));border:1px solid rgba(99,102,241,.15)}
 .ach-item .ach-icon{font-size:26px}
 .ach-item .ach-name{font-size:10px;color:var(--t2);line-height:1.2}
 .ach-item.locked{opacity:.35}
 .ach-item.locked .ach-icon{filter:grayscale(1)}
 
-.goal-item{background:var(--card2);border-radius:var(--r);padding:12px;margin-bottom:8px;position:relative}
+.goal-item{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:var(--r);padding:12px;margin-bottom:8px;position:relative}
 .goal-item .goal-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .goal-item .goal-emoji{font-size:20px}
 .goal-item .goal-name{font-weight:600;font-size:14px;flex:1}
 .goal-item .goal-amount{font-size:12px;color:var(--t2)}
-.goal-item .goal-bar-wrap{height:8px;background:var(--bg);border-radius:4px;overflow:hidden;margin-bottom:6px}
+.goal-item .goal-bar-wrap{height:8px;background:var(--glass-bg-strong);border:1px solid var(--glass-border);border-radius:4px;overflow:hidden;margin-bottom:6px}
 .goal-item .goal-bar{height:100%;border-radius:4px;transition:width var(--t-slow) var(--spring-entrance);animation:barGrow var(--t-slow) var(--spring-entrance) both}
 .goal-item .goal-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--t3)}
 .goal-item .goal-actions{display:flex;gap:6px;margin-top:8px}
-.goal-item .goal-actions button{padding:4px 10px;border-radius:12px;font-size:12px;background:var(--bg);color:var(--text);border:1px solid var(--border);transition:all .2s}
-.goal-item .goal-actions button:active{background:var(--border)}
+.goal-item .goal-actions button{padding:4px 10px;border-radius:12px;font-size:12px;background:var(--glass-bg);color:var(--text);border:1px solid var(--glass-border);transition:all .2s}
+.goal-item .goal-actions button:active{background:var(--glass-bg-strong)}
 
-.menu-item{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--card);border-bottom:1px solid var(--border);cursor:pointer;transition:background .2s,transform .15s var(--spring-bounce);font-size:15px}
-.menu-item:active{background:var(--card2);transform:scale(.98)}
+.menu-item{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--glass-bg);border:1px solid var(--glass-border);border-bottom:none;cursor:pointer;transition:background .2s,transform .15s var(--spring-bounce);font-size:15px}
+.menu-item:active{background:var(--glass-bg-strong);transform:scale(.98)}
 .menu-item:first-of-type{border-radius:var(--r) var(--r) 0 0}
-.menu-item:last-of-type{border-radius:0 0 var(--r) var(--r);border-bottom:none}
-.menu-item:only-of-type{border-radius:var(--r)}
+.menu-item:last-of-type{border-radius:0 0 var(--r) var(--r);border-bottom:1px solid var(--glass-border)}
+.menu-item:only-of-type{border-radius:var(--r);border-bottom:1px solid var(--glass-border)}
 .menu-item .menu-icon{font-size:20px;width:28px;text-align:center}
 .menu-item .menu-text{flex:1}
 .menu-item .menu-arrow{color:var(--t3);font-size:14px}
 .menu-item .menu-right{color:var(--t2);font-size:13px}
 
 /* Switch */
-.switch{position:relative;width:50px;height:30px;border-radius:15px;background:var(--border);transition:background .3s;cursor:pointer;flex-shrink:0}
-.switch.on{background:var(--green)}
+.switch{position:relative;width:50px;height:30px;border-radius:15px;background:var(--glass-bg-strong);border:1px solid var(--glass-border);transition:background .3s;cursor:pointer;flex-shrink:0}
+.switch.on{background:var(--green);border-color:transparent}
 .dark-opt{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:10px;cursor:pointer;transition:background .15s}
-.dark-opt:active{background:var(--card2)}
+.dark-opt:active{background:var(--glass-bg-strong)}
 .dark-opt.active{background:rgba(99,102,241,.1)}
 .dark-opt-icon{font-size:22px;width:32px;text-align:center}
 .dark-opt-info{flex:1}
@@ -485,11 +673,11 @@ body.dk #statsWidgets.grid-view .widget-box{
 .dark-opt-check{font-size:18px;color:var(--p);opacity:0;transition:opacity .2s}
 .dark-opt.active .dark-opt-check{opacity:1}
 .dark-time-row{display:flex;align-items:center;gap:8px;padding:0 16px 12px;font-size:13px;color:var(--t2)}
-.dark-time-row input{width:60px;padding:6px 8px;background:var(--card2);border:1px solid var(--border);border-radius:8px;font-size:14px;color:var(--text);text-align:center;-webkit-appearance:none}
+.dark-time-row input{width:60px;padding:6px 8px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:8px;font-size:14px;color:var(--text);text-align:center;-webkit-appearance:none}
 .switch::after{content:'';position:absolute;top:2px;left:2px;width:26px;height:26px;border-radius:50%;background:#fff;transition:left .3s;box-shadow:0 1px 3px rgba(0,0,0,.15)}
 .switch.on::after{left:22px}
 
-.author-card{text-align:center;padding:24px 16px;margin-top:10px;background:linear-gradient(180deg,transparent 0%,var(--card2) 100%);border-radius:var(--r)}
+.author-card{text-align:center;padding:24px 16px;margin-top:10px;background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:var(--r)}
 .author-card .author-name{font-size:16px;font-weight:700;color:var(--text)}
 .author-card .author-bio{font-size:12px;color:var(--t3);margin-top:6px;line-height:1.7}
 .author-card .author-ver{font-size:11px;color:var(--t3);margin-top:8px}
@@ -502,47 +690,83 @@ body.dk #statsWidgets.grid-view .widget-box{
 #page-profile .ai-title{font-size:15px}
 #page-profile .ai-sub{font-size:11px}
 #page-profile .achievements{gap:6px}
-#page-profile .menu-item{padding:13px 16px;font-size:14px;border-radius:12px;margin-bottom:6px;background:var(--card);border:1px solid var(--border)}
+#page-profile .menu-item{padding:13px 16px;font-size:14px;border-radius:12px;margin-bottom:6px;background:var(--glass-bg);border:1px solid var(--glass-border)}
 #page-profile .menu-icon{font-size:18px}
 #page-profile .author-card{padding:18px 16px;margin-top:8px}
 #page-profile .author-card .author-bio{font-size:12px;line-height:1.7;margin:6px 0}
 #page-profile .section-title{margin:14px 0 8px;font-size:13px;font-weight:600;color:var(--t2)}
 .capsule-list{display:flex;flex-direction:column;gap:10px}
-.capsule-item{background:var(--card2);border-radius:12px;padding:14px;position:relative;overflow:hidden}
+.capsule-item{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;padding:14px;position:relative;overflow:hidden}
 .capsule-item.locked{opacity:.7}
 .capsule-item.locked::after{content:'';position:absolute;inset:0;background:var(--card);opacity:.5}
 .capsule-date{font-size:12px;color:var(--t3);margin-bottom:4px}
 .capsule-msg{font-size:14px;color:var(--text);line-height:1.6;margin-bottom:8px;font-style:italic}
-.capsule-summary{font-size:12px;color:var(--t2);padding:8px;background:var(--bg);border-radius:8px}
+.capsule-summary{font-size:12px;color:var(--t2);padding:8px;background:var(--glass-bg-strong);border:1px solid var(--glass-border);border-radius:8px}
 .capsule-create{display:flex;flex-direction:column;gap:10px;margin-top:8px}
-.capsule-create textarea{width:100%;min-height:80px;padding:10px 12px;background:var(--card2);border-radius:8px;font-size:14px;color:var(--text);border:1px solid var(--border);resize:vertical;font-family:inherit;line-height:1.6}
+.capsule-create textarea{width:100%;min-height:80px;padding:10px 12px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:8px;font-size:14px;color:var(--text);resize:vertical;font-family:inherit;line-height:1.6}
 .capsule-create textarea:focus{border-color:var(--p);outline:none}
-.capsule-create select{padding:10px 12px;background:var(--card2);border-radius:8px;font-size:14px;color:var(--text);border:1px solid var(--border)}
+.capsule-create select{padding:10px 12px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:8px;font-size:14px;color:var(--text)}
 .donate-entry{text-align:center;font-size:13px;color:var(--p);cursor:pointer;padding:8px;margin-top:4px}
 
 /* ===== Toast ===== */
 .toast-container{position:fixed;top:60px;left:0;right:0;z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;padding:0 20px}
-.toast{background:var(--text);color:var(--bg);padding:10px 18px;border-radius:20px;font-size:14px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.15);pointer-events:auto;animation:toastIn .35s var(--spring-bounce);display:flex;align-items:center;gap:8px;white-space:nowrap;max-width:100%}
+.toast{background:var(--glass-bg-strong);color:var(--text);padding:10px 18px;border-radius:20px;font-size:14px;font-weight:500;border:1px solid var(--glass-border-strong);box-shadow:var(--glass-shadow);pointer-events:auto;animation:toastIn .35s var(--spring-bounce);display:flex;align-items:center;gap:8px;white-space:nowrap;max-width:100%;backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .toast.fade-out{animation:toastOut .3s var(--spring-smooth) forwards}
 .toast .toast-undo{color:var(--p);font-weight:600;cursor:pointer;margin-left:4px;background:none;border:none;font-size:14px;padding:0}
 @keyframes toastIn{from{opacity:0;transform:translateY(-20px) scale(.9)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes toastOut{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-12px) scale(.9)}}
 
 /* ===== Modal ===== */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9990;display:none;align-items:center;justify-content:center;animation:fadeIn .2s ease;padding:28px}
+.modal-overlay{position:fixed;inset:0;background:rgba(20,18,35,.32);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:9990;display:none;align-items:center;justify-content:center;animation:fadeIn .2s ease;padding:28px}
 .modal-overlay.show{display:flex}
 .modal-overlay.sheet{align-items:flex-end;padding:0}
-.modal{background:var(--card);border-radius:22px;padding:0;width:min(330px,86vw);max-height:70vh;display:flex;flex-direction:column;min-height:0;box-shadow:0 24px 64px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.06);animation:scaleIn var(--t-normal) var(--spring-overshoot);overflow:hidden}
+.modal{position:relative;background:rgba(255,255,255,.86);backdrop-filter:blur(16px) saturate(125%);-webkit-backdrop-filter:blur(16px) saturate(125%);border:1px solid rgba(255,255,255,.9);border-radius:22px;padding:0;width:min(330px,86vw);max-height:70vh;display:flex;flex-direction:column;min-height:0;box-shadow:0 24px 64px rgba(30,30,60,.28),var(--glass-inset-top),var(--glass-contact);animation:scaleIn var(--t-normal) var(--spring-overshoot);overflow:hidden}
+.modal::before{content:'';position:absolute;inset:0;padding:16px;border-radius:22px;pointer-events:none;z-index:0;
+  background:linear-gradient(150deg,rgba(255,255,255,.75),rgba(255,255,255,.06) 45%,rgba(255,255,255,.40));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;opacity:.7}
+.modal::after{content:'';position:absolute;inset:0;border-radius:22px;pointer-events:none;z-index:0;
+  background:linear-gradient(135deg,var(--glass-highlight) 0%,rgba(255,255,255,.12) 24%,transparent 52%);opacity:.7}
+.modal>*{position:relative;z-index:1}
+body.dk .modal{background:rgba(30,30,38,.82)}
 .modal-overlay.sheet .modal{width:100%;max-width:480px;border-radius:18px 18px 0 0;max-height:85vh;animation:slideUp var(--t-normal) var(--spring-modal)}
 .modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 8px;flex-shrink:0}
 .modal-title{font-size:16px;font-weight:700;flex:1;text-align:center;color:var(--t2)}
-.modal-close{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:var(--card2);color:var(--t2);font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;transition:background .15s,transform .15s}
-.modal-close:active{background:var(--border);transform:scale(.9)}
+.modal-close{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--t2);font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;transition:background .15s,transform .15s}
+.modal-close:active{background:var(--glass-bg-strong);transform:scale(.9)}
 .modal-body{padding:6px 18px 18px;overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;animation:fadeIn .3s ease}
+/* 弹窗内输入框统一玻璃样式：圆角 12px + 聚焦光圈，全局一套 */
+.m-inp{width:100%;box-sizing:border-box;padding:12px 14px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;font-size:15px;color:var(--text);font-family:inherit;outline:none;transition:border-color .2s,box-shadow .2s}
+.m-inp:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(99,102,241,.12)}
+.m-inp::placeholder{color:var(--t3)}
+/* 弹窗内「字段组」：小标签 + 玻璃输入框对齐，让编辑表单整齐划一 */
+.m-field{display:flex;flex-direction:column;gap:6px}
+.m-lbl{font-size:12px;font-weight:600;color:var(--t2);padding:0 2px;letter-spacing:.2px}
+/* 「编辑信息」顶部的头像一体卡片，点击即换头像 */
+.m-avatar-row{display:flex;align-items:center;gap:14px;padding:12px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:14px;cursor:pointer;transition:background .15s,transform .1s}
+.m-avatar-row:active{background:var(--glass-bg-strong);transform:scale(.99)}
+.m-avatar-name{font-size:15px;font-weight:600;color:var(--text);line-height:1.35}
+.m-avatar-sub{font-size:12px;color:var(--t3);margin-top:2px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m-avatar-tip{font-size:12px;color:var(--p);margin-top:5px;font-weight:500}
 .modal-body h3{font-size:17px;font-weight:700;margin:8px 0 16px;text-align:center}
 .modal-body::-webkit-scrollbar{width:4px}
 .modal-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
 .modal-body::-webkit-scrollbar-track{background:transparent}
+/* ===== 头像裁剪：黑色舞台 + 圆形取景窗（纯 transform，不引第三方库，只算一帧 canvas） ===== */
+/* 黑色舞台：图片完整显示在其中，超出舞台才裁掉 */
+.crop-outer{position:relative;background:#000;border-radius:16px;padding:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+/* 取景区 = 正方形，宽高由 JS 锁定；图片和遮罩都挂在这里，可自由拖动 */
+.crop-stage{position:relative;width:min(72vw,268px);touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none;background:#000}
+.crop-stage:active{cursor:grabbing}
+.crop-stage img{position:absolute;left:50%;top:50%;max-width:none;transform-origin:center center;will-change:transform;pointer-events:none;-webkit-user-drag:none;user-select:none}
+/* 取景圈：圈内透明（露出图片/黑色底），圈外压暗 + 白色圆环 */
+.crop-mask{position:absolute;inset:0;pointer-events:none;z-index:2;
+  background:radial-gradient(circle closest-side at 50% 50%,rgba(0,0,0,0) calc(100% - 1.5px),rgba(0,0,0,.62) 100%)}
+.crop-mask::after{content:'';position:absolute;left:50%;top:50%;width:calc(100% - 3px);height:calc(100% - 3px);transform:translate(-50%,-50%);border-radius:50%;box-shadow:0 0 0 1.5px rgba(255,255,255,.9),inset 0 0 0 1.5px rgba(255,255,255,.9)}
+.crop-hint{font-size:12px;color:var(--t3);text-align:center;margin:12px 0 4px;line-height:1.7}
+.crop-zoom{display:flex;align-items:center;gap:10px;margin-top:6px}
+.crop-zoom span{font-size:12px;color:var(--t3);flex-shrink:0}
+.crop-zoom input[type=range]{flex:1}
 .modal-overlay.closing{animation:fadeOut .25s var(--spring-smooth) forwards}
 .modal-overlay.closing.sheet .modal{animation:slideDown .25s var(--spring-smooth) forwards}
 @keyframes fadeOut{from{opacity:1}to{opacity:0}}
@@ -581,27 +805,29 @@ body.dk #statsWidgets.grid-view .widget-box{
 .insight-card.good{background:rgba(52,199,89,.08);color:var(--green)}
 .insight-card.warn{background:rgba(255,149,0,.08);color:#ff9500}
 .insight-card.danger{background:rgba(255,59,48,.08);color:var(--red)}
-.insight-card.info{background:var(--card2);color:var(--t2)}
+.insight-card.info{background:var(--glass-bg);color:var(--t2)}
 .insight-icon{font-size:16px;flex-shrink:0;margin-top:1px}
 .insight-text{flex:1}
 
 /* Goal Form */
 .goal-form{display:flex;flex-direction:column;gap:10px}
-.goal-form input,.goal-form select{padding:10px 12px;background:var(--card2);border-radius:8px;font-size:14px;color:var(--text);border:1px solid var(--border)}
+.goal-form input,.goal-form select{padding:12px 14px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;font-size:15px;color:var(--text);font-family:inherit;outline:none;transition:border-color .2s,box-shadow .2s}
+.goal-form input:focus,.goal-form select:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(99,102,241,.12)}
 .goal-form .goal-emoji-pick{display:flex;gap:6px;flex-wrap:wrap}
-.goal-form .goal-emoji-pick button{width:36px;height:36px;border-radius:8px;font-size:18px;background:var(--card2);border:2px solid transparent;transition:all .2s}
+.goal-form .goal-emoji-pick button{width:36px;height:36px;border-radius:8px;font-size:18px;background:var(--glass-bg);border:2px solid var(--glass-border);transition:all .2s}
 .goal-form .goal-emoji-pick button.selected{border-color:var(--p)}
 
 /* Budget */
 .budget-row{display:flex;align-items:center;gap:10px;margin:12px 0}
-.budget-row input{flex:1;padding:10px 12px;background:var(--card2);border-radius:8px;font-size:15px;color:var(--text);border:1px solid var(--border)}
+.budget-row input{flex:1;padding:12px 14px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;font-size:15px;color:var(--text);min-width:0;font-family:inherit;outline:none;transition:border-color .2s,box-shadow .2s}
+.budget-row input:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(99,102,241,.12)}
 .budget-row .budget-prefix{font-size:16px;color:var(--t2)}
 
 /* Text Import */
-.text-import-area{width:100%;min-height:120px;padding:12px;background:var(--card2);border-radius:8px;font-size:14px;color:var(--text);border:1px solid var(--border);resize:vertical;font-family:inherit;line-height:1.6}
+.text-import-area{width:100%;min-height:120px;padding:12px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;font-size:14px;color:var(--text);resize:vertical;font-family:inherit;line-height:1.6}
 .import-preview{max-height:200px;overflow-y:auto;margin:10px 0}
-.import-preview .ip-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;border-bottom:1px solid var(--border)}
-.import-preview .ip-item .ip-check{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;flex-shrink:0;transition:all .2s}
+.import-preview .ip-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;border-bottom:1px solid var(--glass-border)}
+.import-preview .ip-item .ip-check{width:20px;height:20px;border-radius:50%;border:2px solid var(--glass-border);display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;flex-shrink:0;transition:all .2s}
 .import-preview .ip-item .ip-check.checked{background:var(--green);border-color:var(--green);color:#fff}
 
 /* Responsive */
@@ -614,8 +840,10 @@ body.dk #statsWidgets.grid-view .widget-box{
 }
 
 /* ===== 碎银创想：数据·诗·心跳·星辰 ===== */
-.poem-card{position:relative;overflow:hidden;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%);color:#f0e6d2;border:none}
-.poem-card::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 85% 15%,rgba(255,215,0,.14),transparent 45%),radial-gradient(circle at 10% 90%,rgba(99,102,241,.18),transparent 50%);pointer-events:none}
+/* 诗歌卡：整块一个纯色完美长方形——关掉全部扫光/折射环/内高光，只留单一底色+一层外投影 */
+.poem-card{position:relative;overflow:hidden;background:#16213e;color:#f0e6d2;border:1px solid rgba(255,215,0,.14);
+  box-shadow:0 14px 30px rgba(6,12,34,.30);backdrop-filter:none;-webkit-backdrop-filter:none}
+.poem-card::before,.poem-card::after{display:none!important}
 .poem-head{display:flex;align-items:center;gap:8px;position:relative}
 .poem-badge{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#ffd700,#daa520);color:#1a1a2e;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:"Songti SC",serif;box-shadow:0 0 12px rgba(255,215,0,.4)}
 .poem-title{font-size:14px;font-weight:600;color:#ffd700;letter-spacing:1.5px}
@@ -638,7 +866,7 @@ body.dk #statsWidgets.grid-view .widget-box{
 .star-wrap{display:flex;justify-content:center}
 .star-meta{text-align:center;font-size:11px;color:rgba(205,214,240,.6);margin-top:8px;letter-spacing:.5px}
 /* 碎银时钟：记账页顶部小彩蛋 */
-.coin-clock{display:flex;align-items:center;gap:12px;padding:12px 14px;background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.08));border-radius:14px;margin-bottom:12px;border:1px solid rgba(99,102,241,.15);position:relative;overflow:hidden}
+.coin-clock{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:14px;margin-bottom:12px;position:relative;overflow:hidden;box-shadow:var(--glass-inset-top),var(--glass-inset-bottom)}
 .coin-clock::before{content:'';position:absolute;right:-30px;top:-30px;width:100px;height:100px;background:radial-gradient(circle,rgba(255,215,0,.1),transparent 70%);pointer-events:none}
 .coin-clock-face{position:relative;width:50px;height:50px;border-radius:50%;background:var(--card);box-shadow:inset 0 0 0 2px var(--p),0 2px 10px rgba(99,102,241,.2);flex-shrink:0}
 .coin-clock-hand{position:absolute;left:50%;bottom:50%;width:2px;border-radius:1px;transform-origin:bottom center;background:var(--p)}
@@ -657,13 +885,145 @@ body.dk #statsWidgets.grid-view .widget-box{
 .kaleido-card{background:linear-gradient(160deg,#1a0a2e 0%,#16213e 100%);border:none;color:#fff;overflow:hidden}
 .wave-card{background:linear-gradient(135deg,#001f3f 0%,#003366 100%);border:none;color:#e0e7ff}
 .kaleido-wrap,.wave-wrap{display:flex;justify-content:center}
+
+/* ══════════════════════════════════════════════════════════════
+   液态玻璃 v2 光学层（AndroidLiquidGlass SDF 折射）
+   能力三级探测（body class，JS 在 initGlass() 里写入；探测不到的那级规则整块被忽略）：
+     .lg         有 backdrop-filter → 基础液态玻璃（人人可有）
+     .lg-lite    低端机（内存/核心数少）→ 更轻模糊 + 简化折射滤镜
+     .lg-refract JS 实测 backdrop-filter:url(#) 被真正采纳 → SVG 置换折射 + 色散彩边
+   降级说明：任一级不满足时对应规则整体失效，元素回落到上方已定义的
+   普通玻璃（半透明底 + blur），宽高/间距/圆角零变化，不会破坏布局。
+   ══════════════════════════════════════════════════════════════ */
+
+/* —— L0 降级：完全不支持 backdrop-filter 的 WebView（Android 7 自带内核等）——
+   把"半透明底"换成"近实心底"，文字不会糊在复杂背景上，版式完全不变 */
+body:not(.lg){--glass-bg:rgba(255,255,255,.93);--glass-bg-strong:rgba(255,255,255,1);--glass-blur:none}
+body.dk:not(.lg){--glass-bg:rgba(32,32,40,.94);--glass-bg-strong:rgba(44,44,54,.99);--glass-blur:none}
+
+/* —— L3 折射：玻璃后方内容被真实光学扭曲（feTurbulence→feDisplacementMap）
+      + 轻微色散彩边（红蓝通道 ±1.2px 错位后 screen 合成）——
+      与旧版 @supports 的区别：JS 已实测该声明被采纳才加 .lg-refract，
+      不会出现"号称支持、实际整条声明作废"的假阳性（旧版就是这样静默失效的） —— */
+body.lg-refract .top-bar,
+body.lg-refract .bottom-nav,
+body.lg-refract .nav-indicator,
+body.lg-refract .card,
+body.lg-refract .card2,
+body.lg-refract .section-title,
+body.lg-refract .modal,
+body.lg-refract .today-summary,
+body.lg-refract .type-toggle,
+body.lg-refract .profile-card{
+  backdrop-filter:url(#lgRefractFull) var(--glass-blur);
+  -webkit-backdrop-filter:url(#lgRefractFull) var(--glass-blur);
+}
+body.dk.lg-refract .top-bar{backdrop-filter:url(#lgRefractFull) blur(16px) saturate(140%) brightness(.9);
+  -webkit-backdrop-filter:url(#lgRefractFull) blur(16px) saturate(140%) brightness(.9)}
+body.lg-refract.lg-lite .top-bar,
+body.lg-refract.lg-lite .bottom-nav,
+body.lg-refract.lg-lite .nav-indicator,
+body.lg-refract.lg-lite .card,
+body.lg-refract.lg-lite .card2,
+body.lg-refract.lg-lite .section-title,
+body.lg-refract.lg-lite .modal,
+body.lg-refract.lg-lite .today-summary,
+body.lg-refract.lg-lite .type-toggle,
+body.lg-refract.lg-lite .profile-card{
+  backdrop-filter:url(#lgRefractLite) var(--glass-blur);
+  -webkit-backdrop-filter:url(#lgRefractLite) var(--glass-blur);
+}
+
+/* —— 菲涅尔边缘高光轮廓 + 棱镜彩边 ——
+   边缘掠射角越亮（菲涅尔），环上叠一点青/品红错位色，模拟玻璃棱边的色散 */
+body.lg .card::after,
+body.lg .card2::after,
+body.lg .section-title::after{
+  opacity:var(--lg-rim);
+  background:linear-gradient(150deg,
+    rgba(255,255,255,.90) 0%,
+    rgba(146,224,255,.40) 16%,
+    rgba(255,255,255,.04) 46%,
+    rgba(255,176,240,.34) 76%,
+    rgba(255,255,255,.52) 100%);
+}
+body.lg .nav-indicator::before,
+body.lg .modal::before{
+  opacity:var(--lg-rim);
+  background:linear-gradient(150deg,
+    rgba(255,255,255,.92) 0%,
+    rgba(146,224,255,.42) 18%,
+    rgba(255,255,255,.05) 48%,
+    rgba(255,176,240,.36) 78%,
+    rgba(255,255,255,.55) 100%);
+}
+body.dk.lg .card::after,body.dk.lg .card2::after,body.dk.lg .section-title::after,
+body.dk.lg .nav-indicator::before,body.dk.lg .modal::before{
+  opacity:calc(var(--lg-rim) * .62)}
+/* 章节条只留极淡的一条内高光线（不再套边缘环）：
+   细长条一旦围一圈渐变环，就会被看成一个"矩形描边框"，和 Dock 同一个问题 */
+body.lg .section-title::after{content:'';position:absolute;left:0;right:0;top:0;height:1px;pointer-events:none;z-index:0;
+  background:linear-gradient(90deg,rgba(255,255,255,.55),rgba(255,255,255,.12) 55%,rgba(255,255,255,.30));
+  opacity:calc(var(--lg-rim) * .7)}
+body.lg .today-summary::after,
+body.lg .type-toggle::after,body.lg .profile-card::after{
+  content:'';position:absolute;inset:0;padding:10px;border-radius:inherit;pointer-events:none;z-index:0;
+  background:linear-gradient(150deg,rgba(255,255,255,.80),rgba(255,255,255,.04) 48%,rgba(255,176,240,.24) 78%,rgba(255,255,255,.40));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  opacity:calc(var(--lg-rim) * .8)}
+body.dk.lg .section-title::after{opacity:calc(var(--lg-rim) * .42)}
+body.dk.lg .today-summary::after,
+body.dk.lg .type-toggle::after,body.dk.lg .profile-card::after{opacity:calc(var(--lg-rim) * .5)}
+.section-title,.today-summary,.type-toggle,.profile-card{position:relative;overflow:hidden}
+.section-title>*,.today-summary>*,.type-toggle>*,.profile-card>*{position:relative;z-index:1}
+
+/* —— 表面流动光泽已整体移除：循环扫过的反光条在卡片/Dock 上形成一条生硬的长方形
+      横向亮带（深色模式实测亮度差 Δ44/255，用户视为"Dock 里多出一条东西"）。
+      玻璃质感由静态层承担：半透明底 + 毛玻璃 + 菲涅尔边缘光 + 角落高光，不再有任何扫动。 */
+
+/* —— 平板适配（小米平板等宽屏）：保持 480px 手机版式居中，不重排任何布局；
+      只把模糊半径按面积调大一档（大屏上小模糊会糊成一片）、加一点外发光把玻璃"托"起来 —— */
+@media (min-width:700px){
+  :root{--glass-blur:blur(15px) saturate(175%);--lg-blur-sm:blur(11px) saturate(160%)}
+  #app{box-shadow:0 0 64px rgba(99,102,241,.10)}
+  body.dk #app{box-shadow:0 0 64px rgba(0,0,0,.45)}
+}
+
 </style>
 </head>
 <body>
+<!-- 液态玻璃折射滤镜（借鉴 GitHub liquid-glass：feTurbulence→feDisplacementMap 像素位移折射，纯端侧零依赖）
+     ① lgRefractFull：折射 + 色散彩边（红蓝通道按 ±1.2px 错位后 screen 合成，模拟棱镜色散）
+     ② lgRefractLite：只做折射，省 6 个滤镜原语，给中低端机用 -->
+<svg width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true"><defs>
+<filter id="lgRefractFull" x="-12%" y="-12%" width="124%" height="124%" color-interpolation-filters="sRGB">
+  <feTurbulence type="fractalNoise" baseFrequency="0.008 0.013" numOctaves="2" seed="7" result="noise"/>
+  <feGaussianBlur in="noise" stdDeviation="2.2" result="soft"/>
+  <feDisplacementMap in="SourceGraphic" in2="soft" scale="15" xChannelSelector="R" yChannelSelector="G" result="d"/>
+  <feOffset in="d" dx="-1.2" dy="0" result="ro"/>
+  <feColorMatrix in="ro" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="rch"/>
+  <feOffset in="d" dx="1.2" dy="0" result="bo"/>
+  <feColorMatrix in="bo" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="bch"/>
+  <feColorMatrix in="d" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="gch"/>
+  <feBlend in="rch" in2="gch" mode="screen" result="rg"/>
+  <feBlend in="rg" in2="bch" mode="screen"/>
+</filter>
+<filter id="lgRefractLite" x="-12%" y="-12%" width="124%" height="124%" color-interpolation-filters="sRGB">
+  <feTurbulence type="fractalNoise" baseFrequency="0.009 0.014" numOctaves="1" seed="7" result="noise"/>
+  <feGaussianBlur in="noise" stdDeviation="2.4" result="soft"/>
+  <feDisplacementMap in="SourceGraphic" in2="soft" scale="13" xChannelSelector="R" yChannelSelector="G"/>
+</filter>
+</defs></svg>
+<!-- 背景极光：整站玻璃卡片的"液态"底色来源（纯合成层动画，不参与布局） -->
+<div class="bg-aurora" aria-hidden="true"><i></i><i></i><i></i></div>
 <div id="app">
   <!-- Top Bar -->
   <div class="top-bar">
-    <div class="title" id="pageTitle">碎银记</div>
+    <div style="display:flex;align-items:center;gap:7px;min-width:0">
+      <div class="title" id="pageTitle">碎银记v2.6</div>
+      <button class="btn-icon" onclick="App.showScreenshotImport()" title="拍照／图片识别记账" style="width:auto;padding:0 11px;border-radius:17px;gap:5px;align-items:center"><span style="font-size:15px;line-height:1">📷</span><span style="font-size:12px;font-weight:600;line-height:1">拍照识别</span></button>
+    </div>
     <div class="actions">
       <button class="btn-icon dk-mode" onclick="App.toggleDark()" title="深色模式">🌙</button>
     </div>
@@ -685,7 +1045,8 @@ body.dk #statsWidgets.grid-view .widget-box{
           <span class="ts-value ts-income" id="todayIncome">¥0.00</span>
         </div>
       </div>
-      <div class="type-toggle">
+      <div class="type-toggle" id="typeToggle">
+        <div class="tt-slider" id="ttSlider"></div>
         <button class="expense active" onclick="App.setType('expense')">支出</button>
         <button class="income" onclick="App.setType('income')">收入</button>
       </div>
@@ -738,7 +1099,7 @@ body.dk #statsWidgets.grid-view .widget-box{
     <div class="page" id="page-bills">
       <div class="search-box">
         <span class="search-icon">🔍</span>
-        <input type="text" id="searchInput" placeholder="搜索记录..." oninput="App.renderBills()">
+        <input type="text" id="searchInput" placeholder="搜索记录..." oninput="App.searchDebounced()">
       </div>
       <div class="filter-tags" id="filterTags"></div>
       <div class="bill-list" id="billList"></div>
@@ -766,7 +1127,7 @@ body.dk #statsWidgets.grid-view .widget-box{
           <div class="section-title">智能洞察</div>
           <div id="insights"></div>
           <div style="text-align:center;margin-bottom:8px">
-            <button style="font-size:13px;color:var(--p);background:none;border:none;cursor:pointer;padding:6px 14px;border-radius:20px;border:1px solid var(--p);transition:all .2s" onclick="App.showPersonality()" onmousedown="this.style.transform='scale(.95)'" onmouseup="this.style.transform=''" onmouseleave="this.style.transform=''">🎭 测测你的消费人格</button>
+            <button style="font-size:13px;color:var(--p);cursor:pointer;padding:6px 14px;border-radius:20px;border:1px solid var(--p);transition:all .2s;background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);box-shadow:var(--glass-inset-top)" onclick="App.showPersonality()" onmousedown="this.style.transform='scale(.95)'" onmouseup="this.style.transform=''" onmouseleave="this.style.transform=''">🎭 测测你的消费人格</button>
           </div>
         </div>
         <!-- 碎银诗歌 -->
@@ -865,7 +1226,7 @@ body.dk #statsWidgets.grid-view .widget-box{
     <!-- Page 4: Profile -->
     <div class="page" id="page-profile">
       <div class="card profile-card">
-        <div class="avatar" id="userAvatar">?</div>
+        <div class="avatar" id="userAvatar" onclick="App.showAvatarSheet()" title="点击更换头像">?</div>
         <div class="user-info">
           <div class="user-name" id="userName">未设置</div>
           <div class="user-email" id="userEmail"></div>
@@ -873,10 +1234,10 @@ body.dk #statsWidgets.grid-view .widget-box{
         <button class="btn-sm" onclick="App.showUserForm()">编辑</button>
       </div>
       <div class="ai-entry" onclick="App.showAIReport()">
-        <span class="ai-icon">🤖</span>
+        <span class="ai-icon"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" aria-hidden="true" style="display:block"><path d="M7.6 3.4h8.8l4.2 5.8L12 21 3.4 9.2l4.2-5.8Z" fill="rgba(255,255,255,.24)" stroke="rgba(255,255,255,.95)" stroke-width="1.5" stroke-linejoin="round"/><path d="M3.4 9.2h17.2M7.6 3.4 9 9.2l3 11.8 3-11.8 1.4-5.8" stroke="rgba(255,255,255,.75)" stroke-width="1.2" stroke-linejoin="round"/></svg></span>
         <div class="ai-text">
           <div class="ai-title">AI 理财顾问</div>
-          <div class="ai-sub">查看你的财务分析报告</div>
+          <div class="ai-sub">给本月财务打个分，附改进建议</div>
         </div>
         <span class="ai-arrow">›</span>
       </div>
@@ -977,6 +1338,11 @@ const CATS=[
   {k:'other',n:'其他',i:'📋',c:'#78909c',bg:'#f0f2f5'},
 ];
 const EC=['food','transport','shopping','entertain','housing','medical','edu','shower','other'];
+// 日期字符串一律按「本地时区」取。旧版直接 toISOString()（UTC）有两个真 bug：
+// ① 每天 00:00~07:59（北京时间）会算成前一天，凌晨记账日期凭空早一天；
+// ② new Date(y,m,1) 这类「本地零点」永远落在 UTC 的前一天——「上月统计」实际取到的是上上月。
+function dstr(d){return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)}
+function mstr(d){return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,7)}
 const IC=['salary','gift','invest','refund','other'];
 const MOODS={happy:'😊',neutral:'😐',sad:'😔',hard:'💪',surprise:'🎉',lucky:'🍀',calm:'😌'};
 const EXPENSE_MOODS=[
@@ -1053,16 +1419,67 @@ const App={
   savedAmounts:{expense:'',income:''},
 
   // Data
-  getRecords(){try{return JSON.parse(localStorage.getItem('xzb_r')||'[]')}catch(e){return[]}},
-  saveRecords(r){localStorage.setItem('xzb_r',JSON.stringify(r))},
-  getSettings(){try{return JSON.parse(localStorage.getItem('xzb_s')||'{"budget":0,"goals":[]}')}catch(e){return{budget:0,goals:[]}}},
-  saveSettings(s){localStorage.setItem('xzb_s',JSON.stringify(s))},
-  getUser(){try{return JSON.parse(localStorage.getItem('xzb_u')||'{"name":"","email":"","av":""}')}catch(e){return{name:'',email:'',av:''}}},
-  saveUser(u){localStorage.setItem('xzb_u',JSON.stringify(u))},
+  // 本地存储缓存：同一份数据只在「字符串变化」时解析一次。
+  // 旧版每秒时钟、每次渲染都要 JSON.parse 整个账单数组（1500 条 ≈ 每秒一次大解析），是卡顿大头。
+  _raw:{r:null,s:null,u:null},
+  _val:{r:null,s:null,u:null},
+  _load(k,def){
+    let raw=null;try{raw=localStorage.getItem('xzb_'+k)}catch(e){raw=null}
+    if(raw===null)return def;
+    if(raw===this._raw[k]&&this._val[k]!=null)return this._val[k];
+    let v;try{v=JSON.parse(raw)}catch(e){v=null}
+    if(v===null||typeof v!=='object')v=def;
+    this._raw[k]=raw;this._val[k]=v;
+    return v;
+  },
+  _save(k,v){
+    this._val[k]=v;
+    try{const s=JSON.stringify(v);localStorage.setItem('xzb_'+k,s);this._raw[k]=s;}
+    catch(e){this._raw[k]=null;}  // 写入失败时下次读回旧缓存值
+    this._ver++;                  // 任一数据变更 → 全局版本号 +1，切页渲染据此跳过无变化的重建
+  },
+  _ver:0,
+  _renderedVer:{},
+  // 只在数据自上次渲染后变过时才重建页面 DOM。
+  // 内页之间来回切（不改数据）时完全跳过 innerHTML 重建 → 切页不再卡顿
+  renderPageIfNeeded(page){
+    if(this._renderedVer[page]===this._ver){
+      // 数据没变 → 跳过 DOM 重建。但 stats 页的 canvas 动画在离开时被 cancelAnimationFrame
+      // 停掉了（省电），命中缓存时必须轻量重启，否则星空/心跳/万花筒/声纹会静止在最后一帧
+      if(page==='stats')this.restartStatsAnims();
+      return false;
+    }
+    this._renderedVer[page]=this._ver;
+    if(page==='record')this.renderRecordPage();
+    if(page==='bills')this.renderBills();
+    if(page==='stats')this.renderStats();
+    if(page==='profile'){this.renderProfile();this.renderAchievements();}
+    return true;
+  },
+  // 只重启带 rAF 循环的四个 canvas 动画：不重建 DOM、不重新读布局，开销可忽略
+  restartStatsAnims(){
+    if(this._starRAF||this._hbRAF||this._kaleidoRAF||this._waveRAF)return;  // 已在跑就不重复起
+    this.renderHeartbeat();
+    this.renderStarMap();
+    this.renderKaleidoscope();
+    this.renderWaveform();
+  },
+  getRecords(){return this._load('r',[])},
+  saveRecords(r){this._save('r',r)},
+  getSettings(){return this._load('s',{budget:0,goals:[]})},
+  saveSettings(s){this._save('s',s)},
+  getUser(){return this._load('u',{name:'',email:'',av:''})},
+  saveUser(u){this._save('u',u)},
 
   init(){
     // Dark mode
     const s=this.getSettings();
+    // 迁移旧版 statsWidgets 到新版按视图分离的存储
+    if(s.statsWidgets&&!s.statsWidgetsList&&!s.statsWidgetsGrid){
+      s.statsWidgetsList=s.statsWidgets.slice();
+      delete s.statsWidgets;
+      this.saveSettings(s);
+    }
     if(s.dark||(!('dark' in s)&&window.matchMedia('(prefers-color-scheme:dark)').matches)){
       document.body.classList.add('dk');
     }
@@ -1086,13 +1503,13 @@ const App={
       }
     });
     // Date & Time
-    const today=new Date().toISOString().slice(0,10);
+    const today=dstr(new Date());
     document.getElementById('inputDate').value=today;
     document.getElementById('inputDate').max=today;
     document.getElementById('inputDate').addEventListener('change',()=>this.checkBackfill());
-    // Time auto-calibration
+    // Time auto-calibration：启动校准一次，之后每 10 分钟校准（旧版每分钟 2 个 fetch，离线时纯浪费）
     this._syncNTP();  // 启动时校准
-    setInterval(()=>this._syncNTP(),60000);  // 每分钟校准一次
+    setInterval(()=>this._syncNTP(),600000);
     const now=new Date(Date.now()+(this._ntpOffset||0));
     const hh=String(now.getHours()).padStart(2,'0');
     const mm=String(now.getMinutes()).padStart(2,'0');
@@ -1110,6 +1527,9 @@ const App={
     },30000);
     // User
     this.renderUser();
+    // 液态玻璃 v2：能力探测（决定 .lg/.lg-lite/.lg-refract）
+    // 必须在 switchPage() 之前跑——switchPage 会切 .active，而光泽动画挂在 .active 上
+    this.initGlass();
     // Tips
     this.tipIdx=Math.floor(Math.random()*TIPS.length);
     document.getElementById('tipsText').textContent=TIPS[this.tipIdx];
@@ -1118,16 +1538,15 @@ const App={
     this.renderRecordPage();
     this.updateBudgetReminder();
     this.updateTodaySummary();
-    this.renderBills();
-    this.renderProfile();
+    // 账单页延后到首次切过去再渲染（switchPage 里有），我的页/成就也推迟到首屏出来之后，
+    // 启动时不再同步建几千个 DOM 节点，首屏明显更快
     this.switchPage('record');
     this.initNavDrag();
     this.initSwipe();
     this.updateDateTime();
     var self=this;
     self._dtTimer=setInterval(function(){self.updateDateTime()},1000);
-    // Periodically update streaks
-    this.renderAchievements();
+    setTimeout(function(){self.renderProfile();self.renderAchievements();},250);
     // 启动公告
     this._showWelcome();
   },
@@ -1155,18 +1574,18 @@ const App={
         '愿它陪你把日子过得明明白白 ☕'+
         '</div></div>'+
 
-        '<div style="background:var(--card2);border-radius:12px;padding:11px 13px;margin-bottom:12px">'+
+        '<div style="background:var(--glass-bg);border-radius:12px;padding:11px 13px;margin-bottom:12px">'+
         '<div style="font-weight:700;color:var(--green);font-size:13px;margin-bottom:7px">🛡️ 隐私放一百个心</div>'+
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 8px;font-size:12px;color:var(--t2)">'+
         '<div>✓ 数据只存本地</div><div>✓ 不上传服务器</div>'+
         '<div>✓ 不收集信息</div><div>✓ 无广告追踪</div>'+
         '</div></div>'+
 
-        '<div style="background:var(--card2);border-radius:12px;padding:11px 13px;margin-bottom:12px">'+
+        '<div style="background:var(--glass-bg);border-radius:12px;padding:11px 13px;margin-bottom:12px">'+
         '<div style="font-weight:700;font-size:13px;margin-bottom:7px">✨ 它能帮你做这些</div>'+
         '<div style="font-size:12px;line-height:2;color:var(--t2)">'+
         '📊 消费统计 · 钱花哪了一眼看清<br>'+
-        '🤖 AI 理财顾问 · 给财务打分<br>'+
+        '<span style="display:inline-flex;vertical-align:-3px;margin-right:5px">'+this.gem(14,'p')+'</span>AI 理财顾问 · 给财务打分<br>'+
         '🎯 存钱目标 · 进度慢慢涨<br>'+
         '📷 截图识别 · 拍一下就记好<br>'+
         '🧠 文字导入 · 粘贴自动识别<br>'+
@@ -1196,6 +1615,40 @@ const App={
 
   // ===== Page Switching：水平 transform 偏移，页面永不卸载 =====
   PAGE_ORDER:['record','bills','stats','profile'],
+  // ===== 液态玻璃 v2：能力探测 + 光泽注入 =====
+  // 原因：@supports (backdrop-filter:url(#x)) 存在假阳性——浏览器会"声称支持"却把整条声明作废，
+  // 导致折射静默失效、永远只渲染普通毛玻璃。这里改为真实探测（写入 style 后读回 computed 是否仍含 url），
+  // 只有确认被采纳才加 .lg-refract；探测不到的级别人为跳过，整体自动降级、布局零影响。
+  initGlass(){
+    try{
+      const b=document.body;
+      // L1：必须支持 backdrop-filter（含 -webkit 前缀），否则停在降级态（近实底）
+      const sup=(window.CSS&&CSS.supports&&(CSS.supports('backdrop-filter','blur(1px)')||CSS.supports('-webkit-backdrop-filter','blur(1px)')));
+      if(!sup){b.classList.remove('lg','lg-lite','lg-refract');return;}
+      b.classList.add('lg');
+      // L2 低端机：内存或核心数少 → 用更轻的模糊与简化折射滤镜
+      const mem=navigator.deviceMemory||0;               // 部分浏览器不给此值 → 0 视为不降级
+      const cores=navigator.hardwareConcurrency||2;
+      if((mem>0&&mem<=2)||cores<=2)b.classList.add('lg-lite');
+      else b.classList.remove('lg-lite');
+      // L3 折射（真实探测）
+      if(this._probeRefract())b.classList.add('lg-refract');else b.classList.remove('lg-refract');
+    }catch(e){/* 探测失败则保持降级态，不影响布局 */}
+  },
+  // 真实探测：写入 backdrop-filter:url(#lgRefractFull) 后读回 computed，
+  // 只有当结果同时含 url 与 blur 才算被真正采纳（整条被丢弃时 computed 只剩 blur 或 none）
+  _probeRefract(){
+    try{
+      if(!window.CSS||!CSS.supports||!CSS.supports('backdrop-filter','url(#lgRefractFull)'))return false;
+      const d=document.createElement('div');
+      d.style.cssText='position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;backdrop-filter:url(#lgRefractFull) blur(1px)';
+      document.body.appendChild(d);
+      const cs=getComputedStyle(d);
+      const got=(cs.backdropFilter||cs.webkitBackdropFilter||'');
+      d.parentNode&&d.parentNode.removeChild(d);
+      return /url/i.test(got)&&/blur/i.test(got);
+    }catch(e){return false}
+  },
   switchPage(page){
     if(this.curPage!==page)this.haptic('tab');
     // 离开统计页时停止碎银创想动画，避免后台空转
@@ -1205,36 +1658,63 @@ const App={
       if(this._kaleidoRAF){cancelAnimationFrame(this._kaleidoRAF);this._kaleidoRAF=null;}
       if(this._waveRAF){cancelAnimationFrame(this._waveRAF);this._waveRAF=null;}
     }
+    // 离开统计页时停止所有动画
+    if(this.curPage==='stats'&&page!=='stats'){
+      if(this._starRAF){cancelAnimationFrame(this._starRAF);this._starRAF=null;}
+      if(this._hbRAF){cancelAnimationFrame(this._hbRAF);this._hbRAF=null;}
+      if(this._kaleidoRAF){cancelAnimationFrame(this._kaleidoRAF);this._kaleidoRAF=null;}
+      if(this._waveRAF){cancelAnimationFrame(this._waveRAF);this._waveRAF=null;}
+    }
     this.curPage=page;
-    // 水平偏移切换页面（4 页，每页 25%）
+    // 水平偏移切换页面（4 页，每页 25%）— 先启动动画，再延迟渲染
     const idx=this.PAGE_ORDER.indexOf(page);
     const pagesEl=document.getElementById('pages');
     if(pagesEl){
-      pagesEl.style.transition='transform .32s var(--spring-entrance)';
+      pagesEl.style.transition='transform .3s var(--spring-entrance)';
       pagesEl.style.transform='translateX(-'+(idx*25)+'%)';
+      // 只让当前页跑常驻高光动画，后台页暂停，省 GPU/合成开销
+      pagesEl.querySelectorAll('.page').forEach(p=>{
+        const on=p.id==='page-'+page;
+        p.classList.toggle('active',on);
+        p.setAttribute('aria-hidden',on?'false':'true');
+      });
     }
     // 更新 dock 激活态
     document.querySelectorAll('.bottom-nav .nav-item').forEach(n=>n.classList.remove('active'));
     const activeItem=document.querySelector('.nav-item[data-page="'+page+'"]');
     if(activeItem)activeItem.classList.add('active');
     this.positionNavIndicator(page);
-    const titles={record:'碎银记',bills:'账单',stats:'统计',profile:'我的'};
+    this._jelly();
+    const titles={record:'碎银记v2.6',bills:'账单',stats:'统计',profile:'我的'};
     document.getElementById('pageTitle').textContent=titles[page];
+    // 顶栏扫一道液态反光，标记页面切换
+    const tb=document.querySelector('.top-bar');
+    if(tb){tb.classList.remove('flare');void tb.offsetWidth;tb.classList.add('flare');
+      clearTimeout(this._flareT);this._flareT=setTimeout(()=>tb.classList.remove('flare'),820);}
+    this.syncTopBar();
     this.updateDateTime();
-    // 渲染对应页面内容（页面不卸载，scrollTop 天然保留）
-    if(page==='record')this.renderRecordPage();
-    if(page==='bills')this.renderBills();
-    if(page==='stats')this.renderStats();
-    if(page==='profile')this.renderProfile();
+    // 延迟渲染：等动画启动后再渲染页面内容，避免点击卡顿
+    requestAnimationFrame(()=>this.renderPageIfNeeded(page));
+  },
+  // 滚动超过一丁点就把顶栏玻璃变实（内容浮在顶栏下方时更通透、层次更清楚）
+  syncTopBar(){
+    const p=document.querySelector('.page.active');
+    const scrolled=!!p&&p.scrollTop>8;
+    const t=document.querySelector('.top-bar');
+    if(t)t.classList.toggle('scrolled',scrolled);
   },
   // 启动左右滑动切换：手指水平 swipe 实时移动页面 + 紫色指示器跟随
   initSwipe(){
     const pagesEl=document.getElementById('pages');
     if(!pagesEl||pagesEl._swBound)return;
     pagesEl._swBound=true;
+    // 各页独立滚动 → 统一驱动顶栏玻璃深浅（passive，不拦截滚动）
+    document.querySelectorAll('.page').forEach(pg=>{
+      pg.addEventListener('scroll',()=>this.syncTopBar(),{passive:true});
+    });
     const ORDER=this.PAGE_ORDER;
     let startX=0,startY=0,curX=0,curY=0,dragging=false,vertical=false;
-    let startIndLeft=0,tabWidth=0,startOffset=0;
+    let startIndLeft=0,tabWidth=0,startOffset=0,lastX=0,lastT=0,velX=0,startPageW=0;
     const ind=()=>document.getElementById('navIndicator');
     const nav=()=>document.querySelector('.bottom-nav');
 
@@ -1242,9 +1722,12 @@ const App={
       if(e.touches.length!==1)return;
       const t=e.touches[0];
       startX=t.clientX;startY=t.clientY;curX=startX;curY=startY;
+      lastX=startX;lastT=Date.now();velX=0;
       dragging=false;vertical=false;
       const i=ind();if(i){startIndLeft=parseFloat(i.style.left)||0;}
       const n=nav();if(n){tabWidth=n.getBoundingClientRect().width/4;}
+      // 起手时量一次页面宽度并缓存，touchmove 每帧不再读布局
+      startPageW=pagesEl.getBoundingClientRect().width/4;
       // 记录当前 pages 的 transform 偏移量（百分比转像素）
       const idx=ORDER.indexOf(this.curPage);
       startOffset=-idx*25;
@@ -1256,8 +1739,8 @@ const App={
       curX=t.clientX;curY=t.clientY;
       const dx=curX-startX,dy=curY-startY;
       if(!dragging&&!vertical){
-        // 判定方向：水平位移明显大于垂直，才认为是横滑
-        if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)*1.3){
+        // 方向锁定：水平位移显著主导才认定横滑，否则交给原生垂直滚动
+        if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)*1.6){
           dragging=true;
         }else if(Math.abs(dy)>10){
           vertical=true;
@@ -1265,9 +1748,12 @@ const App={
       }
       if(dragging){
         e.preventDefault();
-        const rect=pagesEl.getBoundingClientRect();
-        // 单页宽度 = pages 总宽 / 4；dx 占单页宽度的比例 × 25% 得到 translateX 偏移
-        const pageWidth=rect.width/4;
+        const now=Date.now();
+        const dt=Math.max(now-lastT,1);
+        velX=(curX-lastX)/dt;
+        lastX=curX;lastT=now;
+        // 单页宽度用起手缓存值，避免 touchmove 每帧读取布局
+        const pageWidth=startPageW||pagesEl.getBoundingClientRect().width/4;
         const offsetPct=(dx/pageWidth)*25;
         let offset=startOffset+offsetPct;
         // 边界橡皮筋
@@ -1292,14 +1778,15 @@ const App={
       dragging=false;
       const dx=curX-startX;
       const idx=ORDER.indexOf(this.curPage);
-      const rect=pagesEl.getBoundingClientRect();
-      const pageWidth=rect.width/4;
-      const threshold=Math.max(30,pageWidth*0.18);
+      const pageWidth=startPageW||pagesEl.getBoundingClientRect().width/4;
+      // 速度优先：快速甩动（>0.5px/ms）直接切换；否则按位移阈值判断
+      const isFlick=Math.abs(velX)>0.5;
+      const threshold=isFlick?10:Math.max(30,pageWidth*0.18);
       let target=idx;
-      if(dx<-threshold&&idx<ORDER.length-1)target=idx+1;
-      else if(dx>threshold&&idx>0)target=idx-1;
-      // 吸附到目标页
-      pagesEl.style.transition='';
+      if((dx<-threshold||(isFlick&&velX<-0.5))&&idx<ORDER.length-1)target=idx+1;
+      else if((dx>threshold||(isFlick&&velX>0.5))&&idx>0)target=idx-1;
+      // 吸附到目标页，带弹性
+      pagesEl.style.transition='transform .38s var(--spring-bounce)';
       pagesEl.style.transform='translateX(-'+(target*25)+'%)';
       const i=ind();if(i)i.style.transition='';
       this.switchPage(ORDER[target]);
@@ -1318,65 +1805,104 @@ const App={
     ind.style.left=(itemRect.left-navRect.left+3)+'px';
     ind.style.width=(itemRect.width-6)+'px';
   },
-  // 液态玻璃指示器拖拽：按住指示器拖动，松手吸附到最近页面
+  // 果冻 Q 弹：每次切换重新触发 squash & stretch（不重排，只重启动画）
+  _jelly(){
+    const ind=document.getElementById('navIndicator');
+    if(!ind)return;
+    ind.classList.remove('jelly');
+    void ind.offsetWidth;
+    ind.classList.add('jelly');
+  },
+  // 液态玻璃指示器拖拽：拖动全程只写 transform（合成层，不碰布局），松手才提交一次 left
   initNavDrag(){
     const nav=document.querySelector('.bottom-nav');
     const ind=document.getElementById('navIndicator');
     if(!nav||!ind)return;
-    let dragging=false,moved=false,startX=0,startLeft=0,lastX=0,lastT=0,velX=0;
+    let dragging=false,moved=false,startX=0,startLeft=0,lastX=0,lastT=0,velX=0,pid=null;
+    let navW=0,navLeft=0,indW=0,minDx=0,maxDx=0,visDx=0,centers=[];
+    // 拖动监听挂在整个 Dock 上：选中态 Tab 的图标 z-index 高于玻璃块，
+    // 只听玻璃块自己的 pointerdown 会被按钮挡住，按住就拖不动了
+    const blockClick=ev=>{ev.stopPropagation();ev.preventDefault();};
     const onDown=e=>{
-      dragging=true;moved=false;
+      if(e.button!==undefined&&e.button!==0)return;
+      dragging=true;moved=false;pid=e.pointerId;
+      // 停掉果冻动画：它靠 keyframes 覆盖 transform，会和下面每帧写入的拖拽 transform 打架
+      ind.classList.remove('jelly');
+      // 冻结当前视觉位置：若玻璃块还在滑动（left 过渡没跑完），
+      // 下面 .dragging 的 transition:none 会直接跳到目标值 → 视觉闪一下
+      const lv=parseFloat(getComputedStyle(ind).left)||0;
+      ind.style.left=lv+'px';
       startX=e.clientX;
-      startLeft=parseFloat(ind.style.left)||0;
+      startLeft=lv;
       lastX=startX;lastT=Date.now();velX=0;
+      // 起手一次性量好全部几何：拖动与松手过程零布局读取
+      const nr=nav.getBoundingClientRect();
+      navW=nr.width;navLeft=nr.left;
+      indW=parseFloat(ind.style.width)||60;
+      minDx=3-startLeft;
+      maxDx=navW-indW-3-startLeft;
+      centers=Array.prototype.map.call(nav.querySelectorAll('.nav-item'),it=>{
+        const r=it.getBoundingClientRect();
+        return {el:it,c:r.left+r.width/2};
+      });
+      visDx=0;
+      // 不在这里 setPointerCapture：捕获会把后续 click 重定向到 Dock，Tab 的 onclick 就点不动了
       ind.classList.add('dragging');
       ind.style.transform='translateY(-50%) scaleY(.92)';
-      e.preventDefault();
       e.stopPropagation();
     };
     const onMove=e=>{
-      if(!dragging)return;
+      if(!dragging||(pid!==null&&e.pointerId!==pid))return;
       const x=e.clientX;
-      const dx=x-startX;
-      if(Math.abs(dx)>4)moved=true;
+      const raw=x-startX;
+      if(Math.abs(raw)>4){
+        if(!moved){moved=true;try{nav.setPointerCapture&&nav.setPointerCapture(e.pointerId);}catch(err){}}
+        e.preventDefault();
+      }
       const now=Date.now();
       const dt=Math.max(now-lastT,1);
       velX=(x-lastX)/dt;
       lastX=x;lastT=now;
-      let newLeft=startLeft+dx;
-      const navRect=nav.getBoundingClientRect();
-      const w=parseFloat(ind.style.width)||60;
-      const minLeft=3,maxLeft=navRect.width-w-3;
-      newLeft=Math.max(minLeft,Math.min(maxLeft,newLeft));
-      ind.style.left=newLeft+'px';
-      // 果冻效果：按速度拉伸
+      // 边界橡皮筋：越界只给 30% 阻尼
+      let dx=raw;
+      if(dx<minDx)dx=minDx+(dx-minDx)*0.3;
+      else if(dx>maxDx)dx=maxDx+(dx-maxDx)*0.3;
+      visDx=dx;
+      // 果冻拉伸：按速度形变
       const stretch=Math.max(-0.2,Math.min(0.2,velX*0.012));
-      ind.style.transform='translateY(-50%) scaleX('+(1+stretch)+') scaleY('+(1-stretch*0.6)+')';
-      e.preventDefault();
+      ind.style.transform='translate('+dx+'px,-50%) scaleX('+(1+stretch)+') scaleY('+(1-stretch*0.6)+')';
     };
-    const onUp=()=>{
+    const onUp=e=>{
       if(!dragging)return;
-      dragging=false;
-      ind.classList.remove('dragging');
+      if(pid!==null&&e&&e.pointerId!==undefined&&e.pointerId!==pid)return;
+      dragging=false;pid=null;
+      // 轻点（没真正拖动）：立刻恢复过渡并 flush 样式，然后直接返回（不走下面的拖拽收尾逻辑）。
+      // flush 很关键：不加会和紧随其后的 click → switchPage 写 left 合并成一次样式变更，
+      // 导致过渡前样式仍是 transition:none → 玻璃块瞬移，果冻动画完全看不到
+      if(!moved){ind.classList.remove('dragging');ind.style.transform='';void ind.offsetWidth;return;}
+      // 拖动后收尾：吞掉紧接着的 click，避免松手误触 Tab
+      nav.addEventListener('click',blockClick,{capture:true});setTimeout(()=>nav.removeEventListener('click',blockClick,{capture:true}),300);
+      // 松手：先算目标（用起手缓存的几何，不读布局）
+      const raw=startLeft+visDx;
+      const target=Math.max(3,Math.min(navW-indW-3,raw));
+      const centerNow=navLeft+target+indW/2;
+      let nearest=null,minDist=Infinity;
+      centers.forEach(o=>{const d=Math.abs(o.c-centerNow);if(d<minDist){minDist=d;nearest=o;}});
+      // 1) 当帧落地：left 直接写成当前视觉位置（.dragging 的 transition:none 生效），清掉 transform，视觉不跳
+      ind.style.left=target+'px';
       ind.style.transform='translateY(-50%)';
-      const items=Array.from(nav.querySelectorAll('.nav-item'));
-      const indRect=ind.getBoundingClientRect();
-      const indCenter=indRect.left+indRect.width/2;
-      let nearest=items[0],minDist=Infinity;
-      items.forEach(it=>{
-        const r=it.getBoundingClientRect();
-        const c=r.left+r.width/2;
-        const d=Math.abs(c-indCenter);
-        if(d<minDist){minDist=d;nearest=it;}
+      // 2) 双 rAF：先让「落地位置」真正渲染一帧，再恢复过渡并写入目标 left，
+      //    这样玻璃块是从松手处平滑滑过去（带果冻挤压），而不是瞬移
+      requestAnimationFrame(()=>{
+        ind.classList.remove('dragging');
+        requestAnimationFrame(()=>{
+          const page=nearest&&nearest.el?nearest.el.dataset.page:null;
+          if(page&&page!==this.curPage)this.switchPage(page);
+          else this.positionNavIndicator(this.curPage);
+        });
       });
-      const page=nearest.dataset.page;
-      if(page&&page!==this.curPage){
-        this.switchPage(page);
-      }else{
-        this.positionNavIndicator(this.curPage);
-      }
     };
-    ind.addEventListener('pointerdown',onDown);
+    nav.addEventListener('pointerdown',onDown);
     window.addEventListener('pointermove',onMove,{passive:false});
     window.addEventListener('pointerup',onUp);
     window.addEventListener('pointercancel',onUp);
@@ -1411,7 +1937,7 @@ const App={
       if(ccTime)ccTime.textContent=hh+':'+mm+':'+ss;
       if(ccDate)ccDate.textContent=y+'年'+m+'月'+d+'日 '+w;
       if(ccSub){
-        const today=now.toISOString().slice(0,10);
+        const today=dstr(now);
         const todayExp=this.getRecords().filter(r=>r.date.startsWith(today)&&r.type==='expense').reduce((s,r)=>s+r.amt,0);
         ccSub.textContent=todayExp>0?('今日已花 ¥'+todayExp.toFixed(1)):'今日尚未记账';
       }
@@ -1427,6 +1953,7 @@ const App={
   _ntpOffset:0,
   _syncNTP(){
     // 浏览器/WebView 无法直接 UDP NTP，改用 HTTP 时间 API 获取精准时间
+    if(navigator.onLine===false)return;  // 离线直接跳过，不做无谓的失败请求
     const urls=[
       'https://worldtimeapi.org/api/timezone/Asia/Shanghai',
       'https://timeapi.io/api/Time/current/zone?timeZone=Asia/Shanghai'
@@ -1458,7 +1985,7 @@ const App={
     const dateEl=document.getElementById('inputDate');
     const bar=document.getElementById('recordBackfillBar');
     const label=document.getElementById('recordBackfillLabel');
-    const today=new Date().toISOString().slice(0,10);
+    const today=dstr(new Date());
     const selected=dateEl.value;
     if(selected&&selected<today){
       const diff=Math.floor((new Date(today)-new Date(selected))/(1000*60*60*24));
@@ -1474,7 +2001,7 @@ const App={
     }
   },
   clearBackfill(){
-    const today=new Date().toISOString().slice(0,10);
+    const today=dstr(new Date());
     document.getElementById('inputDate').value=today;
     document.getElementById('recordBackfillBar').style.display='none';
   },
@@ -1606,7 +2133,7 @@ const App={
   _microCare(msg){
     if(msg.indexOf('记好了')===-1&&msg.indexOf('已更新')===-1)return;
     const h=new Date().getHours();
-    const today=new Date().toISOString().slice(0,10);
+    const today=dstr(new Date());
     const todayRecords=this.getRecords().filter(r=>r.date===today);
     // 深夜关怀 (23:00-5:00)
     if(h>=23||h<5){
@@ -1627,6 +2154,7 @@ const App={
   showModal(html,type){
     const o=document.getElementById('modalOverlay');
     const c=document.getElementById('modalContent');
+    this._avatarSheet=false;
     o.className='modal-overlay show'+(type==='sheet'?' sheet':'');
     // 提取 h3 作为标题（如果有的话），否则用默认
     const titleMatch=html.match(/<h3[^>]*>([\s\S]*?)<\/h3>/);
@@ -1641,6 +2169,7 @@ const App={
   closeModal(){
     const o=document.getElementById('modalOverlay');
     if(!o.classList.contains('show'))return;
+    this._avatarSheet=false;
     o.classList.add('closing');
     document.body.style.overflow='';
     setTimeout(()=>{o.classList.remove('show','closing')},200);
@@ -1656,6 +2185,13 @@ const App={
     this.curMood=null;
     document.querySelectorAll('.type-toggle button').forEach(b=>b.classList.remove('active'));
     document.querySelector('.type-toggle .'+t).classList.add('active');
+    // 果冻滑块：滑向目标侧 + squash & stretch 回弹
+    const tg=document.getElementById('typeToggle');
+    if(tg){
+      tg.classList.toggle('income',t==='income');
+      const sl=document.getElementById('ttSlider');
+      if(sl){sl.classList.remove('jelly');void sl.offsetWidth;sl.classList.add('jelly');}
+    }
     // Restore saved amount for the target type
     document.getElementById('inputAmount').value=this.savedAmounts[t]||'';
     this.renderCatGrid();
@@ -1689,7 +2225,7 @@ const App={
     const expEl=document.getElementById('todayExpense');
     const incEl=document.getElementById('todayIncome');
     if(!expEl||!incEl)return;
-    const today=new Date(Date.now()+(this._ntpOffset||0)).toISOString().slice(0,10);
+    const today=dstr(new Date(Date.now()+(this._ntpOffset||0)));
     const recs=this.getRecords().filter(r=>r.date===today);
     const exp=recs.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amt,0);
     const inc=recs.filter(r=>r.type==='income').reduce((s,r)=>s+r.amt,0);
@@ -1799,7 +2335,7 @@ const App={
     document.getElementById('inputNote').value='';
     this.curCat=null;
     this.curMood=null;
-    document.getElementById('inputDate').value=new Date(Date.now()+(this._ntpOffset||0)).toISOString().slice(0,10);
+    document.getElementById('inputDate').value=dstr(new Date(Date.now()+(this._ntpOffset||0)));
     // Reset time to current (NTP校准)
     const n=new Date(Date.now()+(this._ntpOffset||0));
     const nh=String(n.getHours()).padStart(2,'0');
@@ -1819,6 +2355,8 @@ const App={
     this.renderQuickAmounts();
     document.querySelectorAll('.type-toggle button').forEach(b=>b.classList.remove('active'));
     document.querySelector('.type-toggle .'+this.curType).classList.add('active');
+    const tg0=document.getElementById('typeToggle');
+    if(tg0)tg0.classList.toggle('income',this.curType==='income');
     document.getElementById('btnSubmit').textContent=this.editId!==null?'保存修改':'记一笔';
   },
 
@@ -1852,8 +2390,10 @@ const App={
   },
 
   // ===== Bills Page =====
+  _searchT:null,
+  searchDebounced(){clearTimeout(this._searchT);this._searchT=setTimeout(()=>this.renderBills(),160)},
   renderBills(){
-    const records=this.getRecords().sort((a,b)=>b.ts-a.ts);
+    const records=this.getRecords().slice().sort((a,b)=>b.ts-a.ts);
     const search=document.getElementById('searchInput').value.toLowerCase().trim();
     const filterKey=this.filterKey;
 
@@ -1867,14 +2407,14 @@ const App={
     }
     // Filter
     if(filterKey==='today'){
-      const today=new Date().toISOString().slice(0,10);
+      const today=dstr(new Date());
       filtered=filtered.filter(r=>r.date===today);
     }else if(filterKey==='week'){
       const now=new Date();
       const weekAgo=new Date(now.getFullYear(),now.getMonth(),now.getDate()-7);
       filtered=filtered.filter(r=>new Date(r.date)>=weekAgo);
     }else if(filterKey==='month'){
-      const m=new Date().toISOString().slice(0,7);
+      const m=mstr(new Date());
       filtered=filtered.filter(r=>r.date.startsWith(m));
     }else if(filterKey!=='all'){
       filtered=filtered.filter(r=>r.cat===filterKey);
@@ -1898,12 +2438,14 @@ const App={
       empty.style.display='flex';
     }else{
       empty.style.display='none';
+      // 少量记录才播逐条入场动画；上千条时 1500 个并发动画会把首屏卡死
+      const animate=filtered.length<=40;
       list.innerHTML=filtered.map((r,idx)=>{
         const cat=this.getCatData(r.cat);
         const moodIcon=r.mood?MOODS[r.mood]:'';
-        const delay=Math.min(idx*35,500);
+        const animStyle=animate?'animation-delay:'+Math.min(idx*35,500)+'ms':'animation:none';
         const timeBadge=this.formatTimeBadge(r.date,r.time);
-        return '<div class="bill-item" style="animation-delay:'+delay+'ms" onclick="App.enterEditById(\''+r.id+'\')">'+
+        return '<div class="bill-item" style="'+animStyle+'" onclick="App.enterEditById(\''+r.id+'\')">'+
           '<div class="bill-emoji" style="background:'+cat.bg+'">'+cat.i+'</div>'+
           '<div class="bill-info"><div class="bill-cat">'+cat.n+'</div>'+
           '<div class="bill-meta"><span>'+timeBadge+'</span>'+(r.note?'<span>'+App.escapeHtml(r.note)+'</span>':'')+(moodIcon?'<span>'+moodIcon+'</span>':'')+'</div></div>'+
@@ -1952,14 +2494,15 @@ const App={
       setTimeout(()=>el.remove(),1250);
     }
   },
-  escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML},
+  // 纯正则转义：比「建 DOM 再读 innerHTML」快得多（每条账单渲染都要调一次），且连引号一起转义，属性拼接也安全
+  escapeHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))},
 
   // ===== Time Formatting & Calibration =====
   formatTimeBadge(dateStr,timeStr){
     if(!dateStr)return '';
-    const today=new Date().toISOString().slice(0,10);
+    const today=dstr(new Date());
     const isToday=dateStr===today;
-    const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
+    const yesterday=dstr(new Date(Date.now()-86400000));
     const isYesterday=dateStr===yesterday;
     const parts=dateStr.split('-');
     const shortDate=parseInt(parts[1])+'/'+parseInt(parts[2]);
@@ -2060,11 +2603,15 @@ const App={
   ],
   getEnabledWidgets(){
     const s=this.getSettings();
-    if(!s.statsWidgets){
-      // 默认启用常用、实用的组件，去掉万花筒/星图/声纹等花哨组件
+    const view=s.statsView||'list';
+    // 列表模式与组件模式各自独立的组件列表
+    const key=view==='grid'?'statsWidgetsGrid':'statsWidgetsList';
+    if(!s[key]){
+      // 组件模式默认空白，让用户自行添加；列表模式默认展示常用组件
+      if(view==='grid')return [];
       return ['insights','pie','calendar','trend','ranking','monthcompare'];
     }
-    return s.statsWidgets;
+    return s[key];
   },
   applyWidgetVisibility(){
     const enabled=this.getEnabledWidgets();
@@ -2096,37 +2643,27 @@ const App={
       addBtn.onclick=()=>this.showWidgetManager();
       container.appendChild(addBtn);
     }
-    // 网格视图下显示为正方形，列表视图下显示为横向条
+    // 网格视图下显示为紧凑方块，列表视图下显示为横向条
     const s=this.getSettings();
     const view=s.statsView||'list';
-    addBtn.classList.toggle('grid-mode',view==='grid');
+    // CSS 会根据 #statsWidgets.grid-view 自动适配样式
   },
   setStatsView(view){
     const s=this.getSettings();
     s.statsView=view;
     this.saveSettings(s);
-    // 切换动画：先缩出，再切换视图，再缩入；用 CSS transition 实现丝滑过渡
+    // 切换动画：先淡出，再切换视图，再淡入
     const container=document.getElementById('statsWidgets');
     if(container){
-      container.style.transition='opacity .2s var(--spring-exit),transform .2s var(--spring-exit)';
       container.style.opacity='0';
-      container.style.transform='scale(.94)';
+      container.style.transform='translateY(8px)';
       setTimeout(()=>{
         this.applyWidgetVisibility();
-        // 触发回流后切到缩入动画，并给每个 widget 加 stagger 错开入场
         requestAnimationFrame(()=>{
-          container.style.transition='opacity .34s var(--spring-entrance),transform .34s var(--spring-entrance)';
           container.style.opacity='1';
-          container.style.transform='scale(1)';
-          const boxes=container.querySelectorAll('.widget-box:not(.hidden)');
-          boxes.forEach((b,i)=>{
-            b.style.animation='none';
-            void b.offsetWidth; // 重排以重启动画
-            b.style.animation='widgetPop .42s var(--spring-bounce) both';
-            b.style.animationDelay=(i*45)+'ms';
-          });
+          container.style.transform='translateY(0)';
         });
-      },180);
+      },150);
     }else{
       this.applyWidgetVisibility();
     }
@@ -2150,14 +2687,16 @@ const App={
   },
   toggleWidget(id){
     const s=this.getSettings();
-    // 以当前已启用的组件为基础（未设置时用默认常用组件，而非全部）
+    const view=s.statsView||'list';
+    const key=view==='grid'?'statsWidgetsGrid':'statsWidgetsList';
+    // 以当前视图模式已启用的组件为基础
     let enabled=this.getEnabledWidgets().slice();
     if(enabled.includes(id)){
       enabled=enabled.filter(x=>x!==id);
     }else{
       enabled.push(id);
     }
-    s.statsWidgets=enabled;
+    s[key]=enabled;
     this.saveSettings(s);
     this.applyWidgetVisibility();
     // 更新弹窗里的开关状态
@@ -2182,9 +2721,9 @@ const App={
   renderInsights(){
     const records=this.getRecords();
     const now=new Date();
-    const thisMonth=now.toISOString().slice(0,7);
-    const lastMonth=new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,7);
-    const today=now.toISOString().slice(0,10);
+    const thisMonth=mstr(now);
+    const lastMonth=mstr(new Date(now.getFullYear(),now.getMonth()-1,1));
+    const today=dstr(now);
 
     const monthRecords=records.filter(r=>r.date.startsWith(thisMonth)&&r.type==='expense');
     const lastMonthRecords=records.filter(r=>r.date.startsWith(lastMonth)&&r.type==='expense');
@@ -2267,8 +2806,8 @@ const App={
   renderMonthCompare(){
     const records=this.getRecords();
     const now=new Date();
-    const thisMonth=now.toISOString().slice(0,7);
-    const lastMonth=new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,7);
+    const thisMonth=mstr(now);
+    const lastMonth=mstr(new Date(now.getFullYear(),now.getMonth()-1,1));
     const total=records.filter(r=>r.date.startsWith(thisMonth)&&r.type==='expense').reduce((s,r)=>s+r.amt,0);
     const lastTotal=records.filter(r=>r.date.startsWith(lastMonth)&&r.type==='expense').reduce((s,r)=>s+r.amt,0);
     const c=document.getElementById('monthCompare');
@@ -2298,7 +2837,7 @@ const App={
     ctx.scale(dpr,dpr);
 
     const records=this.getRecords();
-    const thisMonth=new Date().toISOString().slice(0,7);
+    const thisMonth=mstr(new Date());
     const monthRecords=records.filter(r=>r.date.startsWith(thisMonth)&&r.type==='expense');
     const catTotals={};
     monthRecords.forEach(r=>{catTotals[r.cat]=(catTotals[r.cat]||0)+r.amt});
@@ -2407,7 +2946,7 @@ const App={
     const firstDay=new Date(y,m,1).getDay();
     const daysInMonth=new Date(y,m+1,0).getDate();
     const today=new Date();
-    const todayStr=today.toISOString().slice(0,10);
+    const todayStr=dstr(today);
     const isCurrentMonth=(today.getFullYear()===y&&today.getMonth()===m);
 
     // Daily net amounts
@@ -2449,7 +2988,7 @@ const App={
     document.getElementById('calendarGrid').innerHTML=html;
   },
   showDayDetail(dateStr){
-    const today=new Date().toISOString().slice(0,10);
+    const today=dstr(new Date());
     const isFuture=dateStr>today;
     const isToday=dateStr===today;
 
@@ -2520,7 +3059,7 @@ const App={
   startBackfill(dateStr){
     this.switchPage('record');
     document.getElementById('inputDate').value=dateStr;
-    const today=new Date().toISOString().slice(0,10);
+    const today=dstr(new Date());
     const diff=Math.floor((new Date(today)-new Date(dateStr))/(1000*60*60*24));
     let text='';
     if(diff===1)text='📅 补记昨天的账';
@@ -2548,7 +3087,7 @@ const App={
     const months=[];
     for(let i=5;i>=0;i--){
       const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-      months.push(d.toISOString().slice(0,7));
+      months.push(mstr(d));
     }
 
     const expData=[],incData=[];
@@ -2755,7 +3294,7 @@ const App={
 
   renderRanking(){
     const records=this.getRecords();
-    const thisMonth=new Date().toISOString().slice(0,7);
+    const thisMonth=mstr(new Date());
     const monthRecords=records.filter(r=>r.date.startsWith(thisMonth)&&r.type==='expense');
     const catTotals={};
     monthRecords.forEach(r=>{catTotals[r.cat]=(catTotals[r.cat]||0)+r.amt});
@@ -2785,7 +3324,7 @@ const App={
     if(!body)return;
     const records=this.getRecords();
     const now=new Date();
-    const m=now.toISOString().slice(0,7);
+    const m=mstr(now);
     const mr=records.filter(r=>r.date.startsWith(m));
     const exp=mr.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amt,0);
     const inc=mr.filter(r=>r.type==='income').reduce((s,r)=>s+r.amt,0);
@@ -2850,7 +3389,7 @@ const App={
     const now=new Date();now.setHours(0,0,0,0);
     for(let i=13;i>=0;i--){
       const d=new Date(now);d.setDate(d.getDate()-i);
-      const ds=d.toISOString().slice(0,10);
+      const ds=dstr(d);
       days.push(records.filter(r=>r.date.startsWith(ds)&&r.type==='expense').reduce((s,r)=>s+r.amt,0));
     }
     const maxE=Math.max(...days,1);
@@ -2905,7 +3444,7 @@ const App={
     if(this._starRAF)cancelAnimationFrame(this._starRAF);
     const records=this.getRecords();
     const now=new Date();
-    const m=now.toISOString().slice(0,7);
+    const m=mstr(now);
     const mr=records.filter(r=>r.date.startsWith(m)&&r.type==='expense');
     const catT={};mr.forEach(r=>catT[r.cat]=(catT[r.cat]||0)+r.amt);
     const entries=Object.entries(catT).sort((a,b)=>b[1]-a[1]);
@@ -2972,7 +3511,7 @@ const App={
     ctx.setTransform(dpr,0,0,dpr,0,0);
     if(this._kaleidoRAF)cancelAnimationFrame(this._kaleidoRAF);
     const records=this.getRecords();
-    const now=new Date(),m=now.toISOString().slice(0,7);
+    const now=new Date(),m=mstr(now);
     const catT={};
     records.filter(r=>r.date.startsWith(m)&&r.type==='expense').forEach(r=>catT[r.cat]=(catT[r.cat]||0)+r.amt);
     const entries=Object.entries(catT).sort((a,b)=>b[1]-a[1]);
@@ -3041,7 +3580,7 @@ const App={
     const now=new Date();now.setHours(0,0,0,0);
     for(let i=6;i>=0;i--){
       const d=new Date(now);d.setDate(d.getDate()-i);
-      const ds=d.toISOString().slice(0,10);
+      const ds=dstr(d);
       days.push(records.filter(r=>r.date.startsWith(ds)&&r.type==='expense').reduce((s,r)=>s+r.amt,0));
     }
     const maxA=Math.max(...days,1);
@@ -3116,7 +3655,7 @@ const App={
     ctx.globalAlpha=1;
     
     // Stats cards
-    const thisMonth=new Date().toISOString().slice(0,7);
+    const thisMonth=mstr(new Date());
     const mr=records.filter(r=>r.date.startsWith(thisMonth));
     const expTotal=mr.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amt,0);
     const incTotal=mr.filter(r=>r.type==='income').reduce((s,r)=>s+r.amt,0);
@@ -3146,7 +3685,7 @@ const App={
     const entries=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
     
     // 环比数据
-    const lastMonth=new Date(new Date().getFullYear(),new Date().getMonth()-1,1).toISOString().slice(0,7);
+    const lastMonth=mstr(new Date(new Date().getFullYear(),new Date().getMonth()-1,1));
     const lastExp=records.filter(r=>r.date.startsWith(lastMonth)&&r.type==='expense').reduce((s,r)=>s+r.amt,0);
     let trendText='',trendColor='rgba(255,255,255,0.5)';
     if(lastExp>0){
@@ -3202,50 +3741,81 @@ const App={
     const dataUrl=window._statImageDataUrl;
     if(!dataUrl){this.showToast('图片未生成');return}
     const b64=dataUrl.split(',')[1];
-    if(b64 && this._nativeSave(b64,'碎银记_统计图_'+new Date().toISOString().slice(0,10)+'.png','image/png'))return;
+    if(b64 && this._nativeSave(b64,'碎银记_统计图_'+dstr(new Date())+'.png','image/png'))return;
     this.showToast('保存失败，请长按图片保存');
   },
 
   showScreenshotImport(){
     const html='<h3>📷 截图识别导入</h3>'+
-      '<div style="background:var(--card2);border-radius:12px;padding:14px;margin-bottom:14px;font-size:13px;line-height:1.6;color:var(--t2)">'+
+      '<style>#ssStatus{margin-top:0;padding:10px 12px;border-radius:10px;background:var(--glass-bg);font-size:13px;color:var(--t2);line-height:1.5}'+
+      '#ssStatus.err{background:rgba(255,59,48,.09);color:var(--red)}'+
+      '.ai-spin{display:inline-block;width:12px;height:12px;border:2px solid var(--t3);border-top-color:var(--p);border-radius:50%;animation:aiSpin .8s linear infinite;vertical-align:-2px;margin-right:6px}'+
+      '@keyframes aiSpin{to{transform:rotate(360deg)}}</style>'+
+      '<div style="background:var(--glass-bg);border-radius:12px;padding:14px;margin-bottom:14px;font-size:13px;line-height:1.6;color:var(--t2)">'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="font-size:20px">💡</span><b style="color:var(--text)">使用方法</b></div>'+
-      '1. 打开微信/支付宝，截图支付成功页面<br>'+
-      '2. 点击下方「选择图片」按钮<br>'+
-      '3. 查看截图，手动填写金额和分类<br>'+
-      '4. 一键导入到记账本'+
+      '1. 打开微信/支付宝，截图支付成功页面（或拍小票）<br>'+
+      '2. 点「📷 拍照」直接调相机，或点「🖼 相册选图」挑截图<br>'+
+      '3. 端侧 AI 自动识别金额、分类、日期并回填记账表单<br>'+
+      '4. 核对无误后手动点「记一笔」（绝不自动保存）'+
       '</div>'+
       '<div style="display:flex;flex-direction:column;gap:16px">'+
-      '<button class="btn-primary" style="background:var(--blue)" onclick="App._pickScreenshotImage()">📁 选择图片</button>'+
+      '<div style="display:flex;gap:10px">'+
+      '<button class="btn-primary" style="background:var(--blue);flex:1" onclick="App._pickScreenshotImage(\'camera\')">📷 拍照</button>'+
+      '<button class="btn-primary" style="background:var(--blue);flex:1;opacity:.88" onclick="App._pickScreenshotImage(\'album\')">🖼 相册选图</button>'+
+      '</div>'+
       '<div id="screenshotPreview" style="display:none;text-align:center">'+
-      '<img id="screenshotImg" style="max-width:100%;max-height:200px;border-radius:12px;border:1px solid var(--border);object-fit:contain"></div></div>'+
-      '<div style="display:flex;gap:10px"><input id="ssAmt" type="number" placeholder="金额" style="flex:1;padding:12px;background:var(--card2);border-radius:10px;font-size:15px;color:var(--text);border:1px solid var(--border)">'+
-      '<select id="ssCat" style="padding:12px 10px;background:var(--card2);border-radius:10px;font-size:15px;color:var(--text);border:1px solid var(--border)">'+
+      '<img id="screenshotImg" style="max-width:100%;max-height:200px;border-radius:12px;border:1px solid var(--glass-border);object-fit:contain"></div>'+
+      '<div id="ssStatus" class="ai-status" style="display:none"></div></div>'+
+      '<div style="display:flex;gap:10px"><input id="ssAmt" type="number" placeholder="金额" class="m-inp" style="flex:1;width:auto">'+
+      '<select id="ssCat" class="m-inp" style="width:auto;flex:0 0 auto">'+
       EC.map(k=>{const c=CATS.find(x=>x.k===k);return '<option value="'+k+'">'+c.i+' '+c.n+'</option>'}).join('')+
       '</select></div>'+
-      '<input id="ssNote" placeholder="备注（可选）" style="padding:12px;background:var(--card2);border-radius:10px;font-size:14px;color:var(--text);border:1px solid var(--border)">'+
+      '<input id="ssNote" placeholder="备注（可选）" class="m-inp">'+
       '<button class="btn-primary" id="btnImportScreenshot" onclick="App._confirmScreenshotImport()" style="display:none">确认导入</button></div>';
     this.showModal(html,'sheet');
   },
-  _pickScreenshotImage(){
+  _pickScreenshotImage(mode){
+    this._pickTarget='screenshot';
+    mode=mode==='camera'?'camera':'album';
     try{
       if(window.Native && typeof Native.pickImage==='function'){
-        Native.pickImage();
-        this.showToast('请选择截图');
-      }else{
-        // Fallback: use file picker with image type
-        if(window.Native && typeof Native.openFilePicker==='function'){
-          Native.openFilePicker();
-          this.showToast('请选择图片文件');
+        if(mode==='camera' && typeof Native.takePhoto==='function'){
+          Native.takePhoto();      // 原生相机拍照（FileProvider 高清输出）
+          this.showToast('请对准支付页／小票拍照');
         }else{
-          this.showToast('当前版本不支持图片选择');
+          Native.pickImage();      // 原生相册选图
+          this.showToast('请选择截图或小票图片');
         }
+        return;
       }
-    }catch(e){
-      this.showToast('无法打开图片选择');
+    }catch(e){}
+    // 浏览器环境：动态 <input type=file>，拍照走 capture 直接调摄像头
+    let inp=document.getElementById('ssFile');
+    if(!inp){
+      inp=document.createElement('input');
+      inp.type='file';inp.id='ssFile';inp.style.cssText='display:none';
+      inp.addEventListener('change',()=>this._onScreenshotFile(inp));
+      document.body.appendChild(inp);
     }
+    inp.accept='image/*';
+    if(mode==='camera')inp.setAttribute('capture','environment');else inp.removeAttribute('capture');
+    inp.value='';
+    inp.click();
+  },
+  _onScreenshotFile(inp){
+    const f=inp.files&&inp.files[0];
+    if(!f)return;
+    const rd=new FileReader();
+    rd.onload=()=>{const s=String(rd.result||'');const b=s.indexOf(',')>=0?s.split(',')[1]:'';if(b)this._onImageReady(b);};
+    rd.readAsDataURL(f);
   },
   _onImageReady(base64Data){
+    // 原生相册选完图统一回调这里：头像和截图导入共用一个通道，按目标分流
+    if(this._pickTarget==='avatar'){
+      this._pickTarget='screenshot';
+      this.openCropper(base64Data);   // 进裁剪页，确定后才保存
+      return;
+    }
     // Called from native bridge when image is selected
     const preview=document.getElementById('screenshotPreview');
     const img=document.getElementById('screenshotImg');
@@ -3258,9 +3828,188 @@ const App={
       this._tryExtractFromImage(base64Data);
     }
   },
-  _tryExtractFromImage(base64Data){
-    // Placeholder for future OCR integration
-    // For now, just show the image for user to reference
+  // ===== 端侧离线图片识别记账 =====
+  // PP-OCR-Tiny(WASM) 本地 OCR + wasm 小语言模型本地解析，全程不调用云端接口、图片不上传网络。
+  // 解析结果只回填表单，绝不自动保存；必须由用户核对后手动点「记一笔」才写入 localStorage。
+  _aiBase:null,_aiMod:null,_aiOcr:null,_aiLlm:null,_aiBusy:false,
+  _aiBasePath(){
+    if(!this._aiBase)this._aiBase=new URL('assets/offline-ai/',location.href).href;
+    return this._aiBase;
+  },
+  _aiStatus(msg,state){
+    const el=document.getElementById('ssStatus');
+    if(!el)return;
+    el.style.display='block';
+    el.className='ai-status'+(state==='err'?' err':'');
+    const sp=state==='load'?'<span class="ai-spin"></span>':(state==='err'?'⚠️ ':'✅ ');
+    el.innerHTML='<span>'+sp+' '+msg+'</span>';
+  },
+  async _tryExtractFromImage(base64Data){
+    if(this._aiBusy){this.showToast('正在识别中，请稍候…');return;}
+    this._aiBusy=true;
+    try{
+      this._aiStatus('加载离线识别引擎…','load');
+      const mod=await this._aiLoadModule();
+      await this._aiEnsureModel();
+      this._aiStatus('OCR 识别图片文字…','load');
+      const text=await this._aiRunOcr(mod,base64Data);
+      if(!text)throw new Error('未识别到文字，请换一张清晰截图');
+      this._aiStatus('端侧 AI 解析金额/分类/日期…','load');
+      const p=await this._aiRunLlm(mod,text);
+      if(!document.getElementById('ssStatus'))return; // 弹窗已关闭则放弃回填
+      // 需求：识别结果要先弹窗展示识别内容（金额/日期/分类/备注 + OCR 原文），
+      // 由用户确认后再决定「回填表单」还是「直接导入」——原「回填后手动记一笔」的流程完整保留
+      this._aiShowResult(p,text);
+    }catch(e){
+      console.error('[离线识别]',e);
+      this._aiStatus('识别失败：'+((e&&e.message)?e.message:'未知错误')+'，可在下方手动填写后导入','err');
+    }finally{
+      this._aiBusy=false;
+    }
+  },
+  // 识别结果弹窗：展示提取到的字段 + OCR 原文（可折叠），并提供回填 / 直接导入两条路
+  _aiShowResult(p,rawText){
+    if(!p){this.showToast('未识别到内容');return;}
+    const cat=(CATS||[]).find(c=>c.k===p.cat)||{n:'其他',i:'📋'};
+    const raw=String(rawText||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]));
+    const short=raw.length>220?raw.slice(0,220)+'…':raw;
+    const html='<h3>🔍 识别结果</h3>'+
+      '<div style="display:grid;grid-template-columns:auto 1fr;gap:9px 14px;background:var(--glass-bg);border-radius:12px;padding:14px;font-size:14px;margin-bottom:12px">'+
+      '<span style="color:var(--t2)">金额</span><b style="color:var(--red);font-size:17px" class="tabnum">¥'+Number(p.amount||0).toFixed(2)+'</b>'+
+      '<span style="color:var(--t2)">日期</span><b>'+((p.date&&/^\d{4}-\d{2}-\d{2}$/.test(p.date))?p.date:'未识别（默认今天）')+'</b>'+
+      '<span style="color:var(--t2)">分类</span><b>'+cat.i+' '+cat.n+'</b>'+
+      '<span style="color:var(--t2)">备注</span><b>'+(p.note?String(p.note).slice(0,40):'—')+'</b>'+
+      '</div>'+
+      (short?'<details style="margin-bottom:12px"><summary style="font-size:12px;color:var(--t2);cursor:pointer;padding:6px 0">查看 OCR 识别原文</summary>'+
+        '<div style="font-size:12px;color:var(--t3);line-height:1.7;max-height:150px;overflow:auto;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:10px;white-space:pre-wrap;word-break:break-all">'+short+'</div></details>':'')+
+      '<p style="font-size:12px;color:var(--t3);margin:0 0 12px;line-height:1.7">以上内容由端侧 AI 离线提取，请核对后再操作。</p>'+
+      '<div style="display:flex;flex-direction:column;gap:8px">'+
+      '<button class="btn-primary" onclick="App._aiApplyResult(true)">✏️ 回填到记账表单</button>'+
+      '<button class="btn-primary" style="background:linear-gradient(135deg,#94a3b8,#64748b)" onclick="App._aiApplyResult(false)">⚡ 直接导入账单</button>'+
+      '</div>';
+    this.showModal(html,'sheet');
+    this._aiPending=p;
+  },
+  // 用户点「回填 / 直接导入」后的分流（原逻辑不变，只是多了一个确认入口）
+  _aiApplyResult(toForm){
+    const p=this._aiPending;this._aiPending=null;
+    if(!p){this.showToast('识别结果已过期');return;}
+    this.closeModal();
+    if(toForm){
+      // 原有流程：只回填表单，用户核对后手动点「记一笔」才写入
+      this._aiFillForm(p);
+      this.showToast('已回填到记账表单，请核对后点「记一笔」');
+    }else{
+      // 直接导入：写入账单并刷新当前页（与手动记一笔同样走 saveRecords）
+      const type=IC.indexOf(p.cat)>=0?'income':'expense';
+      const rec={id:'r_'+Date.now(),amt:p.amount,cat:p.cat,date:p.date||dstr(new Date()),
+        note:p.note||'',type,mood:null,ts:Date.now()};
+      const records=this.getRecords();
+      records.push(rec);
+      records.sort((a,b)=>b.ts-a.ts);
+      this.saveRecords(records);
+      this.showToast('已导入 ¥'+Number(p.amount).toFixed(2)+' ✅');
+      if(this.curPage==='bills')this.renderBills();
+      if(this.curPage==='stats')this.renderStats();
+      if(this.curPage==='profile')this.renderProfile();
+      this.updateTodaySummary();
+    }
+  },
+  async _aiLoadModule(){
+    if(this._aiMod)return this._aiMod;
+    try{
+      this._aiMod=await import('./assets/offline-ai/offline-ai.mjs');
+    }catch(e){
+      throw new Error('离线识别引擎加载失败（本地资源缺失，浏览器打开请用本地服务器）');
+    }
+    if(!this._aiMod||!this._aiMod.PaddleOCR||!this._aiMod.Wllama)throw new Error('离线识别引擎不完整');
+    return this._aiMod;
+  },
+  async _aiEnsureModel(){
+    // Android 壳：模型打包在 APK 内，首次需释放到应用目录（支持分块读取，避免一次性占内存）
+    if(!(window.Native&&typeof Native.ensureOfflineModel==='function'))return;
+    const st=()=>{try{return Native.offlineModelStatus()}catch(e){return 'error'}};
+    if(st()==='ready')return;
+    this._aiStatus('准备本地模型（仅首次）…','load');
+    try{Native.ensureOfflineModel();}catch(e){throw new Error('模型准备失败');}
+    for(let i=0;i<720;i++){
+      await new Promise(r=>setTimeout(r,500));
+      const s=st();
+      if(s==='ready')return;
+      if(s==='error')throw new Error('模型释放失败，请检查存储空间');
+      if(s&&s.indexOf('progress:')===0)this._aiStatus('准备本地模型 '+s.slice(9)+'%（仅首次）','load');
+    }
+    throw new Error('模型准备超时');
+  },
+  async _aiRunOcr(mod,base64Data){
+    const base=this._aiBasePath();
+    if(!this._aiOcr){
+      this._aiOcr=await mod.PaddleOCR.create({
+        textDetectionModelName:'PP-OCRv6_tiny_det',
+        textDetectionModelAsset:{url:base+'ocr/models/PP-OCRv6_tiny_det.tar'},
+        textRecognitionModelName:'PP-OCRv6_tiny_rec',
+        textRecognitionModelAsset:{url:base+'ocr/models/PP-OCRv6_tiny_rec.tar'},
+        ortOptions:{backend:'wasm',wasmPaths:base+'ocr/ort/'}
+      });
+    }
+    const bin=atob(base64Data);
+    const arr=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+    const results=await this._aiOcr.predict(new Blob([arr],{type:'image/png'}));
+    const r=results&&results[0];
+    const items=(r&&r.items)||[];
+    const lines=items.filter(it=>it&&it.text&&(!it.score||it.score>=0.4)).map(it=>String(it.text).trim());
+    return lines.join('\n');
+  },
+  async _aiRunLlm(mod,text){
+    const base=this._aiBasePath();
+    if(!this._aiLlm){
+      const llm=new mod.Wllama({default:base+'llm/wasm/wllama.wasm',suppressNativeLog:true});
+      await llm.loadModelFromUrl(base+'llm/model.gguf',{
+        n_ctx:1024,
+        n_threads:Math.max(1,Math.min(4,(navigator.hardwareConcurrency||2)-1)),
+        progressCallback:o=>{
+          if(o.total>0){
+            const p=Math.round(o.loaded/o.total*100);
+            this._aiStatus(p<100?('加载语言模型 '+p+'%'):'初始化语言模型…','load');
+          }
+        }
+      });
+      this._aiLlm=llm;
+    }
+    const sys='你是记账信息提取器。根据支付截图的OCR文字提取账单，只输出一个JSON对象，禁止输出任何其他内容。格式：{"amount":金额数字,"cat":"分类代码","note":"简短备注","date":"YYYY-MM-DD"}。cat只能取：food,transport,shopping,entertain,housing,medical,edu,shower,other,salary,gift,invest,refund。没有明确日期时date填null。';
+    const resp=await this._aiLlm.createChatCompletion({
+      messages:[{role:'system',content:sys},{role:'user',content:String(text).slice(0,1500)}],
+      max_tokens:180,temperature:0.1
+    });
+    const out=((resp&&resp.choices&&resp.choices[0]&&resp.choices[0].message&&resp.choices[0].message.content)||'').trim();
+    let obj=null;
+    try{
+      const s=out.indexOf('{'),e=out.lastIndexOf('}');
+      if(s>=0&&e>s)obj=JSON.parse(out.slice(s,e+1));
+    }catch(err){obj=null;}
+    if(!obj)throw new Error('AI 未能解析出账单信息');
+    const amt=parseFloat(obj.amount);
+    if(!amt||amt<=0)throw new Error('未能提取到金额');
+    let cat=String(obj.cat||'other');
+    if(EC.indexOf(cat)<0&&IC.indexOf(cat)<0)cat='other';
+    const today=dstr(new Date());
+    let date=/^\d{4}-\d{2}-\d{2}$/.test(String(obj.date||''))?String(obj.date):today;
+    if(date>today)date=today;
+    return {amount:Math.round(amt*100)/100,cat,date,note:String(obj.note||'').replace(/\s+/g,' ').trim().slice(0,50)};
+  },
+  _aiFillForm(p){
+    // 只回填记账表单，由用户核对后手动点「记一笔」才写入 localStorage
+    this.switchPage('record');
+    const type=IC.indexOf(p.cat)>=0?'income':'expense';
+    if(this.curType!==type)this.setType(type);
+    const amt=document.getElementById('inputAmount');
+    if(amt){amt.value=p.amount;this.onAmountInput();}
+    const note=document.getElementById('inputNote');
+    if(note)note.value=p.note||'';
+    const d=document.getElementById('inputDate');
+    if(d&&p.date){d.value=p.date;d.dispatchEvent(new Event('change'));}
+    this.selectCat(p.cat);
   },
   _confirmScreenshotImport(){
     const amt=parseFloat(document.getElementById('ssAmt').value);
@@ -3268,7 +4017,7 @@ const App={
     const cat=document.getElementById('ssCat').value;
     const note=document.getElementById('ssNote').value.trim();
     const records=this.getRecords();
-    records.push({id:'r_'+Date.now(),amt,cat,date:new Date().toISOString().slice(0,10),note,type:'expense',mood:null,ts:Date.now()});
+    records.push({id:'r_'+Date.now(),amt,cat,date:dstr(new Date()),note,type:'expense',mood:null,ts:Date.now()});
     records.sort((a,b)=>b.ts-a.ts);
     this.saveRecords(records);
     this.closeModal();
@@ -3288,7 +4037,7 @@ const App={
     const fl=document.getElementById('fortuneLabel');
     if(fl){
       const s=this.getSettings();
-      const today=new Date().toISOString().slice(0,10);
+      const today=dstr(new Date());
       fl.textContent=s.fortuneDate===today?s.fortuneLevel:'未抽';
     }
   },
@@ -3297,14 +4046,207 @@ const App={
     const u=this.getUser();
     document.getElementById('userName').textContent=u.name||'未设置';
     document.getElementById('userEmail').textContent=u.email||'';
-    document.getElementById('userAvatar').textContent=u.name?u.name.charAt(0):'?';
+    const av=document.getElementById('userAvatar');
+    if(u.av){
+      av.style.backgroundImage='url('+u.av+')';
+      av.textContent='';
+      av.classList.add('has-img');
+    }else{
+      av.style.backgroundImage='';
+      av.textContent=u.name?u.name.charAt(0):'?';
+      av.classList.remove('has-img');
+    }
+  },
+  // 选择头像：APK 里走原生桥（呼出手机自带相册），浏览器里回退到 file input
+  pickAvatar(){
+    this._pickTarget='avatar';
+    try{
+      if(window.Native && typeof Native.pickImage==='function'){
+        Native.pickImage();   // ACTION_PICK：打开系统/小米自带相册，选完回调 App._onImageReady
+        return;
+      }
+    }catch(e){}
+    let inp=document.getElementById('avatarFile');
+    if(!inp){
+      inp=document.createElement('input');
+      inp.type='file';inp.accept='image/*';inp.id='avatarFile';
+      inp.style.cssText='display:none';
+      inp.addEventListener('change',()=>this.onAvatarFile(inp));
+      document.body.appendChild(inp);
+    }
+    inp.value='';
+    inp.click();
+  },
+  onAvatarFile(inp){
+    const f=inp.files&&inp.files[0];
+    if(!f)return;
+    const rd=new FileReader();
+    rd.onload=()=>this.openCropper(rd.result);
+    rd.readAsDataURL(f);
+  },
+  // 打开裁剪页（原生桥的裸 base64 或浏览器 dataURL 都行）
+  openCropper(b64){
+    const src=/^data:/.test(b64)?b64:('data:image/jpeg;base64,'+b64);
+    const img=new Image();
+    img.onload=()=>{
+      this._cropFromAvatar=!!this._avatarSheet;   // 记住从哪儿来的，裁剪完回去
+      this._crop={img,dx:0,dy:0,zoom:1};
+      const html='<h3>裁剪头像</h3>'+
+        '<div class="crop-outer"><div class="crop-stage" id="cropStage">'+
+        '<img id="cropImg" src="'+src+'" alt=""><div class="crop-mask"></div></div></div>'+
+        '<p class="crop-hint">拖动调整位置，双指捏合或滑块缩放<br>圆圈里始终铺满图片，不会有黑边</p>'+
+        '<div class="crop-zoom"><span>缩放</span><input type="range" id="cropRange" min="1" max="5" step="0.01" value="1" oninput="App._cropZoom(this.value)"></div>'+
+        '<div style="display:flex;gap:8px;margin-top:16px">'+
+        '<button class="btn-primary" style="flex:1;background:linear-gradient(135deg,#94a3b8,#64748b)" onclick="App._cropCancel()">取消</button>'+
+        '<button class="btn-primary" style="flex:1.6" onclick="App._cropConfirm()">确定</button></div>';
+      this.showModal(html);
+      this._initCrop();
+    };
+    img.onerror=()=>this.showToast('图片读取失败');
+    img.src=src;
+  },
+  _initCrop(){
+    const stage=document.getElementById('cropStage');
+    const el=document.getElementById('cropImg');
+    if(!stage||!el)return;
+    stage.style.height=stage.clientWidth+'px';          // 保证正方形裁剪窗
+    const c=this._crop;
+    c.stage=stage;c.el=el;c.size=stage.clientWidth;
+    // 铺满模式：短边贴住取景窗 → 圆圈内一定被图片盖住，杜绝黑边（旧版是长边适配，圈里会露出黑底）
+    c.base=c.size/Math.max(1,Math.min(c.img.naturalWidth,c.img.naturalHeight));
+    c.zoom=1;c.s=c.base;
+    // 竖图默认整体往上挪一点，先露出人脸/主体，而不是胸口
+    c.dx=0;
+    c.dy=Math.max(0,Math.min((c.img.naturalHeight*c.s-c.size)/4,c.size*0.16));
+    this._applyCrop();
+    // 拖动 / 双指缩放：只写 transform，不碰布局
+    this._ptrs=new Map();
+    stage.addEventListener('pointerdown',e=>{
+      stage.setPointerCapture&&stage.setPointerCapture(e.pointerId);
+      this._ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      e.preventDefault();
+    });
+    stage.addEventListener('pointermove',e=>{
+      if(!this._ptrs.has(e.pointerId))return;
+      const prev=this._ptrs.get(e.pointerId);
+      if(this._ptrs.size>=2){
+        // 双指：用前后两指间距比缩放
+        const p0=[...this._ptrs.values()];
+        const d0=Math.hypot(p0[0].x-p0[1].x,p0[0].y-p0[1].y);
+        this._ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+        const p1=[...this._ptrs.values()];
+        const d1=Math.hypot(p1[0].x-p1[1].x,p1[0].y-p1[1].y);
+        if(d0>1&&d1>1)this._cropZoom(c.zoom*(d1/d0));
+      }else{
+        c.dx+=e.clientX-prev.x;
+        c.dy+=e.clientY-prev.y;
+        this._ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+        this._applyCrop();
+      }
+      e.preventDefault();
+    },{passive:false});
+    const up=e=>{this._ptrs.delete(e.pointerId);};
+    stage.addEventListener('pointerup',up);
+    stage.addEventListener('pointercancel',up);
+  },
+  _cropZoom(v){
+    const c=this._crop;if(!c)return;
+    c.zoom=Math.max(1,Math.min(5,parseFloat(v)||1));   // 1 = 刚好铺满，只能放大不能缩到露底
+    c.s=c.base*c.zoom;
+    const r=document.getElementById('cropRange');
+    if(r&&parseFloat(r.value)!==c.zoom)r.value=c.zoom;
+    this._applyCrop();
+  },
+  _applyCrop(){
+    const c=this._crop;if(!c||!c.el)return;
+    const S=c.size;
+    // 夹住位移：取景方框（含圆形圈）永远整块落在图片内，圈里不可能出现黑边
+    const mx=Math.max(0,(c.img.naturalWidth*c.s-S)/2);
+    const my=Math.max(0,(c.img.naturalHeight*c.s-S)/2);
+    c.dx=Math.max(-mx,Math.min(mx,c.dx));
+    c.dy=Math.max(-my,Math.min(my,c.dy));
+    c.el.style.transform='translate(-50%,-50%) translate('+c.dx+'px,'+c.dy+'px) scale('+c.s+')';
+  },
+  _cropConfirm(){
+    const c=this._crop;if(!c)return;
+    try{
+      const S=160;
+      const cv=document.createElement('canvas');cv.width=S;cv.height=S;
+      const g=cv.getContext('2d');
+      // 兜底底色：铺满模式下基本用不到，万一图片没画上也不出现难看的黑块
+      const fg=g.createLinearGradient(0,0,S,S);fg.addColorStop(0,'#8b5cf6');fg.addColorStop(1,'#6366f1');
+      g.fillStyle=fg;g.fillRect(0,0,S,S);
+      // 裁剪窗中心在源图上的坐标 = 图片中心 - 偏移/缩放；半边长 = 窗宽/(2*缩放)
+      const half=c.size/(2*c.s);
+      const cx=c.img.naturalWidth/2-c.dx/c.s;
+      const cy=c.img.naturalHeight/2-c.dy/c.s;
+      g.drawImage(c.img,cx-half,cy-half,half*2,half*2,0,0,S,S);
+      const u=this.getUser();
+      u.av=cv.toDataURL('image/jpeg',.82);
+      this.saveUser(u);
+      this._crop=null;
+      this.closeModal();
+      this.renderUser();
+      this.showToast('头像已更新');
+      if(this._cropFromAvatar)setTimeout(()=>this.showAvatarSheet(),240);
+    }catch(e){this.showToast('裁剪失败');}
+  },
+  _cropCancel(){
+    this._crop=null;
+    this.closeModal();
+    if(this._cropFromAvatar)setTimeout(()=>this.showAvatarSheet(),240);
+  },
+  // 头像页：点头像弹出的中间页，里面再点「更换头像」呼出系统相册
+  showAvatarSheet(){
+    const u=this.getUser();
+    const prev=u.av
+      ? '<img src="'+u.av+'" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,.9);box-shadow:0 6px 18px rgba(99,102,241,.30)">'
+      : '<div style="width:96px;height:96px;border-radius:50%;background:var(--g1);color:#fff;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;box-shadow:0 6px 18px rgba(99,102,241,.30)">'+(u.name?u.name.charAt(0):'?')+'</div>';
+    const html='<h3>头像</h3>'+
+      '<div style="display:flex;justify-content:center;padding:6px 0 10px">'+prev+'</div>'+
+      '<p style="text-align:center;font-size:12px;color:var(--t3);margin:0 0 14px;line-height:1.7">点下方按钮会打开手机自带相册<br>选好图片后自动裁剪成圆形头像</p>'+
+      '<div style="display:flex;flex-direction:column;gap:8px">'+
+      '<button class="btn-primary" onclick="App.pickAvatar()">更换头像</button>'+
+      (u.av?'<button class="btn-primary" style="background:linear-gradient(135deg,#94a3b8,#64748b)" onclick="App.removeAvatar()">移除头像</button>':'')+
+      '</div>';
+    this.showModal(html);
+    this._avatarSheet=true;
+  },
+  removeAvatar(){
+    const u=this.getUser();
+    u.av='';
+    this.saveUser(u);
+    this.renderUser();
+    if(this._avatarSheet)this.showAvatarSheet();
+    else if(document.getElementById('ufName')){
+      // 在「编辑信息」弹窗里移除：刷新预览，保留已输入的昵称/邮箱
+      const n=document.getElementById('ufName').value,e=document.getElementById('ufEmail').value;
+      this.showUserForm();
+      document.getElementById('ufName').value=n;
+      document.getElementById('ufEmail').value=e;
+    }
+    else this.showToast('已移除头像');
   },
   showUserForm(){
     const u=this.getUser();
+    // 顶部圆形头像预览，与「头像」页/我的页同款圆环，点一下直接换头像
+    const avPrev=u.av
+      ? '<img src="'+u.av+'" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,.9);box-shadow:0 6px 18px rgba(99,102,241,.30);display:block;flex-shrink:0">'
+      : '<div style="width:56px;height:56px;border-radius:50%;background:var(--g1);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0;box-shadow:0 6px 18px rgba(99,102,241,.30)">'+(u.name?u.name.charAt(0):'?')+'</div>';
     const html='<h3>编辑信息</h3>'+
-      '<div style="display:flex;flex-direction:column;gap:10px">'+
-      '<input id="ufName" placeholder="昵称" value="'+App.escapeHtml(u.name)+'" style="padding:10px;background:var(--card2);border-radius:8px;font-size:15px;color:var(--text);border:1px solid var(--border)">'+
-      '<input id="ufEmail" placeholder="邮箱" value="'+App.escapeHtml(u.email)+'" style="padding:10px;background:var(--card2);border-radius:8px;font-size:15px;color:var(--text);border:1px solid var(--border)">'+
+      '<div style="display:flex;flex-direction:column;gap:12px">'+
+      '<div class="m-avatar-row" onclick="App.pickAvatar()">'+avPrev+
+      '<div style="flex:1;min-width:0"><div class="m-avatar-name">'+App.escapeHtml(u.name||'未设置昵称')+'</div>'+
+      '<div class="m-avatar-sub">'+(u.email||'未设置邮箱')+'</div>'+
+      '<div class="m-avatar-tip">点击更换头像 ›</div></div></div>'+
+      '<div class="m-field"><span class="m-lbl">昵称</span>'+
+      '<input id="ufName" class="m-inp" placeholder="输入昵称" value="'+App.escapeHtml(u.name)+'"></div>'+
+      '<div class="m-field"><span class="m-lbl">邮箱</span>'+
+      '<input id="ufEmail" class="m-inp" type="email" placeholder="输入邮箱" value="'+App.escapeHtml(u.email)+'"></div>'+
+      '<div style="display:flex;gap:8px">'+
+      '<button class="btn-primary" style="flex:1" onclick="App.pickAvatar()">更换头像</button>'+
+      (u.av?'<button class="btn-primary" style="flex:1;background:linear-gradient(135deg,#94a3b8,#64748b)" onclick="App.removeAvatar()">移除头像</button>':'')+
+      '</div>'+
       '<button class="btn-primary" onclick="App.saveUserForm()">保存</button></div>';
     this.showModal(html);
   },
@@ -3329,7 +4271,7 @@ const App={
       const d=new Date(sorted[i]);
       const expected=new Date(today);
       expected.setDate(expected.getDate()-i);
-      if(d.toISOString().slice(0,10)===expected.toISOString().slice(0,10))streak++;
+      if(dstr(d)===dstr(expected))streak++;
       else break;
     }
     return streak;
@@ -3340,7 +4282,7 @@ const App={
     const now=new Date();
     for(let i=0;i<12;i++){
       const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-      const m=d.toISOString().slice(0,7);
+      const m=mstr(d);
       const total=records.filter(r=>r.date.startsWith(m)&&r.type==='expense').reduce((s,r)=>s+r.amt,0);
       if(total<=settings.budget)streak++;else break;
     }
@@ -3348,7 +4290,7 @@ const App={
   },
   checkFullMonth(records){
     const now=new Date();
-    const m=now.toISOString().slice(0,7);
+    const m=mstr(now);
     const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
     const monthDates=new Set(records.filter(r=>r.date.startsWith(m)).map(r=>r.date));
     for(let d=1;d<=Math.min(daysInMonth,now.getDate());d++){
@@ -3406,7 +4348,7 @@ const App={
     const html='<h3>'+(g?'编辑目标':'新建目标')+'</h3><div class="goal-form">'+
       '<input id="gfName" placeholder="目标名称" value="'+(g?App.escapeHtml(g.name):'')+'">'+
       '<div style="display:flex;gap:8px"><input id="gfTarget" type="number" placeholder="目标金额" value="'+(g?g.target:'')+'" style="flex:1"><input id="gfCurrent" type="number" placeholder="已存金额" value="'+(g?g.current:'')+'" style="flex:1"></div>'+
-      '<input id="gfDate" type="date" value="'+(g?g.date:new Date(Date.now()+30*24*3600*1000).toISOString().slice(0,10))+'">'+
+      '<input id="gfDate" type="date" value="'+(g?g.date:dstr(new Date(Date.now()+30*24*3600*1000)))+'">'+
       '<div class="goal-emoji-pick">'+emojis.map(e=>'<button class="'+(g&&g.icon===e?'selected':'')+'" onclick="App.selectGoalEmoji(event,\''+e+'\')">'+e+'</button>').join('')+'</div>'+
       '<div class="goal-emoji-pick">'+colors.map(c=>'<button class="'+(g&&g.color===c?'selected':'')+'" onclick="App.selectGoalColor(event,\''+c+'\')" style="background:'+c+'"></button>').join('')+'</div>'+
       '<button class="btn-primary" onclick="App.saveGoal(\''+(editId||'')+'\')">保存</button></div>';
@@ -3450,7 +4392,7 @@ const App={
     if(!g)return;
     const html='<h3>存入 "'+App.escapeHtml(g.name)+'"</h3>'+
       '<div style="display:flex;flex-direction:column;gap:10px">'+
-      '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">¥</span><input id="dgAmount" type="number" placeholder="金额" style="flex:1;padding:10px;background:var(--card2);border-radius:8px;font-size:15px;color:var(--text);border:1px solid var(--border)"></div>'+
+      '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">¥</span><input id="dgAmount" type="number" placeholder="金额" class="m-inp" style="flex:1;width:auto"></div>'+
       '<button class="btn-primary" onclick="App.confirmAddToGoal(\''+id+'\')">确认存入</button></div>';
     this.showModal(html);
   },
@@ -3507,7 +4449,7 @@ const App={
   copyShareText(){
     const records=this.getRecords();
     const totalRecords=records.length;
-    const thisMonth=new Date().toISOString().slice(0,7);
+    const thisMonth=mstr(new Date());
     const monthTotal=records.filter(r=>r.date.startsWith(thisMonth)&&r.type==='expense').reduce((s,r)=>s+r.amt,0);
     const streak=this.checkStreak(records);
     const text='✨ 推荐一个超好用的记账APP「碎银记」\n\n'+
@@ -3554,7 +4496,7 @@ const App={
     ctx.fillStyle='#86868b';ctx.font='16px -apple-system,PingFang SC,sans-serif';
     ctx.fillText('每一笔都值得记录',300,140);
     // Month label
-    const thisMonth=new Date().toISOString().slice(0,7);
+    const thisMonth=mstr(new Date());
     const parts=thisMonth.split('-');
     ctx.fillStyle='#aeaeb2';ctx.font='13px -apple-system,PingFang SC,sans-serif';
     ctx.fillText(parts[0]+'年'+parseInt(parts[1])+'月',300,168);
@@ -3673,7 +4615,7 @@ const App={
   exportData(format){
     const records=this.getRecords();
     if(records.length===0){this.showToast('暂无数据可导出');return}
-    const fileName='碎银记_'+new Date().toISOString().slice(0,10)+'.csv';
+    const fileName='碎银记_'+dstr(new Date())+'.csv';
     let csv='类型,金额,分类,日期,备注,心情\n';
     records.forEach(r=>{
       const cat=this.getCatData(r.cat);
@@ -3685,7 +4627,7 @@ const App={
   _showExportFallback(content, filename){
     const html='<h3>导出内容</h3>'+
       '<p style="font-size:12px;color:var(--t2);margin-bottom:8px">请手动复制以下内容，保存为 <b>'+filename+'</b></p>'+
-      '<textarea style="width:100%;height:200px;font-size:11px;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--card2);color:var(--text);font-family:monospace;resize:none" readonly>'+this.escapeHtml(content)+'</textarea>'+
+      '<textarea style="width:100%;height:200px;font-size:11px;border:1px solid var(--glass-border);border-radius:8px;padding:8px;background:var(--glass-bg);color:var(--text);font-family:monospace;resize:none" readonly>'+this.escapeHtml(content)+'</textarea>'+
       '<div style="display:flex;gap:8px;margin-top:10px">'+
       '<button class="btn-primary" style="flex:1" onclick="App._copyExportContent()">📋 复制全部内容</button>'+
       '<button class="btn-primary" style="flex:1;background:var(--t2)" onclick="App.closeModal()">关闭</button></div>';
@@ -3767,7 +4709,8 @@ const App={
       if(isNaN(amt)||amt<=0)continue;
       const catName=cols[2].trim();
       const cat=CATS.find(c=>c.n===catName)||{k:'other'};
-      const date=cols[3].trim()||new Date().toISOString().slice(0,10);
+      const rawDate=(cols[3]||'').trim();
+      const date=/^\d{4}-\d{2}-\d{2}$/.test(rawDate)?rawDate:dstr(new Date());
       const note=cols[4]||'';
       const mood=cols[5]||null;
       const moodMap={'值得':'happy','一般':'neutral','后悔':'sad','来之不易':'hard','意外之财':'surprise','小确幸':'lucky','平淡':'calm'};
@@ -3792,10 +4735,17 @@ const App={
       const existingIds=new Set(all.map(r=>r.id));
       let added=0;
       items.forEach((r,i)=>{
-        if(!existingIds.has(r.id)){
-          all.push({id:r.id||'r_'+Date.now()+'_'+i,amt:r.amt,cat:r.cat||'other',date:r.date||new Date().toISOString().slice(0,10),note:r.note||'',type:r.type||'expense',mood:r.mood||null,ts:r.ts||Date.now()});
-          added++;
-        }
+        if(!r||typeof r!=='object')return;
+        const amt=parseFloat(r.amt);
+        if(!(amt>0))return;
+        // id 会被拼进 onclick 属性：必须清洗掉引号/尖括号，否则一条脏数据能弄崩整个账单页
+        const id=String(r.id==null?'':r.id).replace(/[^A-Za-z0-9_-]/g,'').slice(0,64)||('r_'+Date.now()+'_'+i);
+        if(existingIds.has(id))return;
+        existingIds.add(id);
+        all.push({id,amt,cat:String(r.cat||'other'),date:String(r.date||dstr(new Date())).slice(0,10),
+          note:String(r.note==null?'':r.note).slice(0,200),type:r.type==='income'?'income':'expense',
+          mood:r.mood||null,ts:(+r.ts>0)?+r.ts:Date.now()+i});
+        added++;
       });
       all.sort((a,b)=>b.ts-a.ts);
       this.saveRecords(all);
@@ -3869,7 +4819,7 @@ const App={
     let added=0;
     results.forEach((r,i)=>{
       if(checks[i]&&checks[i].classList.contains('checked')){
-        records.push({id:'r_'+Date.now()+'_'+i,amt:r.amt,cat:r.cat,date:new Date().toISOString().slice(0,10),note:r.note,type:r.type,mood:null,ts:Date.now()});
+        records.push({id:'r_'+Date.now()+'_'+i,amt:r.amt,cat:r.cat,date:dstr(new Date()),note:r.note,type:r.type,mood:null,ts:Date.now()});
         added++;
       }
     });
@@ -3884,7 +4834,7 @@ const App={
   showReportModal(){
     const records=this.getRecords();
     if(records.length===0){this.showToast('暂无数据');return}
-    const thisMonth=new Date().toISOString().slice(0,7);
+    const thisMonth=mstr(new Date());
     const monthRecords=records.filter(r=>r.date.startsWith(thisMonth));
     const expTotal=monthRecords.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amt,0);
     const incTotal=monthRecords.filter(r=>r.type==='income').reduce((s,r)=>s+r.amt,0);
@@ -3893,7 +4843,7 @@ const App={
     const entries=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
 
     // 动态引言
-    const lastMonth=new Date(new Date().getFullYear(),new Date().getMonth()-1,1).toISOString().slice(0,7);
+    const lastMonth=mstr(new Date(new Date().getFullYear(),new Date().getMonth()-1,1));
     const lastExp=records.filter(r=>r.date.startsWith(lastMonth)&&r.type==='expense').reduce((s,r)=>s+r.amt,0);
     let opening='';
     if(expTotal===0&&incTotal===0){opening='这个月还没开始记录，新的一个月，从第一笔开始吧'}
@@ -3924,7 +4874,7 @@ const App={
     report+='━━━━━━━━━━━━━━━━━━\n记好每一笔碎银，未来的你会感谢现在认真的自己 ✨';
 
     const html='<h3>月度报告</h3>'+
-      '<div class="rpt-preview" id="rptContent" style="white-space:pre-wrap;font-size:13px;line-height:1.8;background:var(--card2);border-radius:12px;padding:14px;margin:10px 0;max-height:50vh;overflow-y:auto">'+this.escapeHtml(report)+'</div>'+
+      '<div class="rpt-preview" id="rptContent" style="white-space:pre-wrap;font-size:13px;line-height:1.8;background:var(--glass-bg);border-radius:12px;padding:14px;margin:10px 0;max-height:50vh;overflow-y:auto">'+this.escapeHtml(report)+'</div>'+
       '<button class="btn-primary" onclick="App._copyReport()">📋 复制报告</button>';
     window._reportText=report;
     this.showModal(html,'sheet');
@@ -3938,11 +4888,20 @@ const App={
   },
 
   // ===== AI Report =====
+  // 玻璃钻石图标：AI 相关入口统一用它（原 emoji 看着像贴纸，太廉价）
+  // theme='p' 用紫色系（浅色玻璃底上），默认白色系（紫色渐变卡上）
+  gem(sz,theme){
+    const s=sz||24;
+    const c=theme==='p'?['rgba(139,92,246,.16)','#7c3aed','rgba(124,58,237,.55)']:['rgba(255,255,255,.24)','rgba(255,255,255,.95)','rgba(255,255,255,.75)'];
+    return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:block;flex-shrink:0">'+
+      '<path d="M7.6 3.4h8.8l4.2 5.8L12 21 3.4 9.2l4.2-5.8Z" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.5" stroke-linejoin="round"/>'+
+      '<path d="M3.4 9.2h17.2M7.6 3.4 9 9.2l3 11.8 3-11.8 1.4-5.8" stroke="'+c[2]+'" stroke-width="1.2" stroke-linejoin="round"/></svg>';
+  },
   showAIReport(){
     const records=this.getRecords();
     if(records.length===0){this.showToast('暂无数据，先记几笔吧');return}
-    const thisMonth=new Date().toISOString().slice(0,7);
-    const lastMonth=new Date(new Date().getFullYear(),new Date().getMonth()-1,1).toISOString().slice(0,7);
+    const thisMonth=mstr(new Date());
+    const lastMonth=mstr(new Date(new Date().getFullYear(),new Date().getMonth()-1,1));
     const monthRecords=records.filter(r=>r.date.startsWith(thisMonth));
     const lastMonthRecords=records.filter(r=>r.date.startsWith(lastMonth));
     const expTotal=monthRecords.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amt,0);
@@ -4032,22 +4991,26 @@ const App={
     const scoreColor=score>=80?'#34c759':score>=60?'#ff9500':'#ff3b30';
     const scoreLabel=score>=80?'理财高手':score>=60?'还不错':'需要加油';
 
-    let html='<div style="text-align:center;padding-bottom:4px">';
-    html+='<div style="font-size:12px;color:var(--t2);margin-bottom:4px">本月理财健康报告</div>';
-    html+='<svg width="130" height="130" style="display:block;margin:0 auto"><circle cx="65" cy="65" r="55" fill="none" stroke="var(--border)" stroke-width="7"/>';
-    html+='<circle cx="65" cy="65" r="55" fill="none" stroke="'+scoreColor+'" stroke-width="7" stroke-dasharray="'+Math.round(score/100*345.6)+' 345.6" stroke-dashoffset="0" transform="rotate(-90 65 65)" stroke-linecap="round" style="transition:stroke-dasharray 1s ease"/>';
+    let html='<h3>AI 理财分析</h3>';
+    html+='<div style="text-align:center;padding-bottom:4px">';
+    html+='<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:999px;background:var(--glass-bg-strong);border:1px solid var(--glass-border-strong);font-size:12px;font-weight:600;color:var(--p);box-shadow:var(--glass-inset-top)">'+App.gem(14,'p')+'本月理财健康报告</div>';
+    html+='<div style="position:relative;width:130px;height:130px;margin:10px auto 0">';
+    html+='<div style="position:absolute;inset:14px;border-radius:50%;background:radial-gradient(circle,'+scoreColor+'22,transparent 70%)"></div>';
+    html+='<svg width="130" height="130" style="position:relative;display:block"><circle cx="65" cy="65" r="55" fill="none" stroke="var(--border)" stroke-width="7"/>';
+    html+='<circle id="scoreRing" cx="65" cy="65" r="55" fill="none" stroke="'+scoreColor+'" stroke-width="7" stroke-dasharray="0 345.6" stroke-dashoffset="0" transform="rotate(-90 65 65)" stroke-linecap="round" style="transition:stroke-dasharray .9s cubic-bezier(.22,1,.36,1)"/>';
     html+='<text x="65" y="58" text-anchor="middle" font-size="26" font-weight="700" fill="var(--text)">'+score+'</text>';
-    html+='<text x="65" y="78" text-anchor="middle" font-size="11" fill="var(--t2)">'+scoreLabel+'</text></svg></div>';
+    html+='<text x="65" y="78" text-anchor="middle" font-size="11" fill="var(--t2)">'+scoreLabel+'</text></svg></div></div>';
+    setTimeout(()=>{const r=document.getElementById('scoreRing');if(r)r.setAttribute('stroke-dasharray',Math.round(score/100*345.6)+' 345.6')},80);
 
     // 核心数据卡片
     html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0">';
-    html+='<div style="background:var(--card2);border-radius:10px;padding:10px;text-align:center"><div style="font-size:11px;color:var(--t3)">月支出</div><div style="font-size:18px;font-weight:700;color:var(--red);margin-top:2px" class="tabnum">¥'+expTotal.toFixed(0)+'</div></div>';
-    html+='<div style="background:var(--card2);border-radius:10px;padding:10px;text-align:center"><div style="font-size:11px;color:var(--t3)">月收入</div><div style="font-size:18px;font-weight:700;color:var(--green);margin-top:2px" class="tabnum">¥'+incTotal.toFixed(0)+'</div></div>';
-    html+='<div style="background:var(--card2);border-radius:10px;padding:10px;text-align:center"><div style="font-size:11px;color:var(--t3)">环比</div><div style="font-size:18px;font-weight:700;color:'+momColor+';margin-top:2px">'+momChange+'</div></div>';
+    html+='<div class="ai-tile"><div style="font-size:11px;color:var(--t3)">月支出</div><div style="font-size:18px;font-weight:700;color:var(--red);margin-top:2px" class="tabnum">¥'+expTotal.toFixed(0)+'</div></div>';
+    html+='<div class="ai-tile"><div style="font-size:11px;color:var(--t3)">月收入</div><div style="font-size:18px;font-weight:700;color:var(--green);margin-top:2px" class="tabnum">¥'+incTotal.toFixed(0)+'</div></div>';
+    html+='<div class="ai-tile"><div style="font-size:11px;color:var(--t3)">环比</div><div style="font-size:18px;font-weight:700;color:'+momColor+';margin-top:2px">'+momChange+'</div></div>';
     html+='</div>';
 
     // 恩格尔系数
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;background:var(--card2);border-radius:10px;padding:12px;margin-bottom:8px">';
+    html+='<div class="ai-tile" style="display:flex;align-items:center;justify-content:space-between;padding:12px;margin-bottom:8px">';
     html+='<div><div style="font-size:13px;font-weight:600">恩格尔系数</div><div style="font-size:11px;color:var(--t3);margin-top:2px">餐饮支出占比</div></div>';
     html+='<div style="text-align:right"><div style="font-size:20px;font-weight:700" class="tabnum">'+engel+'%</div><div style="font-size:11px;color:var(--t2)">'+engelLevel+'</div></div></div>';
 
@@ -4089,7 +5052,7 @@ const App={
 
   // ===== 碎银签：每日财运签 =====
   drawFortune(){
-    const today=new Date().toISOString().slice(0,10);
+    const today=dstr(new Date());
     const s=this.getSettings();
     if(s.fortuneDate===today&&s.fortuneText){
       this._showFortune(s.fortuneText,s.fortuneLevel,true);
@@ -4113,7 +5076,7 @@ const App={
     const html='<div style="text-align:center;padding:8px 0">'+
       '<div style="font-size:48px;margin-bottom:8px">🎋</div>'+
       '<div style="font-size:22px;font-weight:700;color:var(--p);margin-bottom:4px">碎银签</div>'+
-      '<div style="display:inline-block;padding:4px 16px;border-radius:20px;background:var(--card2);font-size:14px;font-weight:600;margin:8px 0">'+lvl+'</div>'+
+      '<div style="display:inline-block;padding:4px 16px;border-radius:20px;background:var(--glass-bg);font-size:14px;font-weight:600;margin:8px 0">'+lvl+'</div>'+
       '<div style="font-size:15px;line-height:1.8;color:var(--text);margin:12px 0;padding:0 8px">'+text+'</div>'+
       '<div style="font-size:11px;color:var(--t3);margin-top:8px">'+(opened?'（今日已抽签，明日再来）':'每日一签，助你理财')+'</div>'+
       '</div>';
@@ -4125,7 +5088,7 @@ const App={
   saveCapsules(c){localStorage.setItem('xzb_capsules',JSON.stringify(c))},
   showCapsule(){
     const capsules=this.getCapsules();
-    const today=new Date().toISOString().slice(0,10);
+    const today=dstr(new Date());
     let html='<h3>📮 时间胶囊</h3>';
     html+='<div style="font-size:13px;color:var(--t2);margin-bottom:12px;text-align:center">给未来的自己写一段话，到期后才能打开</div>';
     // 显示已解锁的胶囊
@@ -4169,8 +5132,8 @@ const App={
     if(!msg){this.showToast('写点什么给未来的自己吧 ✍️');return}
     const days=parseInt(document.getElementById('capsuleDate').value);
     const today=new Date();
-    const openDate=new Date(today.getTime()+days*24*60*60*1000).toISOString().slice(0,10);
-    const createDate=today.toISOString().slice(0,10);
+    const openDate=dstr(new Date(today.getTime()+days*24*60*60*1000));
+    const createDate=dstr(today);
     // 生成摘要
     const prefix=createDate.substring(0,7)+'-';
     const monthRecords=this.getRecords().filter(r=>r.date.startsWith(prefix));
@@ -4235,11 +5198,11 @@ const App={
     html+='<div style="font-size:48px;margin-bottom:8px;animation:bounce .6s var(--spring-bounce)">'+emoji+'</div>';
     html+='<div style="font-size:20px;font-weight:700;color:'+color+';margin-bottom:4px">'+personality+'</div>';
     html+='<div style="display:flex;gap:6px;justify-content:center;margin:8px 0">';
-    tags.forEach(t=>{html+='<span style="padding:4px 10px;background:var(--card2);border-radius:12px;font-size:12px;color:var(--t2)">'+t+'</span>'});
+    tags.forEach(t=>{html+='<span style="padding:4px 10px;background:var(--glass-bg);border-radius:12px;font-size:12px;color:var(--t2)">'+t+'</span>'});
     html+='</div>';
     html+='</div>';
-    html+='<div style="background:var(--card2);border-radius:12px;padding:14px;margin:12px 0;font-size:13px;color:var(--t2);line-height:1.7">'+desc+'</div>';
-    html+='<div style="background:var(--card2);border-radius:12px;padding:14px;font-size:12px;color:var(--t3)">';
+    html+='<div style="background:var(--glass-bg);border-radius:12px;padding:14px;margin:12px 0;font-size:13px;color:var(--t2);line-height:1.7">'+desc+'</div>';
+    html+='<div style="background:var(--glass-bg);border-radius:12px;padding:14px;font-size:12px;color:var(--t3)">';
     html+='<div style="font-weight:600;color:var(--text);margin-bottom:6px">📊 本月数据概览</div>';
     html+='<div>总支出 ¥'+totalExp.toFixed(0)+' · 最常花在'+topCatData.n+' ('+Math.round(topCat[1]/totalExp*100)+'%)</div>';
     if(nightPct>0)html+='<div>夜间消费占比 '+nightPct+'%'+(nightPct>=30?' 🌙':'')+'</div>';
@@ -4252,7 +5215,7 @@ const App={
   // ===== Donate =====
   showDonateModal(){
     const html='<h3>🧋 请我喝杯奶茶吧</h3>'+
-      '<div style="text-align:center;color:var(--t2);font-size:13px;line-height:1.8;margin-bottom:14px;padding:14px;background:var(--card2);border-radius:12px">'+
+      '<div style="text-align:center;color:var(--t2);font-size:13px;line-height:1.8;margin-bottom:14px;padding:14px;background:var(--glass-bg);border-radius:12px">'+
       '嗨，我是 <b style="color:var(--p)">我不要芒果</b><br>'+
       '一个计算机专业的大一在读学生 🎓<br><br>'+
       '碎银记是我一个人写的，<br>'+
@@ -4265,8 +5228,8 @@ const App={
       '随缘打赏，金额随意，开心就好 💛'+
       '</div>'+
       '<div class="qr-row" style="display:flex;justify-content:center;gap:16px">'+
-      '<div style="text-align:center"><img src="qr-wechat.jpg" style="width:120px;height:120px;border-radius:8px;border:1px solid var(--border);object-fit:cover"><div style="font-size:11px;color:var(--t3);margin-top:4px">微信</div></div>'+
-      '<div style="text-align:center"><img src="qr-alipay.jpg" style="width:120px;height:120px;border-radius:8px;border:1px solid var(--border);object-fit:cover"><div style="font-size:11px;color:var(--t3);margin-top:4px">支付宝</div></div></div>'+
+      '<div style="text-align:center"><img src="qr-wechat.jpg" style="width:120px;height:120px;border-radius:8px;border:1px solid var(--glass-border);object-fit:cover"><div style="font-size:11px;color:var(--t3);margin-top:4px">微信</div></div>'+
+      '<div style="text-align:center"><img src="qr-alipay.jpg" style="width:120px;height:120px;border-radius:8px;border:1px solid var(--glass-border);object-fit:cover"><div style="font-size:11px;color:var(--t3);margin-top:4px">支付宝</div></div></div>'+
       '<div style="text-align:center;color:var(--t3);font-size:12px;margin-top:12px">随缘打赏，开心就好 💛</div>';
     this.showModal(html);
   },
