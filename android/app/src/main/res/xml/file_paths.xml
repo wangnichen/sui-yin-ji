@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- 拍照临时输出目录（应用缓存，识别用完即弃） -->
+    <cache-path name="camera" path="camera/" />
+</paths>

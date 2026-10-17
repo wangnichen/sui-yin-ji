@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.xiaozhangben.app">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 拍照/选图走系统选择器（ACTION_PICK / ACTION_GET_CONTENT），URI 授权由系统临时授予，
+         不需要读媒体权限；READ_EXTERNAL_STORAGE 仅保留给 Android 12L 及以下的少数 ROM -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <!-- 只有 Android 9 及以下写公共下载目录需要；Android 10+ 走 MediaStore，无需任何存储权限 -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <!-- Android 11+ 包可见性：拍照前查询本机相机应用（Android 17 同样依赖） -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:hardwareAccelerated="true"
+        android:largeHeap="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="碎银记"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- 拍照识别：把相机输出写到应用缓存（自实现极简 Provider，无需第三方库） -->
+        <provider
+            android:name=".SimpleFileProvider"
+            android:authorities="com.xiaozhangben.app.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+</manifest>
