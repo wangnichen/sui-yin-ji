@@ -138,6 +138,11 @@ body.dk .top-bar{background:var(--glass-bg);border-bottom-color:var(--glass-bord
 .page:not(.active) .today-summary,
 .page:not(.active) .type-toggle,
 .page:not(.active) .profile-card{backdrop-filter:none;-webkit-backdrop-filter:none}
+/* 液态玻璃再优化：隔页（与当前页距离>1）整体 visibility:hidden。
+   横滑最多露出相邻页，隔页永远不可见 → 合成器直接跳过其布局/绘制/层合成，
+   比单纯关模糊更省（4 页里始终只合成当前页 + 相邻页共 2 页）。
+   隔页状态只在切页瞬间更新（不发生在拖拽中），相邻页保留所以拖拽画面不受影响 */
+.page.far{visibility:hidden}
 /* 切换时不再用 display，水平 transform 即可；保留 fadeIn 供局部元素使用 */
 @keyframes fadeIn{from{opacity:0;transform:scale(.97) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
 /* 后台页暂停常驻动画（4 页永不卸载，避免无谓的合成层每帧计算） */
@@ -172,6 +177,14 @@ body.dk .bottom-nav{background:rgba(18,18,18,.5);border-color:rgba(255,255,255,.
   background:
     radial-gradient(130% 70% at 18% -10%,rgba(255,255,255,.40),transparent 55%),
     radial-gradient(120% 60% at 85% 112%,rgba(255,255,255,.16),transparent 60%)}
+/* —— Dock 触控跟随光斑（iOS 液态玻璃标志性交互）：手指/鼠标在胶囊上移动时，
+      一片柔光实时跟到哪。纯 CSS 变量 + background 重绘（Dock 只有 ~60px 高小条），
+      无 filter 无新合成层，位置由 JS 用 rAF 合帧写入 --lx/--ly，松手淡出 —— */
+.bottom-nav::before{content:'';position:absolute;inset:0;border-radius:26px;pointer-events:none;z-index:0;
+  background:radial-gradient(120px 78px at var(--lx,50%) var(--ly,130%),rgba(255,255,255,.36),rgba(255,255,255,.10) 46%,transparent 72%);
+  opacity:0;transition:opacity .5s ease}
+.bottom-nav.lit::before{opacity:1;transition:opacity .16s ease}
+body.dk .bottom-nav::before{background:radial-gradient(120px 78px at var(--lx,50%) var(--ly,130%),rgba(255,255,255,.17),rgba(255,255,255,.05) 46%,transparent 72%)}
 /* （旧 @supports 折射检测已删除：@supports 对 backdrop-filter:url() 存在假阳性——
    浏览器会声称支持却整条声明作废，导致"折射"静默失效。现改为 JS 实测后加 body.lg-refract，
    详见文件底部「液态玻璃 v2 光学层」区块。） */
@@ -223,6 +236,15 @@ body.dk .bottom-nav{background:rgba(18,18,18,.5);border-color:rgba(255,255,255,.
     0 10px 26px rgba(60,60,90,.22),
     inset 0 1px 0 rgba(255,255,255,1),
     inset 0 -2px 5px rgba(99,102,241,.10);
+}
+/* —— L3-mini 门控折射：SVG 置换折射只上 Dock 玻璃块这一个元素（~106x52px 小面积）。
+      全页折射已实测掉帧被禁，但小元素成本差两个数量级；且 body.lg-refract-mini 由
+      JS 帧耗时基准实测通过才写入（见 _probeMiniRefract），低端机/掉帧设备自动跳过，
+      跑不动的机器永远停在普通毛玻璃，布局零影响 —— */
+body.lg-refract-mini .nav-indicator,
+body.lg-refract-mini .nav-indicator.dragging{
+  backdrop-filter:url(#lgRefractLite) blur(13px) saturate(145%);
+  -webkit-backdrop-filter:url(#lgRefractLite) blur(13px) saturate(145%);
 }
 body.dk .nav-indicator{background:linear-gradient(160deg,rgba(255,255,255,.30),rgba(226,214,255,.20) 55%,rgba(255,255,255,.26));border-color:rgba(255,255,255,.34);
   box-shadow:0 6px 18px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.46),inset 0 -3px 9px rgba(167,139,250,.26)}
@@ -312,7 +334,6 @@ body.dk .card::after,body.dk .card2::after{opacity:.4}
    文字用石板灰而非 --t2 次级灰：压在淡紫玻璃上需要更强对比 */
 .section-title{font-size:14px;font-weight:600;color:#5f5d70;margin:16px 0 8px;text-transform:uppercase;letter-spacing:.5px;animation:sectionIn .4s var(--spring-soft) both;
   padding:7px 12px;border-radius:10px;background:var(--glass-bg);border:1px solid var(--glass-border);
-  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
   box-shadow:var(--glass-inset-top),var(--glass-inset-bottom)}
 @keyframes sectionIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
 
@@ -393,7 +414,7 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 .filter-tag.active{background:var(--p);color:#fff;border-color:var(--p)}
 
 /* 列表只叠一层毛玻璃：1500 行各带 backdrop-filter 会生成 1500 个模糊层，滚动直接掉到 5fps */
-.bill-list{display:flex;flex-direction:column;gap:8px;backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
+.bill-list{display:flex;flex-direction:column;gap:8px}
 .bill-item{display:flex;align-items:center;padding:12px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:var(--r);gap:12px;transition:transform var(--t-normal) var(--spring-entrance),background .2s;box-shadow:var(--glass-inset-top),var(--glass-inset-bottom),var(--glass-contact);animation:staggerFadeUp .4s var(--spring-entrance) both;content-visibility:auto;contain-intrinsic-size:auto 45px}
 .bill-item:active{background:var(--glass-bg-strong);transform:scale(.98)}
 @keyframes billIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
@@ -1025,7 +1046,7 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
   <!-- Top Bar -->
   <div class="top-bar">
     <div style="display:flex;align-items:center;gap:7px;min-width:0">
-      <div class="title" id="pageTitle">碎银记v2.7</div>
+      <div class="title" id="pageTitle">碎银记v2.5</div>
       <button class="btn-icon" onclick="App.showScreenshotImport()" title="拍照／图片识别记账" style="width:auto;padding:0 11px;border-radius:17px;gap:5px;align-items:center"><span style="font-size:15px;line-height:1">📷</span><span style="font-size:12px;font-weight:600;line-height:1">拍照识别</span></button>
     </div>
     <div class="actions">
@@ -1484,7 +1505,8 @@ const App={
       delete s.statsWidgets;
       this.saveSettings(s);
     }
-    if(s.dark||(!('dark' in s)&&window.matchMedia('(prefers-color-scheme:dark)').matches)){
+    // 首次打开默认浅色模式：只有用户明确选过深色(s.dark)或"跟随系统"时才进深色
+    if(s.darkMode==='follow'||s.dark){
       document.body.classList.add('dk');
     }
     this.updateDarkModeUI();
@@ -1637,32 +1659,52 @@ const App={
       else b.classList.remove('lg-lite');
       // L3 折射（真实探测）
       if(this._probeRefract())b.classList.add('lg-refract');else b.classList.remove('lg-refract');
+      // L3-mini：启动稳定后再跑帧基准，实测 Dock 玻璃块带 SVG 折射不吃掉帧预算才保留
+      setTimeout(()=>{try{this._probeMiniRefract();}catch(e){}},700);
     }catch(e){/* 探测失败则保持降级态，不影响布局 */}
+  },
+  // 帧基准门控：先测 16 帧基线 → 给 body 加 .lg-refract-mini 再测 16 帧 →
+  // 中位帧耗时多花 >2.2ms 或绝对值超 24ms(≈40fps) 或出现 >200ms 尖刺(切后台) → 撤掉。
+  // 测量期间背景极光动画持续变化，玻璃后内容不是静止的，测出来的是真实合成成本；
+  // 高刷屏帧预算更紧（8.3ms），掉帧会直接体现在中位数跳变上，同样能拦住
+  _probeMiniRefract(){
+    const b=document.body;
+    if(!b.classList.contains('lg')||b.classList.contains('lg-lite'))return;
+    const sample=(n,cb)=>{
+      const ts=[];let last=performance.now(),k=0;
+      const step=t=>{
+        const d=t-last;last=t;
+        if(d>200){cb(null);return;}          // 切后台/被打断 → 数据不可信，放弃
+        ts.push(d);
+        if(++k<n)requestAnimationFrame(step);else cb(ts);
+      };
+      requestAnimationFrame(step);
+    };
+    const med=a=>{const s=[...a].sort((x,y)=>x-y);return s[s.length>>1];};
+    sample(16,base=>{
+      if(!base)return;
+      const b0=med(base);
+      b.classList.add('lg-refract-mini');
+      void b.offsetWidth;
+      sample(16,on=>{
+        if(!on){b.classList.remove('lg-refract-mini');return;}
+        if(med(on)-b0>2.2||med(on)>24)b.classList.remove('lg-refract-mini');
+      });
+    });
   },
   // 真实探测：写入 backdrop-filter:url(#lgRefractFull) 后读回 computed，
   // 只有当结果同时含 url 与 blur 才算被真正采纳（整条被丢弃时 computed 只剩 blur 或 none）
   _probeRefract(){
-    try{
-      if(!window.CSS||!CSS.supports||!CSS.supports('backdrop-filter','url(#lgRefractFull)'))return false;
-      const d=document.createElement('div');
-      d.style.cssText='position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;backdrop-filter:url(#lgRefractFull) blur(1px)';
-      document.body.appendChild(d);
-      const cs=getComputedStyle(d);
-      const got=(cs.backdropFilter||cs.webkitBackdropFilter||'');
-      d.parentNode&&d.parentNode.removeChild(d);
-      return /url/i.test(got)&&/blur/i.test(got);
-    }catch(e){return false}
+    // v2.5 性能决策：SVG 置换折射在 Android WebView 上走超慢合成路径——探测能"通过"，
+    // 但顶栏/Dock/全部卡片每帧对底下内容做 SVG 卷积，骁龙旗舰也掉帧（用户实测反馈）。
+    // 视觉收益只是玻璃边缘一点扭曲彩边，代价是全局掉帧 → 全页永久禁用。
+    // 折射需求由 L3-mini 承接：只上 Dock 玻璃块小元素，且过帧基准门控（_probeMiniRefract）。
+    return false;
   },
   switchPage(page){
     if(this.curPage!==page)this.haptic('tab');
-    // 离开统计页时停止碎银创想动画，避免后台空转
-    if(this.curPage!=='stats'&&page!=='stats'){
-      if(this._starRAF){cancelAnimationFrame(this._starRAF);this._starRAF=null;}
-      if(this._hbRAF){cancelAnimationFrame(this._hbRAF);this._hbRAF=null;}
-      if(this._kaleidoRAF){cancelAnimationFrame(this._kaleidoRAF);this._kaleidoRAF=null;}
-      if(this._waveRAF){cancelAnimationFrame(this._waveRAF);this._waveRAF=null;}
-    }
-    // 离开统计页时停止所有动画
+    // 离开统计页时停止碎银创想动画（星空/万花筒/水波只在 stats 页启动，
+    // 因此只需处理「stats → 其他页」一种情况，避免后台空转耗电
     if(this.curPage==='stats'&&page!=='stats'){
       if(this._starRAF){cancelAnimationFrame(this._starRAF);this._starRAF=null;}
       if(this._hbRAF){cancelAnimationFrame(this._hbRAF);this._hbRAF=null;}
@@ -1676,11 +1718,14 @@ const App={
     if(pagesEl){
       pagesEl.style.transition='transform .3s var(--spring-entrance)';
       pagesEl.style.transform='translateX(-'+(idx*25)+'%)';
-      // 只让当前页跑常驻高光动画，后台页暂停，省 GPU/合成开销
+      // 只让当前页跑常驻高光动画，后台页暂停，省 GPU/合成开销；
+      // 隔页（距离>1）加 .far → visibility:hidden，合成器彻底跳过（相邻页保留给横滑画面）
       pagesEl.querySelectorAll('.page').forEach(p=>{
-        const on=p.id==='page-'+page;
+        const key=p.id.replace('page-','');
+        const on=key===page;
         p.classList.toggle('active',on);
         p.setAttribute('aria-hidden',on?'false':'true');
+        p.classList.toggle('far',Math.abs(this.PAGE_ORDER.indexOf(key)-idx)>1);
       });
     }
     // 更新 dock 激活态
@@ -1689,7 +1734,7 @@ const App={
     if(activeItem)activeItem.classList.add('active');
     this.positionNavIndicator(page);
     this._jelly();
-    const titles={record:'碎银记v2.7',bills:'账单',stats:'统计',profile:'我的'};
+    const titles={record:'碎银记v2.5',bills:'账单',stats:'统计',profile:'我的'};
     document.getElementById('pageTitle').textContent=titles[page];
     // 顶栏扫一道液态反光，标记页面切换
     const tb=document.querySelector('.top-bar');
@@ -1718,7 +1763,7 @@ const App={
     });
     const ORDER=this.PAGE_ORDER;
     let startX=0,startY=0,curX=0,curY=0,dragging=false,vertical=false;
-    let startIndLeft=0,tabWidth=0,startOffset=0,lastX=0,lastT=0,velX=0,startPageW=0;
+    let startIndLeft=0,tabPitch=0,indMin=0,indMax=0,startOffset=0,lastX=0,lastT=0,velX=0,startPageW=0;
     const ind=()=>document.getElementById('navIndicator');
     const nav=()=>document.querySelector('.bottom-nav');
 
@@ -1728,13 +1773,31 @@ const App={
       startX=t.clientX;startY=t.clientY;curX=startX;curY=startY;
       lastX=startX;lastT=Date.now();velX=0;
       dragging=false;vertical=false;
-      const i=ind();if(i){startIndLeft=parseFloat(i.style.left)||0;}
-      const n=nav();if(n){tabWidth=n.getBoundingClientRect().width/4;}
+      const i=ind();
+      if(i){
+        // 用真实渲染位置做基准：style.left 是"目标值"，指示器可能还在过渡动画半路；
+        // 从目标值起算会让滑块瞬移（用户反馈的"闪到其他地方"）
+        startIndLeft=parseFloat(getComputedStyle(i).left)||0;
+      }
+      const n=nav();if(n){
+        // 直接量 tab 真实几何：pitch=相邻 item 左缘间距（天然扣掉 Dock 的 6px 内边距）。
+        // 旧算法 navRect.width/4 把内边距摊进每个 tab，每 tab 差 3px，越往右累计越大
+        const nr=n.getBoundingClientRect(),its=n.querySelectorAll('.nav-item');
+        if(its.length>1){
+          tabPitch=its[1].getBoundingClientRect().left-its[0].getBoundingClientRect().left;
+          indMin=its[0].getBoundingClientRect().left-nr.left+3;
+          indMax=its[its.length-1].getBoundingClientRect().left-nr.left+3;
+        }
+      }
       // 起手时量一次页面宽度并缓存，touchmove 每帧不再读布局
       startPageW=pagesEl.getBoundingClientRect().width/4;
-      // 记录当前 pages 的 transform 偏移量（百分比转像素）
-      const idx=ORDER.indexOf(this.curPage);
-      startOffset=-idx*25;
+      // 记录当前 pages 的真实偏移（解析 computed transform，页面吸附动画没走完也能接上）
+      let off=-ORDER.indexOf(this.curPage)*25;
+      try{
+        const m=getComputedStyle(pagesEl).transform;
+        if(m&&m!=='none'){const v=new DOMMatrixReadOnly(m);off=v.m41/startPageW/4*100;}
+      }catch(err){/* 老 WebView 无 DOMMatrix → 用目标值兜底 */}
+      startOffset=off;
     },{passive:true});
 
     pagesEl.addEventListener('touchmove',e=>{
@@ -1766,13 +1829,21 @@ const App={
         if(idx===ORDER.length-1&&offset<-(ORDER.length-1)*25)offset=(-(ORDER.length-1)*25)+(offset+(ORDER.length-1)*25)*0.3;
         pagesEl.style.transition='none';
         pagesEl.style.transform='translateX('+offset+'%)';
-        // 紫色指示器跟随
+        // 紫色指示器跟随：与手指【反向】1:4 联动——手指左滑露出右侧的下一页，
+        // 高亮应滑向右边那个 tab。此前顺写 dx/…方向完全反了（滑块往反方向跑、
+        // 松手又被 switchPage 拽回正确 tab → 用户看到的"乱闪/漂移"）。
+        // 幅度：一个页宽 = 一个真实 tab 间距（tabPitch 已扣内边距）。
         const i=ind();if(i){
+          if(!i.classList.contains('dragging'))i.classList.add('dragging');
           i.style.transition='none';
-          let indOffset=dx/tabWidth*(tabWidth-6);
-          if(idx===0&&indOffset>0)indOffset*=0.3;
-          if(idx===ORDER.length-1&&indOffset<0)indOffset*=0.3;
-          i.style.left=(startIndLeft+indOffset)+'px';
+          let indOffset=-dx/pageWidth*tabPitch;
+          if(idx===0&&indOffset<0)indOffset*=0.3;
+          if(idx===ORDER.length-1&&indOffset>0)indOffset*=0.3;
+          // 钳位到首末 tab 的真实落点，任何情况下不越出 Dock
+          i.style.left=Math.max(indMin,Math.min(indMax,startIndLeft+indOffset))+'px';
+          // 果冻拉伸：与 Dock 拖拽同款手感（幅度更收敛）
+          const st=Math.max(-0.14,Math.min(0.14,velX*0.012));
+          i.style.transform='translateY(-50%) scaleX('+(1+st)+') scaleY('+(1-st*0.6)+')';
         }
       }
     },{passive:false});
@@ -1792,7 +1863,10 @@ const App={
       // 吸附到目标页，带弹性
       pagesEl.style.transition='transform .38s var(--spring-bounce)';
       pagesEl.style.transform='translateX(-'+(target*25)+'%)';
-      const i=ind();if(i)i.style.transition='';
+      // 指示器收尾：摘掉拖拽态、恢复过渡、清掉果冻拉伸（transform 交给 _jelly 接管），
+      // 随后 switchPage→positionNavIndicator 把滑块从当前处平滑吸附到目标 tab
+      const i=ind();
+      if(i){i.classList.remove('dragging');i.style.transition='';i.style.transform='';}
       this.switchPage(ORDER[target]);
     };
     pagesEl.addEventListener('touchend',onEnd);
@@ -1823,7 +1897,7 @@ const App={
     const ind=document.getElementById('navIndicator');
     if(!nav||!ind)return;
     let dragging=false,moved=false,startX=0,startLeft=0,lastX=0,lastT=0,velX=0,pid=null;
-    let navW=0,navLeft=0,indW=0,minDx=0,maxDx=0,visDx=0,centers=[];
+    let navW=0,navLeft=0,indW=0,minDx=0,maxDx=0,visDx=0,centers=[],indLo=0,indHi=0,lastNear=null;
     // 拖动监听挂在整个 Dock 上：选中态 Tab 的图标 z-index 高于玻璃块，
     // 只听玻璃块自己的 pointerdown 会被按钮挡住，按住就拖不动了
     const blockClick=ev=>{ev.stopPropagation();ev.preventDefault();};
@@ -1843,12 +1917,21 @@ const App={
       const nr=nav.getBoundingClientRect();
       navW=nr.width;navLeft=nr.left;
       indW=parseFloat(ind.style.width)||60;
-      minDx=3-startLeft;
-      maxDx=navW-indW-3-startLeft;
-      centers=Array.prototype.map.call(nav.querySelectorAll('.nav-item'),it=>{
+      // 滑块合法区间 = 首末 tab 的真实落点（含 Dock 内边距修正），
+      // 旧算法 3 / navW-indW-3 会让滑块越进内边距 3px
+      const its=nav.querySelectorAll('.nav-item');
+      indLo=its[0].getBoundingClientRect().left-nr.left+3;
+      indHi=its[its.length-1].getBoundingClientRect().left-nr.left+3;
+      minDx=indLo-startLeft;
+      maxDx=indHi-startLeft;
+      centers=Array.prototype.map.call(its,it=>{
         const r=it.getBoundingClientRect();
         return {el:it,c:r.left+r.width/2};
       });
+      // 对齐"当前所在 tab"，防止首个 move 事件就误震
+      const c0=navLeft+startLeft+indW/2;let bn=null,bd=1e9;
+      centers.forEach(o=>{const d=Math.abs(o.c-c0);if(d<bd){bd=d;bn=o;}});
+      lastNear=bn&&bn.el;
       visDx=0;
       // 不在这里 setPointerCapture：捕获会把后续 click 重定向到 Dock，Tab 的 onclick 就点不动了
       ind.classList.add('dragging');
@@ -1872,6 +1955,11 @@ const App={
       if(dx<minDx)dx=minDx+(dx-minDx)*0.3;
       else if(dx>maxDx)dx=maxDx+(dx-maxDx)*0.3;
       visDx=dx;
+      // 跨过某个 tab 中心时轻震一下（4ms），手感对齐系统级 Tab 切换
+      const centerNow=navLeft+startLeft+dx+indW/2;
+      let near=null,nd=1e9;
+      for(let k=0;k<centers.length;k++){const d=Math.abs(centers[k].c-centerNow);if(d<nd){nd=d;near=centers[k];}}
+      if(near&&near.el!==lastNear){lastNear=near.el;try{navigator.vibrate&&navigator.vibrate(4);}catch(err){}}
       // 果冻拉伸：按速度形变
       const stretch=Math.max(-0.2,Math.min(0.2,velX*0.012));
       ind.style.transform='translate('+dx+'px,-50%) scaleX('+(1+stretch)+') scaleY('+(1-stretch*0.6)+')';
@@ -1888,7 +1976,7 @@ const App={
       nav.addEventListener('click',blockClick,{capture:true});setTimeout(()=>nav.removeEventListener('click',blockClick,{capture:true}),300);
       // 松手：先算目标（用起手缓存的几何，不读布局）
       const raw=startLeft+visDx;
-      const target=Math.max(3,Math.min(navW-indW-3,raw));
+      const target=Math.max(indLo,Math.min(indHi,raw));
       const centerNow=navLeft+target+indW/2;
       let nearest=null,minDist=Infinity;
       centers.forEach(o=>{const d=Math.abs(o.c-centerNow);if(d<minDist){minDist=d;nearest=o;}});
@@ -1910,8 +1998,29 @@ const App={
     window.addEventListener('pointermove',onMove,{passive:false});
     window.addEventListener('pointerup',onUp);
     window.addEventListener('pointercancel',onUp);
+    // Dock 触控跟随光斑：指针在胶囊上移动时柔光跟到哪（rAF 合帧写 CSS 变量，
+    // gBCR 只在按下后取一次缓存，拖拽/悬停都生效，松手淡出）
+    if(!this._dockLightBound){
+      this._dockLightBound=true;
+      let litRaf=0,navRect=null,px=0,py=0;
+      const paint=()=>{litRaf=0;nav.style.setProperty('--lx',px+'px');nav.style.setProperty('--ly',py+'px');};
+      nav.addEventListener('pointerdown',e=>{navRect=nav.getBoundingClientRect();px=e.clientX-navRect.left;py=e.clientY-navRect.top;nav.classList.add('lit');if(!litRaf)litRaf=requestAnimationFrame(paint);},{passive:true});
+      nav.addEventListener('pointermove',e=>{
+        if(!nav.classList.contains('lit'))return;
+        if(!navRect)navRect=nav.getBoundingClientRect();
+        px=e.clientX-navRect.left;py=e.clientY-navRect.top;
+        if(!litRaf)litRaf=requestAnimationFrame(paint);
+      },{passive:true});
+      const off=()=>{navRect=null;if(litRaf){cancelAnimationFrame(litRaf);litRaf=0;}nav.classList.remove('lit');};
+      nav.addEventListener('pointerleave',off,{passive:true});
+      window.addEventListener('pointerup',off,{passive:true});
+      window.addEventListener('pointercancel',off,{passive:true});
+    }
   },
   updateDateTime(){
+    // 性能门控：页面隐藏或不在记页（碎银时钟所在页）时直接返回。
+    // 时钟刷新在 switchPage() 里兜底（切页必调本函数），回来第一帧就是准的
+    if(document.hidden||this.curPage!=='record')return;
     // 使用 NTP 校准后的准确时间
     const now=new Date(Date.now()+(this._ntpOffset||0));
     const weekdays=['周日','周一','周二','周三','周四','周五','周六'];
@@ -1923,32 +2032,41 @@ const App={
     const mm=String(now.getMinutes()).padStart(2,'0');
     const ss=String(now.getSeconds()).padStart(2,'0');
     // 碎银时钟：指针转动 + 日期 + 今日支出 + 诗句
-    const ccHour=document.getElementById('ccHour');
-    const ccMinute=document.getElementById('ccMinute');
-    const ccSecond=document.getElementById('ccSecond');
-    const ccTime=document.getElementById('ccTime');
-    const ccDate=document.getElementById('ccDate');
-    const ccSub=document.getElementById('ccSub');
-    const ccPoem=document.getElementById('ccPoem');
-    if(ccHour&&ccMinute&&ccSecond){
+    // 元素引用缓存：页面 DOM 永不卸载（renderRecordPage 只重建分类区），引用长期有效，
+    // 旧版每秒 7 次 getElementById 纯浪费
+    if(!this._ccEls){
+      this._ccEls={
+        hour:document.getElementById('ccHour'),minute:document.getElementById('ccMinute'),
+        second:document.getElementById('ccSecond'),time:document.getElementById('ccTime'),
+        date:document.getElementById('ccDate'),sub:document.getElementById('ccSub'),
+        poem:document.getElementById('ccPoem')};
+    }
+    const cc=this._ccEls;
+    if(cc.hour&&cc.minute&&cc.second){
       const h=now.getHours()%12;
       const minuteDeg=now.getMinutes()*6;
       const hourDeg=h*30+now.getMinutes()*0.5;
       const secondDeg=now.getSeconds()*6;
-      ccHour.style.transform='rotate('+hourDeg+'deg)';
-      ccMinute.style.transform='rotate('+minuteDeg+'deg)';
-      ccSecond.style.transform='rotate('+secondDeg+'deg)';
-      if(ccTime)ccTime.textContent=hh+':'+mm+':'+ss;
-      if(ccDate)ccDate.textContent=y+'年'+m+'月'+d+'日 '+w;
-      if(ccSub){
-        const today=dstr(now);
-        const todayExp=this.getRecords().filter(r=>r.date.startsWith(today)&&r.type==='expense').reduce((s,r)=>s+r.amt,0);
-        ccSub.textContent=todayExp>0?('今日已花 ¥'+todayExp.toFixed(1)):'今日尚未记账';
+      cc.hour.style.transform='rotate('+hourDeg+'deg)';
+      cc.minute.style.transform='rotate('+minuteDeg+'deg)';
+      cc.second.style.transform='rotate('+secondDeg+'deg)';
+      if(cc.time)cc.time.textContent=hh+':'+mm+':'+ss;
+      if(cc.date)cc.date.textContent=y+'年'+m+'月'+d+'日 '+w;
+      if(cc.sub){
+        // 今日支出：按「日期+数据版本号」缓存。旧版每秒 filter/reduce 遍历全部账单，
+        // 5000 条记录 = 每秒 5000 次比较；缓存后只有记账/删改时才算一次
+        const today=y+'-'+m+'-'+d;
+        const key=today+':'+this._ver;
+        if(this._ccSubKey!==key){
+          this._ccSubKey=key;
+          this._ccSubVal=this.getRecords().filter(r=>r.date.startsWith(today)&&r.type==='expense').reduce((s,r)=>s+r.amt,0);
+        }
+        cc.sub.textContent=this._ccSubVal>0?('今日已花 ¥'+this._ccSubVal.toFixed(1)):'今日尚未记账';
       }
-      if(ccPoem){
+      if(cc.poem){
         const poems=['一寸光阴一寸金','劝君惜取少年时','碎银几两，可解万种慌张','人间烟火气，最抚凡人心','记账一时爽，一直记账一直爽','积少成多，聚沙成塔'];
         const idx=Math.floor(now.getHours()/4);
-        ccPoem.textContent=poems[idx%poems.length];
+        cc.poem.textContent=poems[idx%poems.length];
       }
     }
   },
@@ -2109,6 +2227,9 @@ const App={
     }else{
       shouldDark=current>=fromTime&&current<toTime;
     }
+    // 性能优化：状态没变就什么都不做。旧版每分钟无条件 saveSettings（写盘 + _ver++），
+    // _ver++ 会让渲染缓存全部失效 → 下次切页整页重建 DOM；在统计页还会每分钟重画 canvas
+    if(shouldDark===document.body.classList.contains('dk')&&s.dark===shouldDark)return;
     if(shouldDark)document.body.classList.add('dk');else document.body.classList.remove('dk');
     s.dark=shouldDark;
     this.saveSettings(s);
@@ -2255,8 +2376,8 @@ const App={
   },
   onAmountInput(){
     const v=document.getElementById('inputAmount').value;
-    document.querySelectorAll('.quick-amounts button').forEach(b=>b.classList.remove('active'));
-    if(v)document.querySelectorAll('.quick-amounts button').forEach(b=>{if(b.textContent===v)b.classList.add('active')});
+    // 单次遍历完成快捷金额高亮（旧版 2~3 次 querySelectorAll + 两次遍历）
+    document.querySelectorAll('.quick-amounts button').forEach(b=>b.classList.toggle('active',v!==''&&b.textContent===v));
   },
 
   getQuickAmounts(){
@@ -3815,6 +3936,8 @@ const App={
   },
   _onImageReady(base64Data){
     // 原生相册选完图统一回调这里：头像和截图导入共用一个通道，按目标分流
+    // 释放原生桥传来的全局引用：几 MB 的 base64 留在 window 上会一直占着 JS 堆
+    window._pendingImageBase64=null;
     if(this._pickTarget==='avatar'){
       this._pickTarget='screenshot';
       this.openCropper(base64Data);   // 进裁剪页，确定后才保存
@@ -4093,11 +4216,32 @@ const App={
     const src=/^data:/.test(b64)?b64:('data:image/jpeg;base64,'+b64);
     const img=new Image();
     img.onload=()=>{
-      this._cropFromAvatar=!!this._avatarSheet;   // 记住从哪儿来的，裁剪完回去
-      this._crop={img,dx:0,dy:0,zoom:1};
+      // 大图先降采样到最长边 1600：手机原拍图动辄 4000~9000px，超过 GPU 纹理上限时
+      // WebView 会截断绘制（表现为预览下半黑）且 transform 拖动极卡。1600 对 160px 头像有 10 倍清晰度。
+      const mw=Math.max(img.naturalWidth,img.naturalHeight);
+      if(mw>1600){
+        const k=1600/mw;
+        const cv=document.createElement('canvas');
+        cv.width=Math.max(1,Math.round(img.naturalWidth*k));
+        cv.height=Math.max(1,Math.round(img.naturalHeight*k));
+        cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+        const small=new Image();
+        small.onload=()=>this._enterCrop(small);
+        small.onerror=()=>this.showToast('图片读取失败');
+        small.src=cv.toDataURL('image/jpeg',.92);
+        return;
+      }
+      this._enterCrop(img);
+    };
+    img.onerror=()=>this.showToast('图片读取失败');
+    img.src=src;
+  },
+  _enterCrop(img){
+    this._cropFromAvatar=!!this._avatarSheet;   // 记住从哪儿来的，裁剪完回去
+    this._crop={img:img,dx:0,dy:0,zoom:1};
       const html='<h3>裁剪头像</h3>'+
         '<div class="crop-outer"><div class="crop-stage" id="cropStage">'+
-        '<img id="cropImg" src="'+src+'" alt=""><div class="crop-mask"></div></div></div>'+
+        '<img id="cropImg" src="'+img.src+'" alt=""><div class="crop-mask"></div></div></div>'+
         '<p class="crop-hint">拖动调整位置，双指捏合或滑块缩放<br>圆圈里始终铺满图片，不会有黑边</p>'+
         '<div class="crop-zoom"><span>缩放</span><input type="range" id="cropRange" min="1" max="5" step="0.01" value="1" oninput="App._cropZoom(this.value)"></div>'+
         '<div style="display:flex;gap:8px;margin-top:16px">'+
@@ -4105,9 +4249,6 @@ const App={
         '<button class="btn-primary" style="flex:1.6" onclick="App._cropConfirm()">确定</button></div>';
       this.showModal(html);
       this._initCrop();
-    };
-    img.onerror=()=>this.showToast('图片读取失败');
-    img.src=src;
   },
   _initCrop(){
     const stage=document.getElementById('cropStage');
@@ -4679,6 +4820,7 @@ const App={
   _onFileReady(){
     try{
       const b64=window._pendingFileBase64;
+      window._pendingFileBase64=null;  // 及时释放，避免大字符串常驻 JS 堆
       if(!b64)return;
       // 解码 base64
       const binary=atob(b64);
@@ -5232,8 +5374,8 @@ const App={
       '随缘打赏，金额随意，开心就好 💛'+
       '</div>'+
       '<div class="qr-row" style="display:flex;justify-content:center;gap:16px">'+
-      '<div style="text-align:center"><img src="qr-wechat.jpg" style="width:120px;height:120px;border-radius:8px;border:1px solid var(--glass-border);object-fit:cover"><div style="font-size:11px;color:var(--t3);margin-top:4px">微信</div></div>'+
-      '<div style="text-align:center"><img src="qr-alipay.jpg" style="width:120px;height:120px;border-radius:8px;border:1px solid var(--glass-border);object-fit:cover"><div style="font-size:11px;color:var(--t3);margin-top:4px">支付宝</div></div></div>'+
+      '<div style="text-align:center"><img src="data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%27120%27%20height=%27120%27%20viewBox=%270%200%20120%20120%27%3E%3Crect%20width=%27120%27%20height=%27120%27%20rx=%2712%27%20fill=%27%23e5e5ea%27/%3E%3Cg%20fill=%27%23aeaeb2%27%3E%3Crect%20x=%2722%27%20y=%2722%27%20width=%2730%27%20height=%2730%27/%3E%3Crect%20x=%2768%27%20y=%2722%27%20width=%2730%27%20height=%2730%27/%3E%3Crect%20x=%2722%27%20y=%2768%27%20width=%2730%27%20height=%2730%27/%3E%3Crect%20x=%2768%27%20y=%2768%27%20width=%2712%27%20height=%2712%27/%3E%3Crect%20x=%2786%27%20y=%2786%27%20width=%2712%27%20height=%2712%27/%3E%3Crect%20x=%2768%27%20y=%2786%27%20width=%2712%27%20height=%2712%27/%3E%3Crect%20x=%2786%27%20y=%2768%27%20width=%2712%27%20height=%2712%27/%3E%3C/g%3E%3C/svg%3E" style="width:120px;height:120px;border-radius:8px;border:1px solid var(--glass-border);object-fit:cover"><div style="font-size:11px;color:var(--t3);margin-top:4px">微信</div></div>'+
+      '<div style="text-align:center"><img src="data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%27120%27%20height=%27120%27%20viewBox=%270%200%20120%20120%27%3E%3Crect%20width=%27120%27%20height=%27120%27%20rx=%2712%27%20fill=%27%23e5e5ea%27/%3E%3Cg%20fill=%27%23aeaeb2%27%3E%3Crect%20x=%2722%27%20y=%2722%27%20width=%2730%27%20height=%2730%27/%3E%3Crect%20x=%2768%27%20y=%2722%27%20width=%2730%27%20height=%2730%27/%3E%3Crect%20x=%2722%27%20y=%2768%27%20width=%2730%27%20height=%2730%27/%3E%3Crect%20x=%2768%27%20y=%2768%27%20width=%2712%27%20height=%2712%27/%3E%3Crect%20x=%2786%27%20y=%2786%27%20width=%2712%27%20height=%2712%27/%3E%3Crect%20x=%2768%27%20y=%2786%27%20width=%2712%27%20height=%2712%27/%3E%3Crect%20x=%2786%27%20y=%2768%27%20width=%2712%27%20height=%2712%27/%3E%3C/g%3E%3C/svg%3E" style="width:120px;height:120px;border-radius:8px;border:1px solid var(--glass-border);object-fit:cover"><div style="font-size:11px;color:var(--t3);margin-top:4px">支付宝</div></div></div>'+
       '<div style="text-align:center;color:var(--t3);font-size:12px;margin-top:12px">随缘打赏，开心就好 💛</div>';
     this.showModal(html);
   },

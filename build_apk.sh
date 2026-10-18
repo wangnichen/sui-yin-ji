@@ -19,8 +19,8 @@ APP_ROOT="$(cd "$(dirname "$0")" && pwd)"
 PROJECT=$APP_ROOT/android
 OUTPUT=$APP_ROOT
 
-VERSION_CODE=27
-VERSION_NAME="2.6"
+VERSION_CODE=9
+VERSION_NAME="2.5"
 
 # ====== 清理 ======
 rm -rf $PROJECT/build
