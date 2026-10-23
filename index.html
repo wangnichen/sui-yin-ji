@@ -339,8 +339,16 @@ body.dk .card::after,body.dk .card2::after{opacity:.4}
 
 /* ===== Page 1: Record ===== */
 .type-toggle{position:relative;display:flex;gap:0;background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:var(--r);padding:3px;margin-bottom:16px}
-/* 果冻滑块：支出在左、收入在右，切换时从一边 Q 弹滑到另一边 */
-.type-toggle .tt-slider{position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:calc(var(--r) - 2px);background:var(--g1);box-shadow:0 2px 8px rgba(99,102,241,.3);transition:transform .5s var(--spring-smooth);pointer-events:none;z-index:0}
+/* 果冻滑块：支出在左、收入在右，切换时从一边 Q 弹滑到另一边。
+   配色与 Dock 玻璃滑块完全统一：淡紫白玻璃 + 同款内阴影（替换原来的实心紫色块） */
+.type-toggle .tt-slider{position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:calc(var(--r) - 2px);
+  background:linear-gradient(160deg,rgba(255,255,255,.86),rgba(243,240,255,.74) 46%,rgba(224,214,255,.80));
+  backdrop-filter:blur(12px) saturate(130%);-webkit-backdrop-filter:blur(12px) saturate(130%);
+  border:1px solid rgba(255,255,255,.80);
+  box-shadow:0 6px 16px rgba(139,110,214,.18),0 2px 5px rgba(139,110,214,.11),inset 0 1px 0 rgba(255,255,255,.98),inset 0 -3px 9px rgba(167,139,250,.26);
+  transition:transform .5s var(--spring-smooth);pointer-events:none;z-index:0}
+body.dk .type-toggle .tt-slider{background:linear-gradient(160deg,rgba(255,255,255,.30),rgba(226,214,255,.20) 55%,rgba(255,255,255,.26));border-color:rgba(255,255,255,.34);
+  box-shadow:0 6px 18px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.46),inset 0 -3px 9px rgba(167,139,250,.26)}
 .type-toggle.income .tt-slider{transform:translateX(100%)}
 .type-toggle .tt-slider.jelly{animation:ttSquish .55s var(--spring-smooth)}
 @keyframes ttSquish{0%{scale:1 1}30%{scale:1.12 .84}60%{scale:.94 1.07}100%{scale:1 1}}
@@ -356,7 +364,7 @@ body.dk .ts-expense{color:#32d74b}
 body.dk .ts-income{color:#ff5c52}
 .ts-divider{width:1px;height:28px;background:var(--glass-border)}
 .type-toggle button{position:relative;z-index:1;flex:1;padding:10px;border:none;border-radius:calc(var(--r) - 2px);font-size:15px;font-weight:600;background:transparent;color:var(--t2);cursor:pointer;transition:color .3s var(--spring-bounce)}
-.type-toggle button.active{background:transparent;color:#fff;box-shadow:none}
+.type-toggle button.active{background:transparent;color:var(--p);box-shadow:none}
 
 .budget-reminder{font-size:12px;color:var(--t2);text-align:center;padding:6px 12px;background:var(--glass-bg);border-radius:8px;margin-bottom:8px;border:1px solid var(--glass-border);animation:fadeIn .3s var(--spring-soft);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .budget-reminder.warn{color:var(--red);background:rgba(255,59,48,.08)}
@@ -755,6 +763,14 @@ body.dk #statsWidgets.grid-view .widget-box{
 .modal>*{position:relative;z-index:1}
 body.dk .modal{background:rgba(30,30,38,.82)}
 .modal-overlay.sheet .modal{width:100%;max-width:480px;border-radius:18px 18px 0 0;max-height:85vh;animation:slideUp var(--t-normal) var(--spring-modal)}
+/* 裁切弹窗彻底关掉全屏毛玻璃：backdrop-filter:blur(6px) 在 Android WebView 上是 GPU 合成层
+   里最贵的操作之一——1080×1920 全屏做 6px 高斯卷积，裁切时 pointermove 每帧重合成一次，
+   骁龙旗舰也掉成 10fps。裁切本身有纯黑舞台遮罩，视觉完全够 */
+body.crop-open .modal-overlay{background:rgba(0,0,0,.88);backdrop-filter:none;-webkit-backdrop-filter:none}
+body.crop-open .modal{background:rgba(12,12,16,.95);backdrop-filter:none;-webkit-backdrop-filter:none;border-color:rgba(255,255,255,.08);box-shadow:0 24px 64px rgba(0,0,0,.7)}
+body.crop-open .modal::before,body.crop-open .modal::after{display:none}
+/* 裁切舞台独占合成层，避免跟页面其他元素抢合成预算 */
+.crop-stage{contain:paint;transform:translateZ(0)}
 .modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 8px;flex-shrink:0}
 .modal-title{font-size:16px;font-weight:700;flex:1;text-align:center;color:var(--t2)}
 .modal-close{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--t2);font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;transition:background .15s,transform .15s}
@@ -1046,7 +1062,7 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
   <!-- Top Bar -->
   <div class="top-bar">
     <div style="display:flex;align-items:center;gap:7px;min-width:0">
-      <div class="title" id="pageTitle">碎银记v2.5</div>
+      <div class="title" id="pageTitle">碎银记v2.8</div>
       <button class="btn-icon" onclick="App.showScreenshotImport()" title="拍照／图片识别记账" style="width:auto;padding:0 11px;border-radius:17px;gap:5px;align-items:center"><span style="font-size:15px;line-height:1">📷</span><span style="font-size:12px;font-weight:600;line-height:1">拍照识别</span></button>
     </div>
     <div class="actions">
@@ -1322,7 +1338,7 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Modal Overlay -->
-  <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)App.closeModal()">
+  <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this&&!App._crop)App.closeModal()"><!-- 裁切进行中(_crop非空)禁止遮罩误关，防止拖图时指尖滑出丢掉裁切 -->
     <div class="modal" id="modalContent" onclick="event.stopPropagation()"></div>
   </div>
 </div>
@@ -1710,6 +1726,10 @@ const App={
       if(this._hbRAF){cancelAnimationFrame(this._hbRAF);this._hbRAF=null;}
       if(this._kaleidoRAF){cancelAnimationFrame(this._kaleidoRAF);this._kaleidoRAF=null;}
       if(this._waveRAF){cancelAnimationFrame(this._waveRAF);this._waveRAF=null;}
+      // 饼图/趋势图的扫动动画也是 rAF 循环——虽然是一次性动画到 progress=1 会自停，
+      // 但切页离开 stats 时显式 cancel 更保险，防止用户快速切页时扫动还在后台空转
+      if(this._pieAnim){cancelAnimationFrame(this._pieAnim);this._pieAnim=null;}
+      if(this._trendAnim){cancelAnimationFrame(this._trendAnim);this._trendAnim=null;}
     }
     this.curPage=page;
     // 水平偏移切换页面（4 页，每页 25%）— 先启动动画，再延迟渲染
@@ -1734,7 +1754,7 @@ const App={
     if(activeItem)activeItem.classList.add('active');
     this.positionNavIndicator(page);
     this._jelly();
-    const titles={record:'碎银记v2.5',bills:'账单',stats:'统计',profile:'我的'};
+    const titles={record:'碎银记v2.8',bills:'账单',stats:'统计',profile:'我的'};
     document.getElementById('pageTitle').textContent=titles[page];
     // 顶栏扫一道液态反光，标记页面切换
     const tb=document.querySelector('.top-bar');
@@ -1764,12 +1784,19 @@ const App={
     const ORDER=this.PAGE_ORDER;
     let startX=0,startY=0,curX=0,curY=0,dragging=false,vertical=false;
     let startIndLeft=0,tabPitch=0,indMin=0,indMax=0,startOffset=0,lastX=0,lastT=0,velX=0,startPageW=0;
+    let tid=null;   // 起手那根手指的 identifier：中途换指/多指不认新手指的坐标
     const ind=()=>document.getElementById('navIndicator');
     const nav=()=>document.querySelector('.bottom-nav');
 
     pagesEl.addEventListener('touchstart',e=>{
-      if(e.touches.length!==1)return;
+      if(e.touches.length!==1){
+        // 横滑中第二根手指落下：立刻优雅取消（页面回位、滑块归位）。
+        // 否则后续 touchmove 会用错手指的 clientX，把滑块和页面甩到错误方向
+        if(dragging)onEnd(true);
+        return;
+      }
       const t=e.touches[0];
+      tid=t.identifier;
       startX=t.clientX;startY=t.clientY;curX=startX;curY=startY;
       lastX=startX;lastT=Date.now();velX=0;
       dragging=false;vertical=false;
@@ -1802,7 +1829,9 @@ const App={
 
     pagesEl.addEventListener('touchmove',e=>{
       if(e.touches.length!==1)return;
-      const t=e.touches[0];
+      let t=null;
+      for(let k=0;k<e.touches.length;k++){if(e.touches[k].identifier===tid){t=e.touches[k];break;}}
+      if(!t)return;   // 起点那根手指已消失：不认其他手指的坐标，防止滑块被甩飞
       curX=t.clientX;curY=t.clientY;
       const dx=curX-startX,dy=curY-startY;
       if(!dragging&&!vertical){
@@ -1848,7 +1877,7 @@ const App={
       }
     },{passive:false});
 
-    const onEnd=()=>{
+    const onEnd=forceStay=>{
       if(!dragging)return;
       dragging=false;
       const dx=curX-startX;
@@ -1858,8 +1887,11 @@ const App={
       const isFlick=Math.abs(velX)>0.5;
       const threshold=isFlick?10:Math.max(30,pageWidth*0.18);
       let target=idx;
-      if((dx<-threshold||(isFlick&&velX<-0.5))&&idx<ORDER.length-1)target=idx+1;
-      else if((dx>threshold||(isFlick&&velX>0.5))&&idx>0)target=idx-1;
+      // forceStay=true（多指干扰等异常取消）：只回位不翻页，宁可少切一页也不切错
+      if(!forceStay){
+        if((dx<-threshold||(isFlick&&velX<-0.5))&&idx<ORDER.length-1)target=idx+1;
+        else if((dx>threshold||(isFlick&&velX>0.5))&&idx>0)target=idx-1;
+      }
       // 吸附到目标页，带弹性
       pagesEl.style.transition='transform .38s var(--spring-bounce)';
       pagesEl.style.transform='translateX(-'+(target*25)+'%)';
@@ -1869,8 +1901,14 @@ const App={
       if(i){i.classList.remove('dragging');i.style.transition='';i.style.transform='';}
       this.switchPage(ORDER[target]);
     };
-    pagesEl.addEventListener('touchend',onEnd);
-    pagesEl.addEventListener('touchcancel',onEnd);
+    pagesEl.addEventListener('touchend',e=>{
+      if(!dragging)return;
+      // 只有起手那根手指抬起才收尾：别的手指抬起不该打断当前横滑
+      for(let k=0;k<e.changedTouches.length;k++){
+        if(e.changedTouches[k].identifier===tid){onEnd(false);return;}
+      }
+    });
+    pagesEl.addEventListener('touchcancel',()=>onEnd(false));
   },
   // 定位液态玻璃指示器到指定页面
   positionNavIndicator(page){
@@ -1903,6 +1941,7 @@ const App={
     const blockClick=ev=>{ev.stopPropagation();ev.preventDefault();};
     const onDown=e=>{
       if(e.button!==undefined&&e.button!==0)return;
+      if(dragging)return;   // 多点触控：拖拽中忽略第二根手指，防止滑块被另一指劫持跳变
       dragging=true;moved=false;pid=e.pointerId;
       // 停掉果冻动画：它靠 keyframes 覆盖 transform，会和下面每帧写入的拖拽 transform 打架
       ind.classList.remove('jelly');
@@ -1950,10 +1989,12 @@ const App={
       const dt=Math.max(now-lastT,1);
       velX=(x-lastX)/dt;
       lastX=x;lastT=now;
-      // 边界橡皮筋：越界只给 30% 阻尼
+      // 边界硬钳位：滑块是 1:1 跟手的直接操作，若像页面那样给 30% 橡皮筋，
+      // 玻璃块会越出 Dock 胶囊（实测拖出 30+px，看起来像 bug）。
+      // 与横滑路径"任何情况下不越出 Dock"的钳位保持一致：手指继续移动，滑块停在首末 tab 边缘
       let dx=raw;
-      if(dx<minDx)dx=minDx+(dx-minDx)*0.3;
-      else if(dx>maxDx)dx=maxDx+(dx-maxDx)*0.3;
+      if(dx<minDx)dx=minDx;
+      else if(dx>maxDx)dx=maxDx;
       visDx=dx;
       // 跨过某个 tab 中心时轻震一下（4ms），手感对齐系统级 Tab 切换
       const centerNow=navLeft+startLeft+dx+indW/2;
@@ -1998,6 +2039,9 @@ const App={
     window.addEventListener('pointermove',onMove,{passive:false});
     window.addEventListener('pointerup',onUp);
     window.addEventListener('pointercancel',onUp);
+    // 安全网：若 WebView 异常丢失指针捕获（pointerup 没送达），也能把拖拽状态收尾，
+    // 防止 dragging 卡死导致滑块再也按不动。正常松手时 dragging 已为 false，此回调是空操作
+    nav.addEventListener('lostpointercapture',onUp);
     // Dock 触控跟随光斑：指针在胶囊上移动时柔光跟到哪（rAF 合帧写 CSS 变量，
     // gBCR 只在按下后取一次缓存，拖拽/悬停都生效，松手淡出）
     if(!this._dockLightBound){
@@ -2295,6 +2339,17 @@ const App={
     const o=document.getElementById('modalOverlay');
     if(!o.classList.contains('show'))return;
     this._avatarSheet=false;
+    // 防御性清理：closeModal 可以被用户点遮罩、系统返回键、或任何地方触发，
+    // 走不到 _cropCancel/_cropConfirm 时也要把裁切状态清干净，
+    // 否则 body.crop-open 类会泄漏（裁切完毛玻璃永远不恢复）、
+    // rAF 循环会空转到下一个裁切会话
+    if(this._crop){
+      this._crop=null;
+      this._ptrs=null;
+      if(this._cropRAF){cancelAnimationFrame(this._cropRAF);this._cropRAF=0;}
+      this._cropDirty=false;
+      document.body.classList.remove('crop-open');
+    }
     o.classList.add('closing');
     document.body.style.overflow='';
     setTimeout(()=>{o.classList.remove('show','closing')},200);
@@ -2404,23 +2459,35 @@ const App={
     cats.forEach((k,i)=>{
       const cat=CATS.find(x=>x.k===k);
       const delay=i*30;
-      html+='<div class="cat-item'+(this.curCat===k?' selected':'')+'" style="animation-delay:'+delay+'ms" onclick="App.selectCat(\''+k+'\')"><span class="cat-emoji">'+cat.i+'</span><span class="cat-name">'+cat.n+'</span></div>';
+      html+='<div class="cat-item'+(this.curCat===k?' selected':'')+'" style="animation-delay:'+delay+'ms" onclick="App.toggleCat(\''+k+'\')"><span class="cat-emoji">'+cat.i+'</span><span class="cat-name">'+cat.n+'</span></div>';
     });
     c.innerHTML=html;
   },
+  toggleCat(k){this.selectCat(this.curCat===k?null:k)},   // 再点一下已选中的分类＝取消（回到不分类）
   selectCat(k){
-    this.curCat=k;
+    this.curCat=k||null;
     this.haptic('select');
     document.querySelectorAll('.cat-item').forEach(el=>el.classList.remove('selected'));
+    if(!k)return;   // 传空值＝清空选中（编辑未分类记录 / AI 没识别出分类时）
     const target=document.querySelector('.cat-item[onclick*="'+k+'"]');
     if(target)target.classList.add('selected');
   },
-  getCatData(k){return CATS.find(c=>c.k===k)||CATS.find(c=>c.k==='other')},
+  // 未选分类返回空占位（icon/名称都为空），调用方据此不显示任何分类信息；
+  // 历史数据里合法存在的 'other'（用户主动选了「其他」）仍按真实分类显示
+  getCatData(k){if(!k)return {k:'',n:'',i:'',c:'#8e8e93',bg:'transparent'};return CATS.find(c=>c.k===k)||CATS.find(c=>c.k==='other')},
+  // 按分类汇总金额：未分类（cat 为空）的记录不进入分类统计，
+  // 这样饼图/排行/时光/星图/万花筒/AI报告里都不会出现"其他"或空白分类
+  sumByCat(list){
+    const t={};
+    (list||[]).forEach(r=>{if(!r.cat)return;t[r.cat]=(t[r.cat]||0)+r.amt});
+    return t;
+  },
 
   submitRecord(){
     const amt=parseFloat(document.getElementById('inputAmount').value);
     if(!amt||amt<=0){this.haptic('error');this.showToast('请输入金额');return}
-    if(!this.curCat){this.haptic('error');this.showToast('请选择分类');return}
+    // 分类非必选：不选就存空值（未分类），展示端一律不显示分类，也不再归入「其他」
+    const cat=this.curCat||'';
     const date=document.getElementById('inputDate').value;
     const note=document.getElementById('inputNote').value.trim();
     const timeEl=document.getElementById('inputTime');
@@ -2431,7 +2498,7 @@ const App={
     if(this.editId!==null){
       const idx=records.findIndex(r=>r.id===this.editId);
       if(idx>=0){
-        records[idx]={...records[idx],amt,cat:this.curCat,date,note,type:this.curType,mood:this.curMood,time:recordTime};
+        records[idx]={...records[idx],amt,cat,date,note,type:this.curType,mood:this.curMood,time:recordTime};
         this.saveRecords(records);
         this.haptic('success');
         this.showToast('已更新 ✅');
@@ -2439,7 +2506,7 @@ const App={
       this.editId=null;
       document.getElementById('btnSubmit').textContent='记一笔';
     }else{
-      const record={id:'r_'+ts,amt,cat:this.curCat,date,note,type:this.curType,mood:this.curMood,time:recordTime,ts};
+      const record={id:'r_'+ts,amt,cat,date,note,type:this.curType,mood:this.curMood,time:recordTime,ts};
       records.push(record);
       this.saveRecords(records);
       this.haptic('success');
@@ -2460,14 +2527,20 @@ const App={
     document.getElementById('inputNote').value='';
     this.curCat=null;
     this.curMood=null;
-    document.getElementById('inputDate').value=dstr(new Date(Date.now()+(this._ntpOffset||0)));
+    // 日期不再重置回今天：补记多笔同一天的账时保持用户选的日期，不用每笔都重新点回去
+    // （朋友反馈：记完一笔昨天就跳回今天，每次都要重新往前点一天）
+    const dateEl=document.getElementById('inputDate');
+    const nowDay=dstr(new Date(Date.now()+(this._ntpOffset||0)));
+    if(!dateEl.value||dateEl.value>nowDay)dateEl.value=nowDay;   // 兜底：被清空或跨天超过今天才回到今天
+    dateEl.max=nowDay;                                            // 跨天后同步可选的日期上限
+    this.checkBackfill();                                          // 日期仍早于今天时保留「补记」提示条
     // Reset time to current (NTP校准)
     const n=new Date(Date.now()+(this._ntpOffset||0));
     const nh=String(n.getHours()).padStart(2,'0');
     const nm=String(n.getMinutes()).padStart(2,'0');
     if(timeEl)timeEl.value=nh+':'+nm;
     this._timeManual=false;
-    document.getElementById('recordBackfillBar').style.display='none';
+    // 提示条已由上面的 checkBackfill() 按当前日期决定显隐，这里不再强制隐藏
     document.querySelectorAll('#moodSelector button').forEach(b=>b.classList.remove('active'));
     this.renderRecordPage();
     this.updateBudgetReminder();
@@ -2567,12 +2640,13 @@ const App={
       const animate=filtered.length<=40;
       list.innerHTML=filtered.map((r,idx)=>{
         const cat=this.getCatData(r.cat);
+        const hasCat=!!r.cat;   // 没选分类：不显示分类图标和名称，只留时间/备注/金额
         const moodIcon=r.mood?MOODS[r.mood]:'';
         const animStyle=animate?'animation-delay:'+Math.min(idx*35,500)+'ms':'animation:none';
         const timeBadge=this.formatTimeBadge(r.date,r.time);
         return '<div class="bill-item" style="'+animStyle+'" onclick="App.enterEditById(\''+r.id+'\')">'+
-          '<div class="bill-emoji" style="background:'+cat.bg+'">'+cat.i+'</div>'+
-          '<div class="bill-info"><div class="bill-cat">'+cat.n+'</div>'+
+          (hasCat?'<div class="bill-emoji" style="background:'+cat.bg+'">'+cat.i+'</div>':'')+
+          '<div class="bill-info">'+(hasCat?'<div class="bill-cat">'+cat.n+'</div>':'')+
           '<div class="bill-meta"><span>'+timeBadge+'</span>'+(r.note?'<span>'+App.escapeHtml(r.note)+'</span>':'')+(moodIcon?'<span>'+moodIcon+'</span>':'')+'</div></div>'+
           '<div class="bill-amount '+(r.type==='expense'?'expense':'income')+'">'+(r.type==='expense'?'-':'+')+r.amt.toFixed(2)+'</div>'+
           '<div class="bill-actions" onclick="event.stopPropagation()">'+
@@ -2856,8 +2930,7 @@ const App={
 
     const total=monthRecords.reduce((s,r)=>s+r.amt,0);
     const lastTotal=lastMonthRecords.reduce((s,r)=>s+r.amt,0);
-    const catTotals={};
-    monthRecords.forEach(r=>{catTotals[r.cat]=(catTotals[r.cat]||0)+r.amt});
+    const catTotals=this.sumByCat(monthRecords);
 
     const insights=[];
 
@@ -2885,7 +2958,7 @@ const App={
     // Today top 3
     if(todayRecords.length>0){
       const top3=[...todayRecords].sort((a,b)=>b.amt-a.amt).slice(0,3);
-      insights.push({icon:'🔥',text:'今日消费TOP3：'+top3.map(r=>this.getCatData(r.cat).i+' ¥'+r.amt.toFixed(2)).join('、'),cls:'info'});
+      insights.push({icon:'🔥',text:'今日消费TOP3：'+top3.map(r=>{const c=this.getCatData(r.cat);return (r.cat?c.i+' ':'')+'¥'+r.amt.toFixed(2)}).join('、'),cls:'info'});
     }
 
     // Few records
@@ -2964,8 +3037,7 @@ const App={
     const records=this.getRecords();
     const thisMonth=mstr(new Date());
     const monthRecords=records.filter(r=>r.date.startsWith(thisMonth)&&r.type==='expense');
-    const catTotals={};
-    monthRecords.forEach(r=>{catTotals[r.cat]=(catTotals[r.cat]||0)+r.amt});
+    const catTotals=this.sumByCat(monthRecords);
     const total=monthRecords.reduce((s,r)=>s+r.amt,0);
 
     const cx=size/2,cy=size/2,r=75;
@@ -2983,6 +3055,17 @@ const App={
 
     // Sort and merge small categories into "其他" (max 7)
     let entries=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+    // 饼图只讲分类构成：分母用「已分类支出合计」，未分类的钱不参与，环才不会留缺口
+    const catTotal=entries.reduce((s,e)=>s+e[1],0);
+    if(catTotal<=0){
+      ctx.clearRect(0,0,size,size);
+      ctx.fillStyle=isDark?'#636366':'#aeaeb2';
+      ctx.font='14px -apple-system,PingFang SC,sans-serif';
+      ctx.textAlign='center';
+      ctx.fillText('本月支出均未分类',cx,cy);
+      legendEl.innerHTML='';
+      return;
+    }
     let otherAmt=0;
     if(entries.length>7){
       const top=entries.slice(0,6);
@@ -2995,7 +3078,7 @@ const App={
     entries.forEach(([k,amt],i)=>{
       const isOther=k==='_other';
       const cat=isOther?{i:'📦',n:'其他',c:isDark?'#636366':'#c7c7cc'}:this.getCatData(k);
-      const pct=(amt/total*100).toFixed(0);
+      const pct=(amt/catTotal*100).toFixed(0);
       const delay=Math.min(i*50,300);
       legendHtml+='<div class="pie-legend-item" style="animation:staggerFadeUp .4s var(--spring-entrance) both;animation-delay:'+delay+'ms">';
       legendHtml+='<span class="pie-legend-dot" style="background:'+cat.c+'"></span>';
@@ -3016,7 +3099,7 @@ const App={
       entries.forEach(([k,amt])=>{
         const isOther=k==='_other';
         const color=isOther?(isDark?'#636366':'#c7c7cc'):(this.getCatData(k).c||'#999');
-        const slice=amt/total*Math.PI*2;
+        const slice=amt/catTotal*Math.PI*2;
         const drawAngle=Math.min(slice,totalAngle-(startAngle+Math.PI/2));
         if(drawAngle<=0)return;
         ctx.beginPath();
@@ -3032,14 +3115,14 @@ const App={
       ctx.arc(cx,cy,40,0,Math.PI*2);
       ctx.fillStyle=isDark?'#1e1e1e':'#fff';
       ctx.fill();
-      // Center text
+      // Center text：随分类合计变化（全部有分类时与本月支出相同）
       ctx.fillStyle=isDark?'#e8e8e8':'#1c1c1e';
       ctx.font='bold 16px -apple-system,PingFang SC,sans-serif';
       ctx.textAlign='center';
-      ctx.fillText('¥'+(total*progress).toFixed(0),cx,cy-3);
+      ctx.fillText('¥'+(catTotal*progress).toFixed(0),cx,cy-3);
       ctx.fillStyle=isDark?'#a0a0a0':'#86868b';
       ctx.font='10px -apple-system,PingFang SC,sans-serif';
-      ctx.fillText('本月支出',cx,cy+12);
+      ctx.fillText('已分类支出',cx,cy+12);
     };
     const animFrame=(now)=>{
       const elapsed=now-startTime;
@@ -3154,11 +3237,17 @@ const App={
       html+='<div class="day-detail-list">';
       records.forEach(r=>{
         const cat=this.getCatData(r.cat);
+        const hasCat=!!r.cat;
         const moodIcon=r.mood?MOODS[r.mood]:'';
+        const titleParts=[];
+        if(hasCat)titleParts.push(cat.n);
+        if(r.note)titleParts.push(this.escapeHtml(r.note));
+        if(moodIcon)titleParts.push(moodIcon);
+        const title=titleParts.join(' · ');
         html+='<div class="day-detail-item" onclick="App.enterEditById(\''+r.id+'\');App.closeModal()">';
-        html+='<div class="day-detail-cat" style="background:'+cat.bg+';color:'+cat.c+'">'+cat.i+'</div>';
+        if(hasCat)html+='<div class="day-detail-cat" style="background:'+cat.bg+';color:'+cat.c+'">'+cat.i+'</div>';
         html+='<div class="day-detail-info">';
-        html+='<div class="day-detail-catname">'+cat.n+(r.note?' · '+this.escapeHtml(r.note):'')+(moodIcon?' '+moodIcon:'')+'</div>';
+        html+='<div class="day-detail-catname">'+title+'</div>';
         html+='<div style="font-size:11px;color:var(--t3)">'+(r.type==='expense'?'支出':'收入')+(r.time?' · '+r.time:'')+'</div>';
         html+='</div>';
         html+='<div class="day-detail-amt" style="color:'+(r.type==='expense'?'var(--red)':'var(--green)')+'">'+(r.type==='expense'?'-':'+')+'¥'+r.amt.toFixed(2)+'</div>';
@@ -3421,8 +3510,7 @@ const App={
     const records=this.getRecords();
     const thisMonth=mstr(new Date());
     const monthRecords=records.filter(r=>r.date.startsWith(thisMonth)&&r.type==='expense');
-    const catTotals={};
-    monthRecords.forEach(r=>{catTotals[r.cat]=(catTotals[r.cat]||0)+r.amt});
+    const catTotals=this.sumByCat(monthRecords);
     const total=monthRecords.reduce((s,r)=>s+r.amt,0);
     const entries=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
     const c=document.getElementById('ranking');
@@ -3434,7 +3522,9 @@ const App={
 
     c.innerHTML=entries.map(([k,amt],i)=>{
       const cat=this.getCatData(k);
-      const pct=total>0?(amt/total*100):0;
+      // 分母用已分类合计：未分类的钱不进排行，占比之和才是 100%
+      const catTotal=entries.reduce((s,e)=>s+e[1],0);
+      const pct=catTotal>0?(amt/catTotal*100):0;
       const delay=Math.min(i*60,400);
       return '<div class="ranking-item" style="animation:staggerFadeUp .4s var(--spring-entrance) both;animation-delay:'+delay+'ms"><span class="rank-emoji">'+cat.i+'</span><span class="rank-name">'+cat.n+'</span><span class="rank-amount">¥'+amt.toFixed(2)+'</span><div class="rank-bar-wrap"><div class="rank-bar" style="width:'+pct+'%;background:'+cat.c+'"></div></div></div>';
     }).join('');
@@ -3454,7 +3544,7 @@ const App={
     const exp=mr.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amt,0);
     const inc=mr.filter(r=>r.type==='income').reduce((s,r)=>s+r.amt,0);
     const net=inc-exp,cnt=mr.length;
-    const catT={};mr.filter(r=>r.type==='expense').forEach(r=>catT[r.cat]=(catT[r.cat]||0)+r.amt);
+    const catT=this.sumByCat(mr.filter(r=>r.type==='expense'));
     const top=Object.entries(catT).sort((a,b)=>b[1]-a[1])[0];
     const catName=top?this.getCatData(top[0]).n:'日常';
     let mood;
@@ -3571,7 +3661,7 @@ const App={
     const now=new Date();
     const m=mstr(now);
     const mr=records.filter(r=>r.date.startsWith(m)&&r.type==='expense');
-    const catT={};mr.forEach(r=>catT[r.cat]=(catT[r.cat]||0)+r.amt);
+    const catT=this.sumByCat(mr);
     const entries=Object.entries(catT).sort((a,b)=>b[1]-a[1]);
     if(entries.length===0){
       ctx.clearRect(0,0,w,h);
@@ -3637,8 +3727,7 @@ const App={
     if(this._kaleidoRAF)cancelAnimationFrame(this._kaleidoRAF);
     const records=this.getRecords();
     const now=new Date(),m=mstr(now);
-    const catT={};
-    records.filter(r=>r.date.startsWith(m)&&r.type==='expense').forEach(r=>catT[r.cat]=(catT[r.cat]||0)+r.amt);
+    const catT=this.sumByCat(records.filter(r=>r.date.startsWith(m)&&r.type==='expense'));
     const entries=Object.entries(catT).sort((a,b)=>b[1]-a[1]);
     const total=entries.reduce((s,e)=>s+e[1],0)||1;
     const cx=w/2,cy=h/2;
@@ -3805,8 +3894,7 @@ const App={
     });
     
     // Category breakdown
-    const catTotals={};
-    mr.filter(r=>r.type==='expense').forEach(r=>{catTotals[r.cat]=(catTotals[r.cat]||0)+r.amt});
+    const catTotals=this.sumByCat(mr.filter(r=>r.type==='expense'));
     const entries=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
     
     // 环比数据
@@ -3892,7 +3980,7 @@ const App={
       '<img id="screenshotImg" style="max-width:100%;max-height:200px;border-radius:12px;border:1px solid var(--glass-border);object-fit:contain"></div>'+
       '<div id="ssStatus" class="ai-status" style="display:none"></div></div>'+
       '<div style="display:flex;gap:10px"><input id="ssAmt" type="number" placeholder="金额" class="m-inp" style="flex:1;width:auto">'+
-      '<select id="ssCat" class="m-inp" style="width:auto;flex:0 0 auto">'+
+      '<select id="ssCat" class="m-inp" style="width:auto;flex:0 0 auto"><option value="">不选分类</option>'+
       EC.map(k=>{const c=CATS.find(x=>x.k===k);return '<option value="'+k+'">'+c.i+' '+c.n+'</option>'}).join('')+
       '</select></div>'+
       '<input id="ssNote" placeholder="备注（可选）" class="m-inp">'+
@@ -3997,14 +4085,14 @@ const App={
   // 识别结果弹窗：展示提取到的字段 + OCR 原文（可折叠），并提供回填 / 直接导入两条路
   _aiShowResult(p,rawText){
     if(!p){this.showToast('未识别到内容');return;}
-    const cat=(CATS||[]).find(c=>c.k===p.cat)||{n:'其他',i:'📋'};
+    const cat=(CATS||[]).find(c=>c.k===p.cat)||null;   // 没识别出分类就不显示分类，避免误标成「其他」
     const raw=String(rawText||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]));
     const short=raw.length>220?raw.slice(0,220)+'…':raw;
     const html='<h3>🔍 识别结果</h3>'+
       '<div style="display:grid;grid-template-columns:auto 1fr;gap:9px 14px;background:var(--glass-bg);border-radius:12px;padding:14px;font-size:14px;margin-bottom:12px">'+
       '<span style="color:var(--t2)">金额</span><b style="color:var(--red);font-size:17px" class="tabnum">¥'+Number(p.amount||0).toFixed(2)+'</b>'+
       '<span style="color:var(--t2)">日期</span><b>'+((p.date&&/^\d{4}-\d{2}-\d{2}$/.test(p.date))?p.date:'未识别（默认今天）')+'</b>'+
-      '<span style="color:var(--t2)">分类</span><b>'+cat.i+' '+cat.n+'</b>'+
+      '<span style="color:var(--t2)">分类</span><b>'+(cat?cat.i+' '+cat.n:'—')+'</b>'+
       '<span style="color:var(--t2)">备注</span><b>'+(p.note?String(p.note).slice(0,40):'—')+'</b>'+
       '</div>'+
       (short?'<details style="margin-bottom:12px"><summary style="font-size:12px;color:var(--t2);cursor:pointer;padding:6px 0">查看 OCR 识别原文</summary>'+
@@ -4118,8 +4206,9 @@ const App={
     if(!obj)throw new Error('AI 未能解析出账单信息');
     const amt=parseFloat(obj.amount);
     if(!amt||amt<=0)throw new Error('未能提取到金额');
-    let cat=String(obj.cat||'other');
-    if(EC.indexOf(cat)<0&&IC.indexOf(cat)<0)cat='other';
+    // AI 没识别出分类时置空（未分类），不再硬塞「其他」
+    let cat=String(obj.cat||'');
+    if(EC.indexOf(cat)<0&&IC.indexOf(cat)<0)cat='';
     const today=dstr(new Date());
     let date=/^\d{4}-\d{2}-\d{2}$/.test(String(obj.date||''))?String(obj.date):today;
     if(date>today)date=today;
@@ -4136,7 +4225,7 @@ const App={
     if(note)note.value=p.note||'';
     const d=document.getElementById('inputDate');
     if(d&&p.date){d.value=p.date;d.dispatchEvent(new Event('change'));}
-    this.selectCat(p.cat);
+    this.selectCat(p.cat);   // p.cat 为空时即清空选中，保持"未分类"状态
   },
   _confirmScreenshotImport(){
     const amt=parseFloat(document.getElementById('ssAmt').value);
@@ -4247,8 +4336,18 @@ const App={
         '<div style="display:flex;gap:8px;margin-top:16px">'+
         '<button class="btn-primary" style="flex:1;background:linear-gradient(135deg,#94a3b8,#64748b)" onclick="App._cropCancel()">取消</button>'+
         '<button class="btn-primary" style="flex:1.6" onclick="App._cropConfirm()">确定</button></div>';
+      document.body.classList.add('crop-open');   // 关掉全屏毛玻璃 + 裁切独占合成层
       this.showModal(html);
       this._initCrop();
+      // rAF 合帧循环：一帧内多次 pointermove 合并成一次 _applyCrop 调用
+      // 降采样到 1600px 的图 + 合成层 transform 本身不重，但高频 move 叠 Math.hypot
+      // + 多次 pts.values() 遍历在低端 WebView 上也会抖。合帧把同一帧内的增量全吞了
+      const loop=()=>{
+        const c=this._crop;if(!c){this._cropRAF=0;return;}
+        if(this._cropDirty){this._cropDirty=false;this._applyCrop();}
+        this._cropRAF=requestAnimationFrame(loop);
+      };
+      this._cropRAF=requestAnimationFrame(loop);
   },
   _initCrop(){
     const stage=document.getElementById('cropStage');
@@ -4267,7 +4366,8 @@ const App={
     // 拖动 / 双指缩放：只写 transform，不碰布局
     this._ptrs=new Map();
     stage.addEventListener('pointerdown',e=>{
-      stage.setPointerCapture&&stage.setPointerCapture(e.pointerId);
+      if(this._ptrs.size>=2)return;   // 双指已够用：多余手指不参与，防三指误触发乱缩放
+      try{stage.setPointerCapture&&stage.setPointerCapture(e.pointerId);}catch(err){}   // 个别老 WebView 捕获失败也不该废掉拖动
       this._ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
       e.preventDefault();
     });
@@ -4275,7 +4375,8 @@ const App={
       if(!this._ptrs.has(e.pointerId))return;
       const prev=this._ptrs.get(e.pointerId);
       if(this._ptrs.size>=2){
-        // 双指：用前后两指间距比缩放
+        // 双指：用前后两指间距比缩放（Math.hypot 两次 + 展开 pts.values()，
+        // 但合帧后同一帧内多次 move 的缩放率会互相覆盖，最终用最新值渲染）
         const p0=[...this._ptrs.values()];
         const d0=Math.hypot(p0[0].x-p0[1].x,p0[0].y-p0[1].y);
         this._ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
@@ -4286,7 +4387,7 @@ const App={
         c.dx+=e.clientX-prev.x;
         c.dy+=e.clientY-prev.y;
         this._ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
-        this._applyCrop();
+        this._cropDirty=true;   // 合帧：不直接写 transform，交给 rAF 统一渲一帧
       }
       e.preventDefault();
     },{passive:false});
@@ -4300,7 +4401,7 @@ const App={
     c.s=c.base*c.zoom;
     const r=document.getElementById('cropRange');
     if(r&&parseFloat(r.value)!==c.zoom)r.value=c.zoom;
-    this._applyCrop();
+    this._cropDirty=true;   // 合帧：range input 的 oninput 每帧触发多次
   },
   _applyCrop(){
     const c=this._crop;if(!c||!c.el)return;
@@ -4330,6 +4431,10 @@ const App={
       u.av=cv.toDataURL('image/jpeg',.82);
       this.saveUser(u);
       this._crop=null;
+      this._ptrs=null;
+      if(this._cropRAF){cancelAnimationFrame(this._cropRAF);this._cropRAF=0;}
+      this._cropDirty=false;
+      document.body.classList.remove('crop-open');   // 恢复毛玻璃态
       this.closeModal();
       this.renderUser();
       this.showToast('头像已更新');
@@ -4338,6 +4443,10 @@ const App={
   },
   _cropCancel(){
     this._crop=null;
+    this._ptrs=null;
+    if(this._cropRAF){cancelAnimationFrame(this._cropRAF);this._cropRAF=0;}
+    this._cropDirty=false;
+    document.body.classList.remove('crop-open');   // 恢复毛玻璃态
     this.closeModal();
     if(this._cropFromAvatar)setTimeout(()=>this.showAvatarSheet(),240);
   },
@@ -4670,8 +4779,7 @@ const App={
     ctx.fillText((balance>=0?'结余 +':'结余 ')+balance.toFixed(0)+' · 坚持'+streak+'天',300,332);
 
     // Top 3 categories
-    const catTotals={};
-    records.filter(r=>r.date.startsWith(thisMonth)&&r.type==='expense').forEach(r=>{catTotals[r.cat]=(catTotals[r.cat]||0)+r.amt});
+    const catTotals=this.sumByCat(records.filter(r=>r.date.startsWith(thisMonth)&&r.type==='expense'));
     const topCats=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).slice(0,3);
     if(topCats.length>0){
       ctx.fillStyle='#6366f1';ctx.font='bold 15px -apple-system,PingFang SC,sans-serif';ctx.textAlign='left';
@@ -4854,7 +4962,7 @@ const App={
       const amt=parseFloat(cols[1]);
       if(isNaN(amt)||amt<=0)continue;
       const catName=cols[2].trim();
-      const cat=CATS.find(c=>c.n===catName)||{k:'other'};
+      const cat=CATS.find(c=>c.n===catName)||{k:''};   // CSV 里分类列为空/未知 → 存未分类
       const rawDate=(cols[3]||'').trim();
       const date=/^\d{4}-\d{2}-\d{2}$/.test(rawDate)?rawDate:dstr(new Date());
       const note=cols[4]||'';
@@ -4926,7 +5034,7 @@ const App={
         type='income';amt=Math.abs(amt);
       }
       // Guess category
-      let cat='other';
+      let cat='';   // 没命中关键词就保持未分类（不显示分类）
       if(line.includes('餐')||line.includes('饭')||line.includes('食')||line.includes('外卖')||line.includes('奶茶')||line.includes('咖啡'))cat='food';
       else if(line.includes('车')||line.includes('交通')||line.includes('地铁')||line.includes('公交')||line.includes('打车')||line.includes('加油'))cat='transport';
       else if(line.includes('买')||line.includes('购')||line.includes('衣服')||line.includes('鞋')||line.includes('淘宝')||line.includes('京东'))cat='shopping';
@@ -4950,7 +5058,7 @@ const App={
       preview.innerHTML=results.map((r,i)=>{
         const cat=this.getCatData(r.cat);
         return '<div class="ip-item"><div class="ip-check checked" onclick="this.classList.toggle(\'checked\')">✓</div>'+
-          '<span>'+cat.i+' '+cat.n+'</span>'+
+          '<span>'+(r.cat?cat.i+' '+cat.n:'')+'</span>'+
           '<span style="color:'+(r.type==='expense'?'var(--red)':'var(--green)')+'">'+(r.type==='expense'?'-':'+')+r.amt.toFixed(2)+'</span>'+
           '<span style="color:var(--t3);flex:1;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+App.escapeHtml(r.note)+'</span></div>';
       }).join('');
@@ -4984,8 +5092,7 @@ const App={
     const monthRecords=records.filter(r=>r.date.startsWith(thisMonth));
     const expTotal=monthRecords.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amt,0);
     const incTotal=monthRecords.filter(r=>r.type==='income').reduce((s,r)=>s+r.amt,0);
-    const catTotals={};
-    monthRecords.filter(r=>r.type==='expense').forEach(r=>{catTotals[r.cat]=(catTotals[r.cat]||0)+r.amt});
+    const catTotals=this.sumByCat(monthRecords.filter(r=>r.type==='expense'));
     const entries=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
 
     // 动态引言
@@ -5008,9 +5115,10 @@ const App={
     report+='💬 '+opening+'\n\n';
     report+='支出 ¥'+expTotal.toFixed(2)+'  |  收入 ¥'+incTotal.toFixed(2)+'  |  结余 ¥'+(incTotal-expTotal).toFixed(2)+'\n\n';
     report+='📂 支出分类\n';
+    const catSum=entries.reduce((s,e)=>s+e[1],0);
     entries.forEach(([k,amt])=>{
       const cat=this.getCatData(k);
-      const pct=expTotal>0?(amt/expTotal*100).toFixed(1):'0';
+      const pct=catSum>0?(amt/catSum*100).toFixed(1):'0';
       const bar='█'.repeat(Math.round(pct/5))+'░'.repeat(20-Math.round(pct/5));
       const comment=catComments[k]||'';
       report+=cat.i+' '+cat.n+'  ¥'+amt.toFixed(0)+'  '+bar+' '+pct+'%\n';
@@ -5070,8 +5178,8 @@ const App={
     if(s.budget>0){
       if(expTotal<=s.budget)score+=10;else if(expTotal<=s.budget*1.1)score+=4;
     }
-    // 消费多样性（5分）
-    const cats=new Set(expRecords.map(r=>r.cat));
+    // 消费多样性（5分）：未分类（cat 为空）不计入多样性
+    const cats=new Set(expRecords.map(r=>r.cat).filter(Boolean));
     if(cats.size>=4)score+=5;else if(cats.size>=2)score+=2;
     score=Math.min(score,100);
 
@@ -5081,8 +5189,7 @@ const App={
     const engelLevel=parseFloat(engel)>59?'💰 温饱':parseFloat(engel)>50?'🌿 小康':parseFloat(engel)>40?'✨ 富裕':'👑 极富裕';
 
     // ===== 分类排行 =====
-    const catTotals={};
-    expRecords.forEach(r=>{catTotals[r.cat]=(catTotals[r.cat]||0)+r.amt});
+    const catTotals=this.sumByCat(expRecords);
     const sortedCats=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
 
     // ===== 环比变化 =====
@@ -5165,7 +5272,8 @@ const App={
       html+='<div style="font-weight:600;font-size:13px;margin:8px 0 6px">本月消费排行</div>';
       sortedCats.slice(0,3).forEach(([cat,amt])=>{
         const catData=this.getCatData(cat);
-        const pct=(amt/expTotal*100).toFixed(0);
+        const catSum=sortedCats.reduce((s,e)=>s+e[1],0);
+        const pct=catSum>0?(amt/catSum*100).toFixed(0):'0';
         const barColor=catData.c||'var(--t2)';
         html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px">';
         html+='<span style="font-size:20px;width:28px;text-align:center">'+catData.i+'</span>';
@@ -5313,10 +5421,9 @@ const App={
     // 分析消费模式
     const expRecords=monthRecords.filter(r=>r.type==='expense');
     const totalExp=expRecords.reduce((s,r)=>s+r.amt,0);
-    const catTotals={};
-    expRecords.forEach(r=>{catTotals[r.cat]=(catTotals[r.cat]||0)+r.amt});
+    const catTotals=this.sumByCat(expRecords);
     const topCat=Object.entries(catTotals).sort((a,b)=>b[1]-a[1])[0];
-    const topCatData=this.getCatData(topCat[0]);
+    const topCatData=topCat?this.getCatData(topCat[0]):null;
     // 时间分析
     const nightRecords=expRecords.filter(r=>{const h=parseInt((r.time||'12:00').split(':')[0]);return h>=21||h<6});
     const nightPct=expRecords.length>0?Math.round(nightRecords.length/expRecords.length*100):0;
@@ -5350,7 +5457,7 @@ const App={
     html+='<div style="background:var(--glass-bg);border-radius:12px;padding:14px;margin:12px 0;font-size:13px;color:var(--t2);line-height:1.7">'+desc+'</div>';
     html+='<div style="background:var(--glass-bg);border-radius:12px;padding:14px;font-size:12px;color:var(--t3)">';
     html+='<div style="font-weight:600;color:var(--text);margin-bottom:6px">📊 本月数据概览</div>';
-    html+='<div>总支出 ¥'+totalExp.toFixed(0)+' · 最常花在'+topCatData.n+' ('+Math.round(topCat[1]/totalExp*100)+'%)</div>';
+    html+='<div>总支出 ¥'+totalExp.toFixed(0)+(topCatData?' · 最常花在'+topCatData.n+' ('+Math.round(topCat[1]/totalExp*100)+'%)':'')+'</div>';
     if(nightPct>0)html+='<div>夜间消费占比 '+nightPct+'%'+(nightPct>=30?' 🌙':'')+'</div>';
     html+='<div>共记了 '+monthRecords.length+' 笔账</div>';
     html+='</div>';

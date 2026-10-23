@@ -19,12 +19,16 @@ APP_ROOT="$(cd "$(dirname "$0")" && pwd)"
 PROJECT=$APP_ROOT/android
 OUTPUT=$APP_ROOT
 
-VERSION_CODE=9
-VERSION_NAME="2.5"
+VERSION_CODE=14
+VERSION_NAME="2.8"
 
 # ====== 清理 ======
 rm -rf $PROJECT/build
 mkdir -p $PROJECT/build/obj $PROJECT/build/dex $PROJECT/build/apk
+
+# v2.6 修复：打包前自动同步 index.html → assets/（之前漏了这步导致 APK 里打包旧代码）
+cp "$APP_ROOT/index.html" "$PROJECT/app/src/main/assets/index.html"
+echo ">>> 0. 同步 index.html → assets/ OK"
 
 echo ">>> 1. 编译资源 (aapt2)..."
 $BUILD_TOOLS/aapt2 compile \
