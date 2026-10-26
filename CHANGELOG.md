@@ -1,4 +1,22 @@
 # 更新日志
+## v2.10（开发中）
+
+### 本次更新
+
+**AI 对话：思考过程可视化 + 流式输出（本次重点）**
+- AI 理财顾问对话区新增五步思考时间线：📦 加载端侧大模型（469MB，仅首次）→ 📖 读取本月账本 → 🧩 构建离线上下文 → 🧠 端侧模型推理 → ✨ 回复完成；每步实时状态（进行中 / 完成 / 出错）与量化信息（加载进度 %、账本摘要字数、历史轮数、tokens 数、耗时）
+- 接入 wllama 流式推理：onData 逐 token 回调 + rAF 合帧渲染（兼容 OpenAI delta 与 llama.cpp 裸 content 两种 chunk 结构）；回复气泡带打字光标，完成即移除
+- 对话结束恢复输入框 / 发送按钮；对话历史超过 6 条自动裁剪至最近 4 条（压缩进 n_ctx=1024）
+
+**修复：非 HTTPS 环境端侧模型加载失败（本次重点）**
+- 现象：AI 对话启动即报「No supported storage backend found」，端侧大模型无法加载——生产 WebView（http://suiyinji.local 本地源）与本地调试（http://localhost 之外的 http 源）均为非安全上下文，OPFS / Cache API 不可用，而 wllama 默认缓存后端强制依赖二者
+- 修复三步：① 新增 `_aiFetchModel` 用 fetch 流式读取 GGUF 模型（带百分比进度，真机上不在用户存储二次落盘）；② 构造 Wllama 时在第二参注入 noCache 存储桩（构造期即急切实例化缓存管理器，必须构造时注入），顺带修正 options 传参位置错误（`suppressNativeLog` 此前从未生效）；③ `loadModel` 改传裸 Blob 数组（内部调 `blob.slice()` 校验 GGUF 头，不接受 `{name,blob}` 包装）
+
+**浏览器实测（全部 PASS）**
+- 两轮端到端对话：五步时间线完整；16 / 74 tokens 流式计数与逐字渲染；耗时 44.9s / 49.7s；第二轮正确注入 2 轮历史；结束后输入/发送/光标全部恢复；console 0 error
+
+---
+
 ## v2.9（当前发布，versionCode 15）
 
 ### 本次更新
