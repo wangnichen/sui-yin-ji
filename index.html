@@ -338,7 +338,7 @@ body.dk .card::after,body.dk .card2::after{opacity:.4}
 @keyframes sectionIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
 
 /* ===== Page 1: Record ===== */
-.type-toggle{position:relative;display:flex;gap:0;background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:var(--r);padding:3px;margin-bottom:16px}
+.type-toggle{position:relative;display:flex;gap:0;background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:var(--r);padding:3px;margin-bottom:16px;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 /* 果冻滑块：支出在左、收入在右，切换时从一边 Q 弹滑到另一边。
    配色与 Dock 玻璃滑块完全统一：淡紫白玻璃 + 同款内阴影（替换原来的实心紫色块） */
 .type-toggle .tt-slider{position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:calc(var(--r) - 2px);
@@ -347,6 +347,7 @@ body.dk .card::after,body.dk .card2::after{opacity:.4}
   border:1px solid rgba(255,255,255,.80);
   box-shadow:0 6px 16px rgba(139,110,214,.18),0 2px 5px rgba(139,110,214,.11),inset 0 1px 0 rgba(255,255,255,.98),inset 0 -3px 9px rgba(167,139,250,.26);
   transition:transform .5s var(--spring-smooth);pointer-events:none;z-index:0}
+.type-toggle .tt-slider.dragging{transition:none}
 body.dk .type-toggle .tt-slider{background:linear-gradient(160deg,rgba(255,255,255,.30),rgba(226,214,255,.20) 55%,rgba(255,255,255,.26));border-color:rgba(255,255,255,.34);
   box-shadow:0 6px 18px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.46),inset 0 -3px 9px rgba(167,139,250,.26)}
 .type-toggle.income .tt-slider{transform:translateX(100%)}
@@ -714,8 +715,6 @@ body.dk #statsWidgets.grid-view .widget-box{
 .author-card .author-name{font-size:16px;font-weight:700;color:var(--text)}
 .author-card .author-bio{font-size:12px;color:var(--t3);margin-top:6px;line-height:1.7}
 .author-card .author-ver{font-size:11px;color:var(--t3);margin-top:8px}
-.author-card .donate-entry{margin-top:14px;display:inline-block;padding:8px 20px;border-radius:20px;background:var(--g1);color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;box-shadow:0 3px 10px rgba(99,102,241,.25)}
-.author-card .donate-entry:active{transform:scale(.95)}
 /* profile 页间距优化 */
 #page-profile .card{padding:12px;margin-bottom:10px}
 #page-profile .profile-card{padding:16px;gap:12px}
@@ -739,7 +738,6 @@ body.dk #statsWidgets.grid-view .widget-box{
 .capsule-create textarea{width:100%;min-height:80px;padding:10px 12px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:8px;font-size:14px;color:var(--text);resize:vertical;font-family:inherit;line-height:1.6}
 .capsule-create textarea:focus{border-color:var(--p);outline:none}
 .capsule-create select{padding:10px 12px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:8px;font-size:14px;color:var(--text)}
-.donate-entry{text-align:center;font-size:13px;color:var(--p);cursor:pointer;padding:8px;margin-top:4px}
 
 /* ===== Toast ===== */
 .toast-container{position:fixed;top:60px;left:0;right:0;z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;padding:0 20px}
@@ -1062,7 +1060,7 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
   <!-- Top Bar -->
   <div class="top-bar">
     <div style="display:flex;align-items:center;gap:7px;min-width:0">
-      <div class="title" id="pageTitle">碎银记v2.8</div>
+      <div class="title" id="pageTitle">碎银记v2.9</div>
       <button class="btn-icon" onclick="App.showScreenshotImport()" title="拍照／图片识别记账" style="width:auto;padding:0 11px;border-radius:17px;gap:5px;align-items:center"><span style="font-size:15px;line-height:1">📷</span><span style="font-size:12px;font-weight:600;line-height:1">拍照识别</span></button>
     </div>
     <div class="actions">
@@ -1310,9 +1308,8 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
       </div>
       <div class="author-card">
         <div class="author-name">🎓 我不要芒果</div>
-        <div class="author-bio" style="line-height:1.7;color:var(--t2)">计算机专业大一在读，课余用代码打磨的小工具。<br>没有 KPI 与投资人，只想让你用得顺手。<br>若帮你省下一杯奶茶钱，不妨请我喝一杯 ☕</div>
-        <div class="author-ver">碎银记 v2.0 · 持续更新中</div>
-        <div class="donate-entry" onclick="App.showDonateModal()">🧋 请作者喝杯奶茶</div>
+        <div class="author-bio" style="line-height:1.7;color:var(--t2)">大一计算机科学与技术专业在读，<br>用 Trae + DeepSeek 打磨的纯本地记账工具。<br>没有广告与会员，数据只存在你的设备里。</div>
+        <div class="author-ver">碎银记 v2.9 · 持续更新中</div>
       </div>
     </div>
   </div>
@@ -1585,6 +1582,7 @@ const App={
     this.switchPage('record');
     this.initNavDrag();
     this.initSwipe();
+    this.initTypeDrag();
     this.updateDateTime();
     var self=this;
     self._dtTimer=setInterval(function(){self.updateDateTime()},1000);
@@ -1595,7 +1593,7 @@ const App={
 
   // ===== Welcome Announcement =====
   _showWelcome(){
-    const ver='2.0.0';
+    const ver='2.9.0';
     const s=this.getSettings();
     if(s.welcomeVer===ver)return;
     setTimeout(()=>{
@@ -1609,11 +1607,11 @@ const App={
         '<div style="background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.08));border-radius:14px;padding:13px 14px;margin-bottom:12px;border:1px solid rgba(99,102,241,.12)">'+
         '<div style="font-size:13px;line-height:1.9">'+
         '我是 <b style="color:var(--p)">我不要芒果</b> 🥭<br>'+
-        '计算机专业大一学生，<br>'+
-        '课余时间敲代码做了这个小工具。<br>'+
+        '大一计算机科学与技术专业在读，<br>'+
+        '用 Trae + DeepSeek 打磨出这个小工具。<br>'+
         '没有广告，没有会员，不卖数据——<br>'+
         '所有碎银只住在你的手机里 🏠<br>'+
-        '愿它陪你把日子过得明明白白 ☕'+
+        '愿它陪你把日子过得明明白白 🌱'+
         '</div></div>'+
 
         '<div style="background:var(--glass-bg);border-radius:12px;padding:11px 13px;margin-bottom:12px">'+
@@ -1636,18 +1634,16 @@ const App={
         '</div></div>'+
 
         '<div style="background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(139,92,246,.1));border-radius:12px;padding:11px 13px;margin-bottom:12px;border:1px solid rgba(99,102,241,.15)">'+
-        '<div style="font-weight:700;color:var(--p);font-size:13px;margin-bottom:7px">🆕 v2.0 新鲜出炉</div>'+
+        '<div style="font-weight:700;color:var(--p);font-size:13px;margin-bottom:7px">🆕 v2.9 新鲜出炉</div>'+
         '<div style="font-size:12px;line-height:2;color:var(--t2)">'+
-        '🪙 碎银时钟 · 时间日期加诗句<br>'+
-        '🌐 NTP 校时 · 记账分秒不差<br>'+
-        '🎋 碎银签 · 每日一签问财运<br>'+
-        '⚡ 深浅色秒切 · 告别卡顿'+
+        '🫧 收支滑块 · 按住玻璃块直接拖<br>'+
+        '👆 页面横滑 · 跟手度大幅优化<br>'+
+        '🛡 兼容加固 · 老机型 WebView 更稳'+
         '</div></div>'+
 
         '<div style="text-align:center;font-size:11px;color:var(--t3);line-height:1.7;padding:2px 0 6px">'+
-        '省下一杯奶茶钱的话 🧋<br>'+
-        '也请我喝一杯呀～<br>'+
-        '<span style="color:var(--p)">你的支持，是我的动力 ✨</span>'+
+        '纯本地运行 · 不联网 · 不上传<br>'+
+        '<span style="color:var(--p)">愿它陪你把日子过得明明白白 ✨</span>'+
         '</div>'
       );
       s.welcomeVer=ver;
@@ -1754,7 +1750,7 @@ const App={
     if(activeItem)activeItem.classList.add('active');
     this.positionNavIndicator(page);
     this._jelly();
-    const titles={record:'碎银记v2.8',bills:'账单',stats:'统计',profile:'我的'};
+    const titles={record:'碎银记v2.9',bills:'账单',stats:'统计',profile:'我的'};
     document.getElementById('pageTitle').textContent=titles[page];
     // 顶栏扫一道液态反光，标记页面切换
     const tb=document.querySelector('.top-bar');
@@ -1835,10 +1831,12 @@ const App={
       curX=t.clientX;curY=t.clientY;
       const dx=curX-startX,dy=curY-startY;
       if(!dragging&&!vertical){
-        // 方向锁定：水平位移显著主导才认定横滑，否则交给原生垂直滚动
-        if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)*1.6){
+        // 方向锁定：真机上手指划弧，水平/垂直常常分不干净——此前 1.6 倍门槛太苛刻，
+        // 稍带弧度的横滑会被误判成垂直滚动并永久锁死。放宽到 1.2 倍、起步 8px；
+        // 垂直判定同步要求 1.2 倍主导且位移更大，让"基本平着划"的手势稳稳落在横滑侧
+        if(Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)*1.2){
           dragging=true;
-        }else if(Math.abs(dy)>10){
+        }else if(Math.abs(dy)>14&&Math.abs(dy)>Math.abs(dx)*1.2){
           vertical=true;
         }
       }
@@ -2035,13 +2033,33 @@ const App={
         });
       });
     };
-    nav.addEventListener('pointerdown',onDown);
-    window.addEventListener('pointermove',onMove,{passive:false});
-    window.addEventListener('pointerup',onUp);
-    window.addEventListener('pointercancel',onUp);
-    // 安全网：若 WebView 异常丢失指针捕获（pointerup 没送达），也能把拖拽状态收尾，
-    // 防止 dragging 卡死导致滑块再也按不动。正常松手时 dragging 已为 false，此回调是空操作
-    nav.addEventListener('lostpointercapture',onUp);
+    if(window.PointerEvent){
+      nav.addEventListener('pointerdown',onDown);
+      window.addEventListener('pointermove',onMove,{passive:false});
+      window.addEventListener('pointerup',onUp);
+      window.addEventListener('pointercancel',onUp);
+      // 安全网：若 WebView 异常丢失指针捕获（pointerup 没送达），也能把拖拽状态收尾，
+      // 防止 dragging 卡死导致滑块再也按不动。正常松手时 dragging 已为 false，此回调是空操作
+      nav.addEventListener('lostpointercapture',onUp);
+    }else{
+      // 老 WebView 没有 PointerEvent：上面整段会静默失灵。把 touch 事件适配成
+      // pointer 风格（补一个 pointerId），复用同一套 onDown/onMove/onUp 逻辑。
+      // touchstart 保持 passive——onDown 只读坐标，不改默认行为
+      nav.addEventListener('touchstart',e=>{
+        if(e.touches.length!==1)return;
+        const t=e.touches[0];t.pointerId=0;onDown(t);
+      },{passive:true});
+      window.addEventListener('touchmove',e=>{
+        if(!dragging||e.touches.length!==1)return;
+        const t=e.touches[0];t.pointerId=0;onMove(t);
+      },{passive:false});
+      const tEnd=e=>{
+        const t=e.changedTouches&&e.changedTouches[0];
+        if(t){t.pointerId=0;onUp(t);}
+      };
+      window.addEventListener('touchend',tEnd,{passive:false});
+      window.addEventListener('touchcancel',tEnd);
+    }
     // Dock 触控跟随光斑：指针在胶囊上移动时柔光跟到哪（rAF 合帧写 CSS 变量，
     // gBCR 只在按下后取一次缓存，拖拽/悬停都生效，松手淡出）
     if(!this._dockLightBound){
@@ -2060,6 +2078,71 @@ const App={
       window.addEventListener('pointerup',off,{passive:true});
       window.addEventListener('pointercancel',off,{passive:true});
     }
+  },
+  // 收支滑块（支出/收入）拖拽：tt-slider 是 pointer-events:none 的纯装饰层，
+  // 此前只能点按钮切换，真机上「按住玻璃块拖」毫无反应。现在在容器上监听按下，
+  // 让玻璃块 1:1 跟手：过中线轻震提示换侧，松手落在哪侧就提交哪侧。
+  // ttSquish 用独立 scale 属性做果冻，与 transform 位移正交，松手后的
+  // 滑动过渡和果冻挤压可以同时生效
+  initTypeDrag(){
+    const tg=document.getElementById('typeToggle');
+    const sl=document.getElementById('ttSlider');
+    if(!tg||!sl||!window.PointerEvent)return;
+    let dragging=false,moved=false,pid=null,startX=0,basePx=0,curPx=0,slW=0,target=null;
+    const onDown=e=>{
+      if(e.button!==undefined&&e.button!==0)return;
+      if(dragging)return;   // 多点触控：拖拽中忽略第二根手指
+      dragging=true;moved=false;pid=e.pointerId;target=null;
+      sl.classList.remove('jelly');
+      sl.classList.add('dragging');
+      startX=e.clientX;
+      slW=parseFloat(getComputedStyle(sl).width)||tg.getBoundingClientRect().width/2;
+      // 起始基准：income 侧玻璃块停在 translateX(100%)（自身宽度），expense 侧是 0
+      basePx=tg.classList.contains('income')?slW:0;
+      curPx=basePx;
+    };
+    const onMove=e=>{
+      if(!dragging||(pid!==null&&e.pointerId!==pid))return;
+      const dx=e.clientX-startX;
+      if(Math.abs(dx)>4&&!moved){moved=true;try{tg.setPointerCapture&&tg.setPointerCapture(e.pointerId);}catch(err){}}
+      if(moved)e.preventDefault();
+      // 硬钳位在两格之间，与 Dock 滑块同策略：直接操作不越界
+      curPx=Math.max(0,Math.min(slW,basePx+dx));
+      sl.style.transform='translateX('+curPx+'px)';
+      // 过中线轻震一下，提示即将换侧（不真正切换，松手才提交）
+      const side=curPx>slW/2?'income':'expense';
+      if(side!==target){target=side;if(moved){try{navigator.vibrate&&navigator.vibrate(4);}catch(err){}}}
+    };
+    const finish=(e,commit)=>{
+      if(!dragging)return;
+      if(pid!==null&&e&&e.pointerId!==undefined&&e.pointerId!==pid)return;
+      dragging=false;pid=null;
+      // 轻点（没真正拖动）：立刻恢复过渡并 flush 样式，让紧随的 click → setType
+      // 的滑动+果冻动画完整可见（同 Dock 滑块的处理）
+      if(!moved){sl.classList.remove('dragging');sl.style.transform='';void sl.offsetWidth;return;}
+      if(!commit){
+        // 系统接管手势（拖动中页面开始滚动触发 pointercancel）：回弹起始侧，不提交换侧
+        sl.style.transform='translateX('+basePx+'px)';
+        requestAnimationFrame(()=>{sl.classList.remove('dragging');sl.style.transform='';});
+        return;
+      }
+      // 松手提交：先把内联 transform 定格在目标侧像素位置（仍是 transition:none，
+      // 视觉零跳变），下一帧移除 dragging 恢复过渡并清内联值，交给 setType 写
+      // .income 类接管位移
+      const side=curPx>slW/2?'income':'expense';
+      sl.style.transform='translateX('+(side==='income'?slW:0)+'px)';
+      requestAnimationFrame(()=>{
+        sl.classList.remove('dragging');
+        sl.style.transform='';
+        this.setType(side);
+      });
+    };
+    const onUp=e=>finish(e,true);
+    const onCancel=e=>finish(e,false);
+    tg.addEventListener('pointerdown',onDown);
+    window.addEventListener('pointermove',onMove,{passive:false});
+    window.addEventListener('pointerup',onUp);
+    window.addEventListener('pointercancel',onCancel);
   },
   updateDateTime(){
     // 性能门控：页面隐藏或不在记页（碎银时钟所在页）时直接返回。
@@ -4617,7 +4700,10 @@ const App={
     const date=document.getElementById('gfDate').value;
     if(!name||!target||!date){this.showToast('请填写完整信息');return}
     const icon=document.querySelector('.goal-form .goal-emoji-pick button.selected');
-    const color=document.querySelectorAll('.goal-form .goal-emoji-pick')[1]?.querySelector('button.selected');
+    // 目标色按钮组是第二个 .goal-emoji-pick；不用可选链——老 WebView 不认识 ?.
+    // 会直接 SyntaxError，整个脚本挂掉
+    const picks=document.querySelectorAll('.goal-form .goal-emoji-pick');
+    const color=picks.length>1?picks[1].querySelector('button.selected'):null;
     const s=this.getSettings();
     if(!s.goals)s.goals=[];
     if(editId){
@@ -5465,27 +5551,6 @@ const App={
     this.showModal(html,'sheet');
   },
 
-  // ===== Donate =====
-  showDonateModal(){
-    const html='<h3>🧋 请我喝杯奶茶吧</h3>'+
-      '<div style="text-align:center;color:var(--t2);font-size:13px;line-height:1.8;margin-bottom:14px;padding:14px;background:var(--glass-bg);border-radius:12px">'+
-      '嗨，我是 <b style="color:var(--p)">我不要芒果</b><br>'+
-      '一个计算机专业的大一在读学生 🎓<br><br>'+
-      '碎银记是我一个人写的，<br>'+
-      '没有团队，没有公司，只有一台电脑和对编程的热爱。<br>'+
-      '做这件事的初衷很简单——<br>'+
-      '市面上的记账APP广告太多、功能太杂，<br>'+
-      '我想做一个 <b>真正干净、好用、尊重隐私</b> 的工具。<br><br>'+
-      '如果碎银记帮你理清了账目、省下了一笔钱，<br>'+
-      '那请我一杯奶茶，就是最好的认可 ☕<br>'+
-      '随缘打赏，金额随意，开心就好 💛'+
-      '</div>'+
-      '<div class="qr-row" style="display:flex;justify-content:center;gap:16px">'+
-      '<div style="text-align:center"><img src="data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%27120%27%20height=%27120%27%20viewBox=%270%200%20120%20120%27%3E%3Crect%20width=%27120%27%20height=%27120%27%20rx=%2712%27%20fill=%27%23e5e5ea%27/%3E%3Cg%20fill=%27%23aeaeb2%27%3E%3Crect%20x=%2722%27%20y=%2722%27%20width=%2730%27%20height=%2730%27/%3E%3Crect%20x=%2768%27%20y=%2722%27%20width=%2730%27%20height=%2730%27/%3E%3Crect%20x=%2722%27%20y=%2768%27%20width=%2730%27%20height=%2730%27/%3E%3Crect%20x=%2768%27%20y=%2768%27%20width=%2712%27%20height=%2712%27/%3E%3Crect%20x=%2786%27%20y=%2786%27%20width=%2712%27%20height=%2712%27/%3E%3Crect%20x=%2768%27%20y=%2786%27%20width=%2712%27%20height=%2712%27/%3E%3Crect%20x=%2786%27%20y=%2768%27%20width=%2712%27%20height=%2712%27/%3E%3C/g%3E%3C/svg%3E" style="width:120px;height:120px;border-radius:8px;border:1px solid var(--glass-border);object-fit:cover"><div style="font-size:11px;color:var(--t3);margin-top:4px">微信</div></div>'+
-      '<div style="text-align:center"><img src="data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%27120%27%20height=%27120%27%20viewBox=%270%200%20120%20120%27%3E%3Crect%20width=%27120%27%20height=%27120%27%20rx=%2712%27%20fill=%27%23e5e5ea%27/%3E%3Cg%20fill=%27%23aeaeb2%27%3E%3Crect%20x=%2722%27%20y=%2722%27%20width=%2730%27%20height=%2730%27/%3E%3Crect%20x=%2768%27%20y=%2722%27%20width=%2730%27%20height=%2730%27/%3E%3Crect%20x=%2722%27%20y=%2768%27%20width=%2730%27%20height=%2730%27/%3E%3Crect%20x=%2768%27%20y=%2768%27%20width=%2712%27%20height=%2712%27/%3E%3Crect%20x=%2786%27%20y=%2786%27%20width=%2712%27%20height=%2712%27/%3E%3Crect%20x=%2768%27%20y=%2786%27%20width=%2712%27%20height=%2712%27/%3E%3Crect%20x=%2786%27%20y=%2768%27%20width=%2712%27%20height=%2712%27/%3E%3C/g%3E%3C/svg%3E" style="width:120px;height:120px;border-radius:8px;border:1px solid var(--glass-border);object-fit:cover"><div style="font-size:11px;color:var(--t3);margin-top:4px">支付宝</div></div></div>'+
-      '<div style="text-align:center;color:var(--t3);font-size:12px;margin-top:12px">随缘打赏，开心就好 💛</div>';
-    this.showModal(html);
-  },
 };
 
 // ===== Init =====
