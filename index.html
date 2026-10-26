@@ -4259,22 +4259,51 @@ const App={
     const lines=items.filter(it=>it&&it.text&&(!it.score||it.score>=0.4)).map(it=>String(it.text).trim());
     return lines.join('\n');
   },
-  async _aiRunLlm(mod,text){
-    const base=this._aiBasePath();
-    if(!this._aiLlm){
-      const llm=new mod.Wllama({default:base+'llm/wasm/wllama.wasm',suppressNativeLog:true});
-      await llm.loadModelFromUrl(base+'llm/model.gguf',{
-        n_ctx:1024,
-        n_threads:Math.max(1,Math.min(4,(navigator.hardwareConcurrency||2)-1)),
-        progressCallback:o=>{
-          if(o.total>0){
-            const p=Math.round(o.loaded/o.total*100);
-            this._aiStatus(p<100?('加载语言模型 '+p+'%'):'初始化语言模型…','load');
-          }
-        }
-      });
-      this._aiLlm=llm;
+  // 流式读取模型文件为 Blob：不依赖 OPFS/Cache API（http 源下不可用），也不在真机上二次落盘
+  async _aiFetchModel(url,onProgress){
+    const resp=await fetch(url);
+    if(!resp.ok)throw new Error('模型文件读取失败（HTTP '+resp.status+'）');
+    const total=+resp.headers.get('Content-Length')||491400032;
+    if(!resp.body){
+      const b=await resp.blob();
+      if(onProgress)onProgress(100);
+      return b;
     }
+    const reader=resp.body.getReader();
+    const chunks=[];let loaded=0,last=-1;
+    for(;;){
+      const r=await reader.read();
+      if(r.done)break;
+      chunks.push(r.value);loaded+=r.value.length;
+      if(onProgress&&total>0){
+        const p=Math.min(99,Math.round(loaded/total*100));
+        if(p!==last){last=p;onProgress(p);}
+      }
+    }
+    if(onProgress)onProgress(100);
+    return new Blob(chunks,{type:'application/octet-stream'});
+  },
+  // 加载（或复用）端侧 LLM 单例；onProgress(pct) 可选，默认把进度写到截图导入的状态条
+  async _aiEnsureLlm(onProgress){
+    if(this._aiLlm)return this._aiLlm;
+    const base=this._aiBasePath();
+    const mod=await this._aiLoadModule();
+    const noCache={isSupported(){return false},read(){return Promise.resolve(null)},write(){return Promise.resolve()},getSize(){return Promise.resolve(-1)},list(){return Promise.resolve([])},delete(){return Promise.resolve()},deleteMany(){return Promise.resolve()},clear(){return Promise.resolve()}};
+    const llm=new mod.Wllama({default:base+'llm/wasm/wllama.wasm'},{suppressNativeLog:true,cacheManager:noCache});
+    const rep=p=>{
+      if(typeof onProgress==='function')onProgress(p);
+      else this._aiStatus(p<100?('加载语言模型 '+p+'%'):'初始化语言模型…','load');
+    };
+    const blob=await this._aiFetchModel(base+'llm/model.gguf',rep);
+    await llm.loadModel([blob],{
+      n_ctx:1024,
+      n_threads:Math.max(1,Math.min(4,(navigator.hardwareConcurrency||2)-1))
+    });
+    this._aiLlm=llm;
+    return llm;
+  },
+  async _aiRunLlm(mod,text){
+    await this._aiEnsureLlm();
     const sys='你是记账信息提取器。根据支付截图的OCR文字提取账单，只输出一个JSON对象，禁止输出任何其他内容。格式：{"amount":金额数字,"cat":"分类代码","note":"简短备注","date":"YYYY-MM-DD"}。cat只能取：food,transport,shopping,entertain,housing,medical,edu,shower,other,salary,gift,invest,refund。没有明确日期时date填null。';
     const resp=await this._aiLlm.createChatCompletion({
       messages:[{role:'system',content:sys},{role:'user',content:String(text).slice(0,1500)}],
@@ -4296,6 +4325,167 @@ const App={
     let date=/^\d{4}-\d{2}-\d{2}$/.test(String(obj.date||''))?String(obj.date):today;
     if(date>today)date=today;
     return {amount:Math.round(amt*100)/100,cat,date,note:String(obj.note||'').replace(/\s+/g,' ').trim().slice(0,50)};
+  },
+
+  // ===== AI 理财顾问对话：端侧流式推理 + 思考过程时间线 =====
+  // 思考过程 = 真实推理管道的可视化（读账本 → 构建上下文 → 端侧逐 token 生成），全程本地发生、无任何网络请求
+  _aiChatBusy:false,_aiChatHist:[],_aiChatRAF:0,
+  _aiChatSummary(){
+    const now=new Date();
+    const ym=dstr(now).slice(0,7);   // 'YYYY-MM'，与账单日期串同格式
+    const records=this.getRecords().filter(r=>r.date&&String(r.date).indexOf(ym)===0);
+    let exp=0,inc=0,expN=0;
+    const byCat={};
+    records.forEach(r=>{
+      if(r.type==='income'){inc+=r.amt;return;}
+      exp+=r.amt;expN++;
+      if(r.cat)byCat[r.cat]=(byCat[r.cat]||0)+r.amt;
+    });
+    const tops=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]).slice(0,4)
+      .map(k=>{const c=this.getCatData(k);return (c.n||k)+' ¥'+byCat[k].toFixed(0)+'（'+(exp>0?Math.round(byCat[k]/exp*100):0)+'%）';}).join('、');
+    const recent=records.slice(0,5).map(r=>{
+      const c=r.cat?this.getCatData(r.cat):null;
+      return r.date.slice(5)+' '+(r.type==='income'?'+':'-')+r.amt.toFixed(0)+(c&&c.n?(' '+c.n):'')+(r.note?(' '+String(r.note).slice(0,10)):'');
+    }).join('；');
+    const s=this.getSettings();
+    let out='今天是'+dstr(now)+'。本月支出 ¥'+exp.toFixed(0)+'（'+expN+'笔），收入 ¥'+inc.toFixed(0)+'。';
+    if(tops)out+='分类Top：'+tops+'。';
+    if(s.budget>0)out+='月预算 ¥'+Number(s.budget).toFixed(0)+'。';
+    if(recent)out+='最近记录：'+recent+'。';
+    return out.slice(0,500);
+  },
+  _aiChatSend(){
+    const inp=document.getElementById('aiChatInput');
+    if(!inp)return;
+    const q=inp.value;
+    if(!q.trim())return;
+    inp.value='';
+    this._aiChat(q);
+  },
+  _aiChip(q){
+    this._aiChat(q);
+  },
+  async _aiChat(q){
+    if(this._aiChatBusy){this.showToast('AI 正在思考，请稍候…');return;}
+    q=(q||'').trim();
+    if(!q)return;
+    const msgs=document.getElementById('aiChatMsgs');
+    if(!msgs)return;
+    this._aiChatBusy=true;
+    const t0=Date.now();
+    const inp=document.getElementById('aiChatInput');
+    const sendBtn=document.getElementById('aiChatSend');
+    if(inp)inp.disabled=true;
+    if(sendBtn)sendBtn.disabled=true;
+    // 用户气泡
+    const ub=document.createElement('div');
+    ub.className='ai-bubble u';
+    ub.textContent=q;
+    msgs.appendChild(ub);
+    // 思考时间线 + AI 回复气泡（骨架先上，内容流式填充；全程 textContent 防注入）
+    const think=document.createElement('div');
+    think.className='ai-think';
+    msgs.appendChild(think);
+    const ab=document.createElement('div');
+    ab.className='ai-bubble a';
+    const atext=document.createElement('span');
+    const acaret=document.createElement('span');
+    acaret.className='ai-caret';
+    ab.appendChild(atext);ab.appendChild(acaret);
+    msgs.appendChild(ab);
+    msgs.scrollTop=msgs.scrollHeight;
+    const steps=[];
+    const addStep=function(icon,label){
+      const row=document.createElement('div');
+      row.className='ai-think-step on';
+      const s1=document.createElement('span');s1.textContent=icon+' '+label;
+      const s2=document.createElement('span');s2.className='ai-think-meta';s2.textContent='…';
+      row.appendChild(s1);row.appendChild(s2);
+      think.appendChild(row);
+      msgs.scrollTop=msgs.scrollHeight;
+      const st={row:row,meta:s2};
+      steps.push(st);
+      return st;
+    };
+    const endStep=function(st,ok,info){
+      st.row.classList.remove('on');
+      st.row.classList.add(ok?'done':'err');
+      st.meta.textContent=info||(ok?'✓':'✕');
+    };
+    let rafId=0;
+    try{
+      // 0. 端侧大模型（仅首次需要加载，之后常驻内存复用）
+      if(!this._aiLlm){
+        const st0=addStep('📦','加载端侧大模型（469MB，仅首次）');
+        await this._aiEnsureLlm(function(p){st0.meta.textContent=p+'%';});
+        endStep(st0,true,'✓');
+      }
+      // 1. 读取本月账本
+      const st1=addStep('📖','读取本月账本');
+      const ctx=this._aiChatSummary();
+      endStep(st1,true,ctx.length+' 字摘要');
+      // 2. 构建离线上下文（系统提示 + 最近 2 轮历史 + 账本摘要，压缩进 n_ctx=1024）
+      const st2=addStep('🧩','构建离线上下文');
+      const hist=this._aiChatHist.slice(-2);
+      endStep(st2,true,hist.length+' 轮历史');
+      // 3. 端侧流式推理：逐 token 回调 → rAF 合帧渲染，避免高频 DOM 写入
+      const st3=addStep('🧠','端侧模型推理中');
+      let full='',toks=0;
+      const msgsRef=msgs,atextRef=atext,st3Ref=st3;
+      const flush=function(){
+        rafId=0;
+        atextRef.textContent=full;
+        msgsRef.scrollTop=msgsRef.scrollHeight;
+      };
+      const onData=function(chunk){
+        let piece='';
+        if(chunk){
+          // 兼容两种 chunk 结构：OpenAI 风格 choices[0].delta.content / llama.cpp 裸 content
+          if(chunk.choices&&chunk.choices[0]&&chunk.choices[0].delta&&typeof chunk.choices[0].delta.content==='string')piece=chunk.choices[0].delta.content;
+          else if(typeof chunk.content==='string')piece=chunk.content;
+        }
+        if(!piece)return;
+        full+=piece;
+        toks++;
+        st3Ref.meta.textContent=toks+' tokens';
+        if(!rafId)rafId=requestAnimationFrame(flush);
+      };
+      const messages=[{role:'system',content:'你是「碎银记」的理财顾问。所有数据来自用户手机本地账本摘要，只依据摘要回答，不要编造数据。用口语化中文，不超过120字，给1-2条具体建议。'}]
+        .concat(hist.map(function(h){return {role:h.role,content:h.content};}))
+        .concat([{role:'user',content:'账本摘要：'+ctx+'\n\n我的问题：'+q}]);
+      const resp=await this._aiLlm.createChatCompletion({
+        messages:messages,
+        max_tokens:220,temperature:0.7,
+        stream:true,onData:onData
+      });
+      // 兜底：引擎不支持流式回调时 full 为空，退回一次性结果
+      if(!full){
+        full=((resp&&resp.choices&&resp.choices[0]&&resp.choices[0].message&&resp.choices[0].message.content)||'').trim();
+      }
+      if(rafId){cancelAnimationFrame(rafId);rafId=0;}
+      atext.textContent=full;
+      const secs=(Date.now()-t0)/1000;
+      endStep(st3,true,toks>0?(toks+' tokens · '+secs.toFixed(1)+'s'):'✓');
+      // 4. 完成
+      const st4=addStep('✨','回复完成');
+      endStep(st4,true,secs.toFixed(1)+'s 总耗时');
+      this._aiChatHist.push({role:'user',content:q},{role:'assistant',content:full});
+      if(this._aiChatHist.length>6)this._aiChatHist=this._aiChatHist.slice(-4);
+      if(!full)atext.textContent='（模型没有返回内容，请换个问法再试一次）';
+      msgs.scrollTop=msgs.scrollHeight;
+    }catch(e){
+      const msg=(e&&e.message)?String(e.message):'未知错误';
+      if(steps.length>0)endStep(steps[steps.length-1],false,msg.slice(0,36));
+      atext.textContent='端侧推理出错了：'+msg;
+    }finally{
+      if(rafId){cancelAnimationFrame(rafId);rafId=0;}
+      if(acaret.parentNode)acaret.parentNode.removeChild(acaret);
+      this._aiChatBusy=false;
+      if(inp)inp.disabled=false;
+      if(sendBtn)sendBtn.disabled=false;
+      const m2=document.getElementById('aiChatMsgs');
+      if(m2)m2.scrollTop=m2.scrollHeight;
+    }
   },
   _aiFillForm(p){
     // 只回填记账表单，由用户核对后手动点「记一笔」才写入 localStorage
@@ -5386,6 +5576,47 @@ const App={
 
     // 底部
     html+='<div style="text-align:center;font-size:11px;color:var(--t3);margin-top:12px;padding-top:8px;border-top:1px solid var(--border)">基于本月 '+expRecords.length+' 笔支出数据生成<br>数据仅存本地，不上传任何服务器</div>';
+
+    // ===== AI 顾问对话区：端侧流式推理 + 思考过程可视化 =====
+    html+='<style>'
+      +'.ai-sect{display:flex;align-items:center;gap:6px;margin:14px 0 8px;font-weight:600;font-size:13px}'
+      +'.ai-chat-box{background:var(--glass-bg-strong);border:1px solid var(--glass-border-strong);border-radius:14px;padding:10px}'
+      +'#aiChatMsgs{max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:2px}'
+      +'.ai-empty{font-size:12px;color:var(--t3);text-align:center;padding:16px 6px;line-height:1.6}'
+      +'.ai-bubble{max-width:88%;padding:8px 12px;border-radius:14px;font-size:13px;line-height:1.55;word-break:break-word;white-space:pre-wrap}'
+      +'.ai-bubble.u{align-self:flex-end;background:var(--p);color:#fff;border-bottom-right-radius:4px}'
+      +'.ai-bubble.a{align-self:flex-start;background:var(--card,var(--glass-bg-strong));border:1px solid var(--glass-border-strong);color:var(--text);border-bottom-left-radius:4px}'
+      +'.ai-think{align-self:flex-start;background:var(--bg,transparent);border:1px dashed var(--border);border-radius:10px;padding:6px 10px;display:flex;flex-direction:column;gap:3px;max-width:88%}'
+      +'.ai-think-step{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:var(--t3);transition:color .3s}'
+      +'.ai-think-step.on{color:var(--p)}'
+      +'.ai-think-step.done{color:var(--t2)}'
+      +'.ai-think-step.err{color:var(--red)}'
+      +'.ai-think-meta{font-variant-numeric:tabular-nums;flex-shrink:0}'
+      +'.ai-caret{display:inline-block;width:7px;height:14px;background:var(--p);margin-left:2px;vertical-align:-2px;border-radius:2px;animation:aiCaret .8s steps(1) infinite}'
+      +'@keyframes aiCaret{50%{opacity:0}}'
+      +'.ai-chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px}'
+      +'.ai-chip{font-family:inherit;line-height:1.2;font-size:12px;padding:5px 11px;border-radius:999px;background:var(--glass-bg-strong);border:1px solid var(--glass-border-strong);color:var(--t2);cursor:pointer;user-select:none;-webkit-user-select:none}'
+      +'.ai-chip:active{background:var(--p);color:#fff}'
+      +'.ai-inputrow{display:flex;gap:8px;margin-top:8px}'
+      +'#aiChatInput{flex:1;min-width:0;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--bg,transparent);color:var(--text);padding:0 12px;font-size:13px;outline:none;-webkit-appearance:none}'
+      +'#aiChatInput:focus{border-color:var(--p)}'
+      +'#aiChatInput:disabled,#aiChatSend:disabled{opacity:.45}'
+      +'#aiChatSend{font-family:inherit;height:38px;padding:0 16px;border:none;border-radius:10px;background:var(--p);color:#fff;font-size:13px;font-weight:600;flex-shrink:0}'
+      +'</style>';
+    html+='<div class="ai-sect">'+App.gem(14,'p')+'问问 AI 顾问<span style="font-weight:400;font-size:11px;color:var(--t3)">（端侧运行 · 数据不出手机）</span></div>';
+    html+='<div class="ai-chat-box">';
+    html+='<div id="aiChatMsgs"><div class="ai-empty">👋 问我任何关于你账本的问题<br>AI 模型完全运行在本机，无需联网</div></div>';
+    html+='<div class="ai-chips" role="group" aria-label="快捷问题">'
+      +'<button type="button" class="ai-chip" onclick="App._aiChip(\'我这个月钱花哪儿了？\')">💸 钱花哪儿了</button>'
+      +'<button type="button" class="ai-chip" onclick="App._aiChip(\'我这个月花最多的是什么？\')">🏆 花最多的是</button>'
+      +'<button type="button" class="ai-chip" onclick="App._aiChip(\'给我一些省钱建议吧\')">💡 怎么省钱</button>'
+      +'<button type="button" class="ai-chip" onclick="App._aiChip(\'我的预算还剩多少？\')">🎯 预算还剩</button>'
+      +'</div>';
+    html+='<div class="ai-inputrow">'
+      +'<input id="aiChatInput" type="text" aria-label="向 AI 顾问提问" placeholder="问问 AI：这个月钱花哪儿了？" onkeydown="if(event.key===\'Enter\')App._aiChatSend()">'
+      +'<button id="aiChatSend" type="button" onclick="App._aiChatSend()">发送</button>'
+      +'</div>';
+    html+='</div>';
 
     this.showModal(html,'sheet');
   },
