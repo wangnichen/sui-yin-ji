@@ -1380,6 +1380,15 @@ const EC=['food','transport','shopping','entertain','housing','medical','edu','s
 // ① 每天 00:00~07:59（北京时间）会算成前一天，凌晨记账日期凭空早一天；
 // ② new Date(y,m,1) 这类「本地零点」永远落在 UTC 的前一天——「上月统计」实际取到的是上上月。
 function dstr(d){return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)}
+// 账单统一排序：记账日期倒序，同日按记账时刻倒序，同刻按创建时间倒序。
+// 修复（朋友反馈）：旧版按创建时间排序，补记的历史日期会被顶到最新日期之前（如 26 号记在 27 号前面）。
+function recSort(a,b){
+  const ad=a.date||'',bd=b.date||'';
+  if(ad!==bd)return ad<bd?1:-1;
+  const at=a.time||'',bt=b.time||'';
+  if(at!==bt)return at<bt?1:-1;
+  return (b.ts||0)-(a.ts||0);
+}
 function mstr(d){return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,7)}
 const IC=['salary','gift','invest','refund','other'];
 const MOODS={happy:'😊',neutral:'😐',sad:'😔',hard:'💪',surprise:'🎉',lucky:'🍀',calm:'😌'};
@@ -2674,7 +2683,7 @@ const App={
   _searchT:null,
   searchDebounced(){clearTimeout(this._searchT);this._searchT=setTimeout(()=>this.renderBills(),160)},
   renderBills(){
-    const records=this.getRecords().slice().sort((a,b)=>b.ts-a.ts);
+    const records=this.getRecords().slice().sort(recSort);
     const search=document.getElementById('searchInput').value.toLowerCase().trim();
     const filterKey=this.filterKey;
 
@@ -2862,7 +2871,7 @@ const App={
     this.showToast('已删除','撤销',()=>{
       const rs=this.getRecords();
       rs.push(this.undoData);
-      rs.sort((a,b)=>b.ts-a.ts);
+      rs.sort(recSort);
       this.saveRecords(rs);
       this.renderBills();
       this.undoData=null;
@@ -4204,7 +4213,7 @@ const App={
         note:p.note||'',type,mood:null,ts:Date.now()};
       const records=this.getRecords();
       records.push(rec);
-      records.sort((a,b)=>b.ts-a.ts);
+      records.sort(recSort);
       this.saveRecords(records);
       this.showToast('已导入 ¥'+Number(p.amount).toFixed(2)+' ✅');
       if(this.curPage==='bills')this.renderBills();
@@ -4683,7 +4692,7 @@ const App={
     const note=document.getElementById('ssNote').value.trim();
     const records=this.getRecords();
     records.push({id:'r_'+Date.now(),amt,cat,date:dstr(new Date()),note,type:'expense',mood:null,ts:Date.now()});
-    records.sort((a,b)=>b.ts-a.ts);
+    records.sort(recSort);
     this.saveRecords(records);
     this.closeModal();
     this.showToast('已导入 ¥'+amt.toFixed(2)+' ✅');
@@ -5426,7 +5435,7 @@ const App={
     if(added===0){this.showToast('未找到有效记录');return}
     const all=this.getRecords();
     records.forEach(r=>{all.push(r)});
-    all.sort((a,b)=>b.ts-a.ts);
+    all.sort(recSort);
     this.saveRecords(all);
     this.showToast('成功导入 '+added+' 条记录 ✅');
     if(this.curPage==='bills')this.renderBills();
@@ -5453,7 +5462,7 @@ const App={
           mood:r.mood||null,ts:(+r.ts>0)?+r.ts:Date.now()+i});
         added++;
       });
-      all.sort((a,b)=>b.ts-a.ts);
+      all.sort(recSort);
       this.saveRecords(all);
       this.showToast('成功导入 '+added+' 条记录 ✅');
       if(this.curPage==='bills')this.renderBills();
@@ -5529,7 +5538,7 @@ const App={
         added++;
       }
     });
-    records.sort((a,b)=>b.ts-a.ts);
+    records.sort(recSort);
     this.saveRecords(records);
     this.closeModal();
     this.showToast('成功导入 '+added+' 条记录');
