@@ -4487,6 +4487,182 @@ const App={
       if(m2)m2.scrollTop=m2.scrollHeight;
     }
   },
+  // ===== 三师会诊：多 Agent 泳道看板 =====
+  // 端侧模型为单实例，三位顾问依次会诊（排队中→会诊中→完成），看板化呈现协同流程；
+  // 主持人再做一次短调用，把三方意见合并成行动清单。全程 textContent 写入，防提示词注入回流。
+  _aiConsultToggle(){
+    const cv=document.getElementById('aiConsult'),tv=document.getElementById('aiChatView');
+    if(!cv||!tv)return;
+    const open=cv.style.display!=='none';
+    const btn=document.getElementById('aiConsultBtn');
+    if(open){
+      cv.style.display='none';tv.style.display='';
+      if(btn)btn.textContent='🩺 三师会诊';
+    }else{
+      tv.style.display='none';cv.style.display='';
+      if(btn)btn.textContent='💬 返回对话';
+      if(!this._aiConsultOpened){this._aiConsultOpened=true;this._aiConsultRun();}
+    }
+  },
+  async _aiConsultRun(){
+    if(this._aiChatBusy){this.showToast('AI 正在会诊，请稍候…');return;}
+    this._aiChatBusy=true;
+    const st=document.getElementById('consultStatus');
+    const sum=document.getElementById('consultSum');
+    const btn=document.getElementById('aiConsultBtn');
+    const rerun=document.getElementById('consultRerun');
+    const inp=document.getElementById('aiChatInput'),send=document.getElementById('aiChatSend');
+    if(inp)inp.disabled=true;
+    if(send)send.disabled=true;
+    if(rerun)rerun.disabled=true;
+    if(btn)btn.disabled=true;
+    const results=['','',''];
+    for(let i=0;i<3;i++){
+      const lane=document.getElementById('consultLane'+i);
+      if(lane)lane.className='consult-lane';
+      const s=document.getElementById('consultState'+i);if(s)s.textContent='排队中';
+      const b=document.getElementById('consultBody'+i);if(b)b.textContent='';
+      const m=document.getElementById('consultMeta'+i);if(m)m.textContent='';
+    }
+    if(sum)sum.style.display='none';
+    const setSt=function(t,err){if(st){st.textContent=t;st.className='consult-status'+(err?' err':'');}};
+    const t0=Date.now();
+    try{
+      // 0. 端侧模型（复用单例，仅首次加载）
+      if(!this._aiLlm){
+        setSt('首次加载端侧模型（469MB）…');
+        await this._aiEnsureLlm(function(p){setSt('加载语言模型 '+p+'%');});
+      }
+      const ctx=this._aiChatSummary();
+      const roles=[
+        '你是「碎银记」的记账师老周，作风严谨。只依据用户账本摘要核对账目，指出最多3条异常、可疑或可能漏记之处；摘要里没有的信息不要编造。口语化中文，100字以内。',
+        '你是「碎银记」的数据分析师小析。只依据账本摘要做结构化分析：找出最大支出、占比与异常波动，给出2-3条数据结论。数字只能来自摘要，口语化中文，100字以内。',
+        '你是「碎银记」的毒舌理财教练阿燃，一针见血但不攻击人。只依据账本摘要，指出最坏的1个消费习惯，并给1条今天就能做的行动。60字以内。'
+      ];
+      // 1-3. 三位顾问依次会诊（单实例无法真并行，泳道以流水线状态呈现）
+      for(let i=0;i<3;i++){
+        const lane=document.getElementById('consultLane'+i);
+        const state=document.getElementById('consultState'+i);
+        const body=document.getElementById('consultBody'+i);
+        const meta=document.getElementById('consultMeta'+i);
+        if(lane){lane.className='consult-lane running';if(lane.scrollIntoView)lane.scrollIntoView({block:'nearest'});}
+        if(state)state.textContent='会诊中';
+        setSt('第 '+(i+1)+'/3 位顾问会诊中…');
+        const rt=Date.now();
+        let full='',toks=0,rafId=0;
+        const flush=function(){
+          rafId=0;
+          if(body)body.textContent=full;
+          if(lane&&lane.scrollIntoView)lane.scrollIntoView({block:'nearest'});
+        };
+        const onData=function(chunk){
+          let piece='';
+          if(chunk){
+            if(chunk.choices&&chunk.choices[0]&&chunk.choices[0].delta&&typeof chunk.choices[0].delta.content==='string')piece=chunk.choices[0].delta.content;
+            else if(typeof chunk.content==='string')piece=chunk.content;
+          }
+          if(!piece)return;
+          full+=piece;toks++;
+          if(meta)meta.textContent=toks+' tokens';
+          if(!rafId)rafId=requestAnimationFrame(flush);
+        };
+        const resp=await this._aiLlm.createChatCompletion({
+          messages:[{role:'system',content:roles[i]},{role:'user',content:'账本摘要：'+ctx}],
+          max_tokens:120,temperature:0.7,stream:true,onData:onData
+        });
+        if(!full){
+          full=((resp&&resp.choices&&resp.choices[0]&&resp.choices[0].message&&resp.choices[0].message.content)||'').trim();
+        }
+        if(rafId){cancelAnimationFrame(rafId);rafId=0;}
+        if(body)body.textContent=full;
+        results[i]=full;
+        const secs=((Date.now()-rt)/1000).toFixed(1);
+        if(lane)lane.className='consult-lane done';
+        if(state)state.textContent='✓ 完成';
+        if(meta)meta.textContent=(toks>0?toks+' tokens · ':'')+secs+'s';
+      }
+      // 4. 主持人汇总（第 4 次短调用）
+      setSt('汇总会诊结论…');
+      const sumResp=await this._aiLlm.createChatCompletion({
+        messages:[
+          {role:'system',content:'你是碎银记的会诊主持人，把三位顾问的意见浓缩成3条可执行动作。'},
+          {role:'user',content:'账本摘要：'+ctx+'\n\n记账师：'+results[0]+'\n分析师：'+results[1]+'\n教练：'+results[2]
+            +'\n\n现在输出3行，格式为「1.核对：具体动作」「2.控支：具体动作」「3.今日：具体动作」，每行动作20字以内，必须依据上面三位顾问的意见填写，禁止输出分析、解释或复述数据。'}
+        ],
+        max_tokens:110,temperature:0.3
+      });
+      let sumTxt=((sumResp&&sumResp.choices&&sumResp.choices[0]&&sumResp.choices[0].message&&sumResp.choices[0].message.content)||'').trim();
+      // 清洗小模型输出的 markdown 标记并去重（同质化行只保留一条）
+      const seen={};
+      let lines=sumTxt?sumTxt.split('\n').map(function(s){
+        return s.replace(/^\s*\d+[.、)．]\s*/,'').replace(/[*#`_>~\-]+/g,'').trim();
+      }).filter(function(s){
+        if(!s)return false;
+        if(seen[s])return false;
+        seen[s]=1;return true;
+      }):[];
+      lines=lines.slice(0,3);
+      // 防小模型照抄格式示例：冒号后正文过短或命中模板词的行判为无效，按分工回填兜底
+      const fallbacks=['核对：确认老周指出的异常记录','控支：给占比最大的分类设消费上限','今日：把今天这笔的凭据补全'];
+      lines=lines.filter(function(s){
+        const p=s.indexOf('：');
+        const body=p>=0?s.slice(p+1).trim():s;
+        return body.length>=4&&!/^(查账动作|省钱动作|今天就做的动作|具体动作|.{0,2}动作)$/.test(body);
+      });
+      for(let k=0;k<3&&lines.length<3;k++){
+        if(lines.indexOf(fallbacks[k])<0)lines.push(fallbacks[k]);
+      }
+      lines=lines.slice(0,3);
+      if(sum)sum.style.display='';
+      const ol=document.getElementById('consultSumList');
+      if(ol){
+        while(ol.firstChild)ol.removeChild(ol.firstChild);
+        lines.forEach(function(t){
+          const li=document.createElement('li');li.textContent=t;ol.appendChild(li);
+        });
+      }
+      const note=document.getElementById('consultSumNote');
+      const secs=((Date.now()-t0)/1000).toFixed(1);
+      if(note)note.textContent='端侧模型单实例，三位顾问依次会诊 · 账本数据未离开本机 · 总耗时 '+secs+'s';
+      setSt('会诊完成 · 总耗时 '+secs+'s');
+      this._aiConsultOpened=true;
+    }catch(e){
+      const msg=(e&&e.message)?String(e.message):'未知错误';
+      setSt('会诊中断：'+msg.slice(0,44),true);
+      for(let i=0;i<3;i++){
+        const s=document.getElementById('consultState'+i);
+        if(!s)continue;
+        if(s.textContent==='会诊中'){
+          s.textContent='✕ 出错';
+          const lane=document.getElementById('consultLane'+i);
+          if(lane)lane.className='consult-lane err';
+          const body=document.getElementById('consultBody'+i);
+          if(body&&!body.textContent)body.textContent=msg.slice(0,90);
+        }else if(s.textContent==='排队中'){
+          s.textContent='未进行';
+        }
+      }
+      // 模型未就绪（如浏览器复现未放置 model.gguf）：给明确指引，记账与统计不受影响
+      if(!this._aiLlm&&sum){
+        sum.style.display='';
+        const ol=document.getElementById('consultSumList');
+        if(ol){
+          while(ol.firstChild)ol.removeChild(ol.firstChild);
+          const li=document.createElement('li');
+          li.textContent='端侧模型未就绪：把 model.gguf 放到 assets/offline-ai/llm/ 后点「再会诊一次」（放置方式见 offline-ai/README.md）。';
+          ol.appendChild(li);
+        }
+        const note=document.getElementById('consultSumNote');
+        if(note)note.textContent='记账、统计、报告等不依赖模型的功能不受影响。';
+      }
+    }finally{
+      this._aiChatBusy=false;
+      if(inp)inp.disabled=false;
+      if(send)send.disabled=false;
+      if(rerun)rerun.disabled=false;
+      if(btn)btn.disabled=false;
+    }
+  },
   _aiFillForm(p){
     // 只回填记账表单，由用户核对后手动点「记一笔」才写入 localStorage
     this.switchPage('record');
@@ -5602,9 +5778,41 @@ const App={
       +'#aiChatInput:focus{border-color:var(--p)}'
       +'#aiChatInput:disabled,#aiChatSend:disabled{opacity:.45}'
       +'#aiChatSend{font-family:inherit;height:38px;padding:0 16px;border:none;border-radius:10px;background:var(--p);color:#fff;font-size:13px;font-weight:600;flex-shrink:0}'
+      // ===== 三师会诊（多 Agent 泳道看板）=====
+      +'.ai-sect-btn{margin-left:auto;font-family:inherit;font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid var(--p);background:transparent;color:var(--p);cursor:pointer;user-select:none;-webkit-user-select:none;flex-shrink:0}'
+      +'.ai-sect-btn:active{background:var(--p);color:#fff}'
+      +'.ai-sect-btn:disabled{opacity:.45}'
+      +'.consult-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:2px 0 8px}'
+      +'.consult-title{font-size:12px;font-weight:700}'
+      +'.consult-status{font-size:11px;color:var(--t3);font-variant-numeric:tabular-nums;text-align:right}'
+      +'.consult-status.err{color:var(--red)}'
+      +'.consult-lanes{display:flex;flex-direction:column;gap:8px}'
+      +'.consult-lane{border:1px solid var(--glass-border-strong);border-radius:12px;padding:8px 10px;background:var(--bg,transparent);transition:border-color .3s}'
+      +'.consult-lane.running{border-color:var(--p)}'
+      +'.lane-head{display:flex;align-items:center;gap:8px}'
+      +'.lane-avatar{font-size:16px;flex-shrink:0}'
+      +'.lane-name{font-size:12px;font-weight:600}'
+      +'.lane-role{font-size:10px;color:var(--t3)}'
+      +'.lane-state{margin-left:auto;font-size:10px;padding:2px 8px;border-radius:999px;background:var(--glass-bg-strong);color:var(--t3);flex-shrink:0}'
+      +'.consult-lane.running .lane-state{background:var(--p);color:#fff}'
+      +'.consult-lane.done .lane-state{color:var(--green)}'
+      +'.consult-lane.err .lane-state{color:var(--red)}'
+      +'.lane-body{font-size:12.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;margin-top:6px}'
+      +'.lane-body:empty{display:none}'
+      +'.lane-meta{font-size:10px;color:var(--t3);margin-top:4px;text-align:right;font-variant-numeric:tabular-nums}'
+      +'.consult-sum{margin-top:10px;border:1px dashed var(--border);border-radius:12px;padding:10px;background:var(--glass-bg-strong)}'
+      +'.consult-sum-title{font-size:12px;font-weight:700;margin-bottom:6px}'
+      +'.consult-sum ol{margin:0;padding-left:18px;font-size:12.5px;line-height:1.75}'
+      +'.consult-sum-note{font-size:11px;color:var(--t3);margin-top:6px}'
+      +'.consult-actions{display:flex;gap:8px;margin-top:10px}'
+      +'.consult-actions button{flex:1;font-family:inherit;height:34px;border-radius:9px;border:1px solid var(--border);background:var(--glass-bg-strong);color:var(--text);font-size:12px;cursor:pointer}'
+      +'.consult-actions button:disabled{opacity:.45}'
+      +'.consult-actions button.primary{background:var(--p);color:#fff;border:none}'
       +'</style>';
-    html+='<div class="ai-sect">'+App.gem(14,'p')+'问问 AI 顾问<span style="font-weight:400;font-size:11px;color:var(--t3)">（端侧运行 · 数据不出手机）</span></div>';
+    html+='<div class="ai-sect">'+App.gem(14,'p')+'问问 AI 顾问<span style="font-weight:400;font-size:11px;color:var(--t3)">（端侧运行 · 数据不出手机）</span>'
+      +'<button type="button" class="ai-sect-btn" id="aiConsultBtn" onclick="App._aiConsultToggle()">🩺 三师会诊</button></div>';
     html+='<div class="ai-chat-box">';
+    html+='<div id="aiChatView">';
     html+='<div id="aiChatMsgs"><div class="ai-empty">👋 问我任何关于你账本的问题<br>AI 模型完全运行在本机，无需联网</div></div>';
     html+='<div class="ai-chips" role="group" aria-label="快捷问题">'
       +'<button type="button" class="ai-chip" onclick="App._aiChip(\'我这个月钱花哪儿了？\')">💸 钱花哪儿了</button>'
@@ -5616,7 +5824,36 @@ const App={
       +'<input id="aiChatInput" type="text" aria-label="向 AI 顾问提问" placeholder="问问 AI：这个月钱花哪儿了？" onkeydown="if(event.key===\'Enter\')App._aiChatSend()">'
       +'<button id="aiChatSend" type="button" onclick="App._aiChatSend()">发送</button>'
       +'</div>';
-    html+='</div>';
+    html+='</div>';// 关闭 #aiChatView（会诊打开时整块隐藏）
+    // ===== 三师会诊：多 Agent 泳道看板（默认隐藏，_aiConsultToggle 切换）=====
+    const consultLanes=[
+      {a:'🧾',n:'记账师 · 老周',r:'核对账目 · 查异常与漏记'},
+      {a:'📊',n:'分析师 · 小析',r:'结构化分析 · 找最大支出与波动'},
+      {a:'🔥',n:'教练 · 阿燃',r:'直击坏习惯 · 给立刻能做的行动'}
+    ];
+    html+='<div id="aiConsult" style="display:none">'
+      +'<div class="consult-head"><span class="consult-title">🩺 AI 三师会诊</span>'
+      +'<span class="consult-status" id="consultStatus">三位顾问已就位</span></div>'
+      +'<div class="consult-lanes">';
+    consultLanes.forEach(function(L,i){
+      html+='<div class="consult-lane" id="consultLane'+i+'">'
+        +'<div class="lane-head"><span class="lane-avatar">'+L.a+'</span>'
+        +'<div><div class="lane-name">'+L.n+'</div><div class="lane-role">'+L.r+'</div></div>'
+        +'<span class="lane-state" id="consultState'+i+'">排队中</span></div>'
+        +'<div class="lane-body" id="consultBody'+i+'"></div>'
+        +'<div class="lane-meta" id="consultMeta'+i+'"></div>'
+        +'</div>';
+    });
+    html+='</div>'
+      +'<div class="consult-sum" id="consultSum" style="display:none">'
+      +'<div class="consult-sum-title">🎯 会诊结论 · 行动清单</div>'
+      +'<ol id="consultSumList"></ol>'
+      +'<div class="consult-sum-note" id="consultSumNote"></div></div>'
+      +'<div class="consult-actions">'
+      +'<button type="button" class="primary" id="consultRerun" onclick="App._aiConsultRun()">🔄 再会诊一次</button>'
+      +'<button type="button" id="consultBack" onclick="App._aiConsultToggle()">← 返回对话</button>'
+      +'</div></div>';
+    html+='</div>';// 关闭 ai-chat-box
 
     this.showModal(html,'sheet');
   },
