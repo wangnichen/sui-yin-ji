@@ -524,8 +524,6 @@ body.dk #statsWidgets.grid-view .widget-box{
    （上方 .widget-box .card{background:transparent} 会把深色卡洗成浅玻璃底，
     而卡内文字是米白/亮色 → 白底白字看不清，这里按原卡背景恢复） */
 #statsWidgets.grid-view .widget-box .card.poem-card{background:#16213e;border-color:rgba(255,215,0,.18)}
-#statsWidgets.grid-view .widget-box .card.kaleido-card{background:linear-gradient(160deg,#1a0a2e 0%,#16213e 100%);border-color:rgba(255,255,255,.14)}
-#statsWidgets.grid-view .widget-box .card.wave-card{background:linear-gradient(135deg,#001f3f 0%,#003366 100%);border-color:rgba(224,231,255,.2)}
 
 /* 网格诗歌 */
 #statsWidgets.grid-view .widget-box .poem-body{font-size:12px;line-height:1.7;letter-spacing:.3px}
@@ -551,9 +549,7 @@ body.dk #statsWidgets.grid-view .widget-box{
 #statsWidgets.grid-view .widget-box[data-widget="insights"] > div:last-child{flex-shrink:0;padding:4px 8px 8px}
 
 /* 网格画布容器 */
-#statsWidgets.grid-view .widget-box .card .star-wrap,
-#statsWidgets.grid-view .widget-box .card .kaleido-wrap,
-#statsWidgets.grid-view .widget-box .card .wave-wrap{display:flex;align-items:center;justify-content:center;min-height:80px}
+#statsWidgets.grid-view .widget-box .card .star-wrap{display:flex;align-items:center;justify-content:center;min-height:80px}
 #statsWidgets.grid-view .widget-box .card canvas{max-width:100%;max-height:140px}
 
 /* 添加按钮在网格中 */
@@ -923,10 +919,7 @@ body.crop-open .modal::before,body.crop-open .modal::after{display:none}
 .coin-clock-coin{position:absolute;right:-2px;top:-2px;font-size:12px;animation:coinFloat 2s ease-in-out infinite}
 @keyframes coinFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
 .coin-clock-poem{position:absolute;right:12px;top:50%;transform:translateY(-50%);max-width:38%;text-align:right;font-size:11px;line-height:1.6;color:var(--p2);font-family:"STKaiti","KaiTi",serif;opacity:.85;pointer-events:none;letter-spacing:1px}
-/* 碎银万花筒 & 声纹 */
-.kaleido-card{background:linear-gradient(160deg,#1a0a2e 0%,#16213e 100%);border:none;color:#fff;overflow:hidden}
-.wave-card{background:linear-gradient(135deg,#001f3f 0%,#003366 100%);border:none;color:#e0e7ff}
-.kaleido-wrap,.wave-wrap{display:flex;justify-content:center}
+/* 碎银诗歌深色卡（网格视图恢复原深色背景） */
 
 /* ══════════════════════════════════════════════════════════════
    液态玻璃 v2 光学层（AndroidLiquidGlass SDF 折射）
@@ -1211,20 +1204,6 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
             <div class="star-meta" id="starMeta"></div>
           </div>
         </div>
-        <!-- 碎银万花筒 -->
-        <div class="widget-box" data-widget="kaleido">
-          <div class="card kaleido-card">
-            <div class="mini-head" style="color:#fff"><span>🌀 碎银万花筒</span><span class="mini-sub" style="color:rgba(255,255,255,.5)">每一笔都是一瓣花</span></div>
-            <div class="kaleido-wrap"><canvas id="kaleidoCanvas" width="340" height="220"></canvas></div>
-          </div>
-        </div>
-        <!-- 消费声纹 -->
-        <div class="widget-box" data-widget="waveform">
-          <div class="card wave-card">
-            <div class="mini-head" style="color:#e0e7ff"><span>🎵 消费声纹</span><span class="mini-sub" style="color:rgba(224,231,255,.5)">7日心跳波形</span></div>
-            <div class="wave-wrap"><canvas id="waveCanvas" width="340" height="120"></canvas></div>
-          </div>
-        </div>
         <!-- 月度对比 -->
         <div class="widget-box" data-widget="monthcompare">
           <div class="section-title">月度对比</div>
@@ -1317,7 +1296,7 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
       <div class="author-card">
         <div class="author-name">🎓 我不要芒果</div>
         <div class="author-bio" style="line-height:1.7;color:var(--t2)">大一计算机科学与技术专业在读，<br>用 Trae + DeepSeek 打磨的纯本地记账工具。<br>没有广告与会员，数据只存在你的设备里。</div>
-        <div class="author-ver">碎银记 v3.0 · 构建 #20 · 持续更新中</div>
+        <div class="author-ver">碎银记 v3.0 · 构建 #21 · 持续更新中</div>
         <div id="sliderDiagLine" style="font-size:11px;color:var(--t3);margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.6"></div>
       </div>
     </div>
@@ -1507,7 +1486,7 @@ const App={
   renderPageIfNeeded(page){
     if(this._renderedVer[page]===this._ver){
       // 数据没变 → 跳过 DOM 重建。但 stats 页的 canvas 动画在离开时被 cancelAnimationFrame
-      // 停掉了（省电），命中缓存时必须轻量重启，否则星空/心跳/万花筒/声纹会静止在最后一帧
+      // 停掉了（省电），命中缓存时必须轻量重启，否则星空/心跳会静止在最后一帧
       if(page==='stats')this.restartStatsAnims();
       return false;
     }
@@ -1518,13 +1497,11 @@ const App={
     if(page==='profile'){this.renderProfile();this.renderAchievements();}
     return true;
   },
-  // 只重启带 rAF 循环的四个 canvas 动画：不重建 DOM、不重新读布局，开销可忽略
+  // 只重启带 rAF 循环的两个 canvas 动画：不重建 DOM、不重新读布局，开销可忽略
   restartStatsAnims(){
-    if(this._starRAF||this._hbRAF||this._kaleidoRAF||this._waveRAF)return;  // 已在跑就不重复起
+    if(this._starRAF||this._hbRAF)return;  // 已在跑就不重复起
     this.renderHeartbeat();
     this.renderStarMap();
-    this.renderKaleidoscope();
-    this.renderWaveform();
   },
   getRecords(){return this._load('r',[])},
   saveRecords(r){this._save('r',r)},
@@ -1753,13 +1730,11 @@ const App={
   },
   switchPage(page){
     if(this.curPage!==page)this.haptic('tab');
-    // 离开统计页时停止碎银创想动画（星空/万花筒/水波只在 stats 页启动，
+    // 离开统计页时停止碎银创想动画（星空/心跳只在 stats 页启动，
     // 因此只需处理「stats → 其他页」一种情况，避免后台空转耗电
     if(this.curPage==='stats'&&page!=='stats'){
       if(this._starRAF){cancelAnimationFrame(this._starRAF);this._starRAF=null;}
       if(this._hbRAF){cancelAnimationFrame(this._hbRAF);this._hbRAF=null;}
-      if(this._kaleidoRAF){cancelAnimationFrame(this._kaleidoRAF);this._kaleidoRAF=null;}
-      if(this._waveRAF){cancelAnimationFrame(this._waveRAF);this._waveRAF=null;}
       // 饼图/趋势图的扫动动画也是 rAF 循环——虽然是一次性动画到 progress=1 会自停，
       // 但切页离开 stats 时显式 cancel 更保险，防止用户快速切页时扫动还在后台空转
       if(this._pieAnim){cancelAnimationFrame(this._pieAnim);this._pieAnim=null;}
@@ -2734,7 +2709,7 @@ const App={
   // 历史数据里合法存在的 'other'（用户主动选了「其他」）仍按真实分类显示
   getCatData(k){if(!k)return {k:'',n:'',i:'',c:'#8e8e93',bg:'transparent'};return CATS.find(c=>c.k===k)||CATS.find(c=>c.k==='other')},
   // 按分类汇总金额：未分类（cat 为空）的记录不进入分类统计，
-  // 这样饼图/排行/时光/星图/万花筒/AI报告里都不会出现"其他"或空白分类
+  // 这样饼图/排行/时光/星图/AI报告里都不会出现"其他"或空白分类
   sumByCat(list){
     const t={};
     (list||[]).forEach(r=>{if(!r.cat)return;t[r.cat]=(t[r.cat]||0)+r.amt});
@@ -3062,8 +3037,6 @@ const App={
     {id:'poem',name:'碎银诗歌',icon:'📜',desc:'把本月花销写成一首诗'},
     {id:'heartbeat',name:'财务心跳',icon:'💓',desc:'最近14天支出心跳图'},
     {id:'starmap',name:'消费星图',icon:'🌌',desc:'你的专属财务星座'},
-    {id:'kaleido',name:'碎银万花筒',icon:'🌀',desc:'消费类别旋转成花'},
-    {id:'waveform',name:'消费声纹',icon:'🎵',desc:'7日消费心跳波形'},
     {id:'monthcompare',name:'月度对比',icon:'📊',desc:'本月与上月对比'},
     {id:'pie',name:'支出分类',icon:'🥧',desc:'分类占比饼图'},
     {id:'calendar',name:'消费日历',icon:'📅',desc:'每日花销热力图'},
@@ -3077,8 +3050,15 @@ const App={
     const key=view==='grid'?'statsWidgetsGrid':'statsWidgetsList';
     if(!s[key]){
       // 组件模式默认空白，让用户自行添加；列表模式默认展示常用组件
+      // 碎银诗歌默认启用（用户反馈「碎银诗歌倒是不错要默认启用」）
       if(view==='grid')return [];
-      return ['insights','budget','pie','calendar','trend','ranking','monthcompare'];
+      return ['insights','budget','poem','pie','calendar','trend','ranking','monthcompare'];
+    }
+    // 一次性迁移：构建 #21 起碎银诗歌默认启用，老用户保存过的组件列表也补上它
+    //（只迁移这一次，之后用户手动关掉不会再被打开）
+    if(view==='list'&&!s._poemOn){
+      if(!s[key].includes('poem'))s[key].splice(Math.min(1,s[key].length),0,'poem');
+      s._poemOn=true;this.saveSettings(s);
     }
     return s[key];
   },
@@ -3179,8 +3159,6 @@ const App={
     this.renderPoem();
     this.renderHeartbeat();
     this.renderStarMap();
-    this.renderKaleidoscope();
-    this.renderWaveform();
     this.renderMonthCompare();
     this.renderPieChart();
     this.renderCalendar();
@@ -3198,7 +3176,7 @@ const App={
       el.innerHTML='<div style="text-align:center;padding:14px 10px">'+
         '<div style="font-size:32px;margin-bottom:6px">🎯</div>'+
         '<div style="font-size:13px;color:var(--t2);line-height:1.8">设置月度预算后，管家会帮你预测月末花销、<br>算出今天还能安心花多少</div>'+
-        '<button class="btn-primary" style="margin-top:10px;padding:9px 22px;font-size:13px" onclick="App.showBudget()">去设置预算</button>'+
+        '<button class="btn-primary" style="margin-top:10px;padding:9px 22px;font-size:13px" onclick="App.showBudgetModal()">去设置预算</button>'+
         '</div>';
       return;
     }
@@ -4038,127 +4016,6 @@ const App={
     render();
     const meta=document.getElementById('starMeta');
     if(meta){const names=entries.slice(0,3).map(e=>this.getCatData(e[0]).n).join('·');meta.textContent='本月共'+entries.length+'颗星 · 主星：'+names;}
-  },
-
-  /* ===== 碎银万花筒：消费类别旋转成花 ===== */
-  _kaleidoRAF:null,
-  renderKaleidoscope(){
-    const canvas=document.getElementById('kaleidoCanvas');
-    if(!canvas)return;
-    const ctx=canvas.getContext('2d');
-    const dpr=window.devicePixelRatio||1;
-    const w=340,h=220;
-    canvas.width=w*dpr;canvas.height=h*dpr;
-    canvas.style.width=w+'px';canvas.style.height=h+'px';
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-    if(this._kaleidoRAF)cancelAnimationFrame(this._kaleidoRAF);
-    const records=this.getRecords();
-    const now=new Date(),m=mstr(now);
-    const catT=this.sumByCat(records.filter(r=>r.date.startsWith(m)&&r.type==='expense'));
-    const entries=Object.entries(catT).sort((a,b)=>b[1]-a[1]);
-    const total=entries.reduce((s,e)=>s+e[1],0)||1;
-    const cx=w/2,cy=h/2;
-    let angle=0;
-    const render=()=>{
-      ctx.clearRect(0,0,w,h);
-      const g=ctx.createRadialGradient(cx,cy,5,cx,cy,w*0.7);
-      g.addColorStop(0,'rgba(139,92,246,.18)');g.addColorStop(1,'rgba(26,10,46,0)');
-      ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
-      if(entries.length===0){
-        ctx.fillStyle='rgba(255,255,255,.7)';ctx.font='13px sans-serif';ctx.textAlign='center';
-        ctx.fillText('记一笔账，万花筒便会绽放',cx,cy);
-        this._kaleidoRAF=requestAnimationFrame(render);return;
-      }
-      const petals=Math.min(entries.length,8);
-      const baseR=70;
-      ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);
-      for(let i=0;i<petals;i++){
-        const [cat,amt]=entries[i];
-        const catData=this.getCatData(cat);
-        const ratio=amt/total;
-        const petalLen=baseR+ratio*60;
-        const petalW=12+ratio*22;
-        const a=(i/petals)*Math.PI*2;
-        ctx.save();ctx.rotate(a);
-        const pg=ctx.createLinearGradient(0,0,0,-petalLen);
-        pg.addColorStop(0,catData.c);pg.addColorStop(1,'rgba(255,255,255,.3)');
-        ctx.fillStyle=pg;
-        ctx.globalAlpha=0.75;
-        ctx.beginPath();
-        ctx.moveTo(0,0);
-        ctx.bezierCurveTo(petalW*0.6,-petalLen*0.3,petalW*0.6,-petalLen*0.7,0,-petalLen);
-        ctx.bezierCurveTo(-petalW*0.6,-petalLen*0.7,-petalW*0.6,-petalLen*0.3,0,0);
-        ctx.fill();
-        ctx.restore();
-      }
-      ctx.restore();
-      // 中心碎银
-      const cg=ctx.createRadialGradient(cx,cy,0,cx,cy,22);
-      cg.addColorStop(0,'#ffd700');cg.addColorStop(0.6,'#daa520');cg.addColorStop(1,'rgba(218,165,32,0)');
-      ctx.fillStyle=cg;ctx.beginPath();ctx.arc(cx,cy,22,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle='#1a0a2e';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText('碎银',cx,cy);
-      angle+=0.006;
-      this._kaleidoRAF=requestAnimationFrame(render);
-    };
-    render();
-  },
-
-  /* ===== 碎银声纹：7日消费心跳波形 ===== */
-  _waveRAF:null,
-  renderWaveform(){
-    const canvas=document.getElementById('waveCanvas');
-    if(!canvas)return;
-    const ctx=canvas.getContext('2d');
-    const dpr=window.devicePixelRatio||1;
-    const w=340,h=120;
-    canvas.width=w*dpr;canvas.height=h*dpr;
-    canvas.style.width=w+'px';canvas.style.height=h+'px';
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-    if(this._waveRAF)cancelAnimationFrame(this._waveRAF);
-    const records=this.getRecords();
-    const days=[];
-    const now=new Date();now.setHours(0,0,0,0);
-    for(let i=6;i>=0;i--){
-      const d=new Date(now);d.setDate(d.getDate()-i);
-      const ds=dstr(d);
-      days.push(records.filter(r=>r.date.startsWith(ds)&&r.type==='expense').reduce((s,r)=>s+r.amt,0));
-    }
-    const maxA=Math.max(...days,1);
-    const midY=h/2;
-    let phase=0;
-    const render=()=>{
-      ctx.clearRect(0,0,w,h);
-      // 网格线
-      ctx.strokeStyle='rgba(0,255,200,.06)';ctx.lineWidth=1;
-      for(let i=0;i<=4;i++){const y=20+i*20;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
-      // 波形
-      const barW=w/days.length;
-      const pts=[];
-      for(let i=0;i<days.length;i++){
-        const x=i*barW+barW/2;
-        const amp=(days[i]/maxA)*40;
-        for(let j=0;j<barW;j+=2){
-          const t=j/barW;
-          const wave=Math.sin(t*Math.PI*4+phase+i*0.5)*amp*Math.sin(t*Math.PI);
-          pts.push([x-barW/2+j,midY+wave]);
-        }
-      }
-      // 发光层
-      ctx.shadowBlur=12;ctx.shadowColor='#00ffcc';
-      ctx.strokeStyle='rgba(0,255,200,.5)';ctx.lineWidth=6;ctx.lineJoin='round';
-      ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();
-      ctx.shadowBlur=0;
-      ctx.strokeStyle='#00ffcc';ctx.lineWidth=2;
-      ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();
-      // 峰值点
-      days.forEach((d,i)=>{
-        if(d>0){const x=i*barW+barW/2;ctx.fillStyle='#00ffcc';ctx.beginPath();ctx.arc(x,midY,3,0,Math.PI*2);ctx.fill();}
-      });
-      phase+=0.08;
-      this._waveRAF=requestAnimationFrame(render);
-    };
-    render();
   },
 
   nextTip(){
@@ -6082,12 +5939,13 @@ const App={
     if(topDay)insights.push({icon:'📅',text:'花钱最多的一天是 '+this.escapeHtml(topDay[0])+'，花了 ¥'+topDay[1].toFixed(0),type:'info'});
 
     // ===== 生成建议 =====
+    // 条目可带跳转动作：建议不只是文字，点一下直接进对应设置（用户反馈「设定月度记账目标要能跳转」）
     const suggestions=[];
-    if(s.budget<=0)suggestions.push('设置月度预算，帮你控制支出上限 🎯');
-    if(!s.goals||s.goals.length===0)suggestions.push('设一个存钱目标，让储蓄有方向 🏦');
-    if(totalRecords<10)suggestions.push('多记几笔，数据越多分析越精准 📊');
-    if(expRecords.length>=10&&cats.size<=2)suggestions.push('消费集中在1-2个分类，试试更多元的消费方式 🎨');
-    if(expTotal>0&&incTotal===0)suggestions.push('记得记录收入，收支全貌才能更好分析 💰');
+    if(s.budget<=0)suggestions.push({t:'设置月度预算，帮你控制支出上限 🎯',a:'App.showBudgetModal()'});
+    if(!s.goals||s.goals.length===0)suggestions.push({t:'设一个存钱目标，让储蓄有方向 🏦',a:'App.switchPage(\'profile\')'});
+    if(totalRecords<10)suggestions.push({t:'多记几笔，数据越多分析越精准 📊'});
+    if(expRecords.length>=10&&cats.size<=2)suggestions.push({t:'消费集中在1-2个分类，试试更多元的消费方式 🎨'});
+    if(expTotal>0&&incTotal===0)suggestions.push({t:'记得记录收入，收支全貌才能更好分析 💰'});
 
     // ===== Build HTML =====
     const scoreColor=score>=80?'#34c759':score>=60?'#ff9500':'#ff3b30';
@@ -6140,10 +5998,13 @@ const App={
       });
     }
 
-    // 建议
+    // 建议（带 a 动作的条目可点击跳转，右侧给出 › 提示）
     if(suggestions.length>0){
       html+='<div style="font-weight:600;font-size:13px;margin:12px 0 6px">💡 改进建议</div><ul class="ai-suggestions">';
-      suggestions.forEach(s=>{html+='<li><span>→</span><span>'+s+'</span></li>'});
+      suggestions.forEach(s=>{
+        if(s.a)html+='<li style="cursor:pointer" onclick="'+s.a+'"><span>→</span><span style="flex:1">'+s.t+'</span><span style="color:var(--p)">›</span></li>';
+        else html+='<li><span>→</span><span>'+s.t+'</span></li>';
+      });
       html+='</ul>';
     }
 
@@ -6429,7 +6290,7 @@ document.addEventListener('DOMContentLoaded',()=>App.init());
    2) 兜底：init 链中途抛错会让链尾的 initNavDrag/initTypeDrag 永远绑不上（Tab 内联 onclick 照常），
       这里独立轮询补齐（内部幂等标记防双绑）。800ms 首 tick 足够快，绑定成功即停 */
 (function(){
-  window.__sliderDiag={ver:20,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
+  window.__sliderDiag={ver:21,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
     pDown:0,pTouch:0,pMouse:0,pMove:0,bindErr:''};
   var d=window.__sliderDiag;
   function inNav(e){var n=e.target;var nav=document.querySelector('.bottom-nav');
