@@ -1,7 +1,15 @@
 # 更新日志
-## v3.0（当前发布，versionCode 21）
+## v3.0（当前发布，versionCode 22）
 
 ### 本次更新
+
+**滑块拖拽重写 + 端侧 AI 改为纯按需加载（构建 #22，用户实测反馈）**
+
+- **重写两个滑块的拖拽内核（本次重点）**：APK 里 Dock 玻璃滑块 / 收支滑块「按得住但拖不动」反复出现，根因是旧实现把 pointer / touch / mouse 当成三条需要按 `pointerId` 过滤、中途还要「流改绑」的输入流——Android WebView 里 `pointerdown` 与后续 `pointermove` 的 `pointerId` 常不一致，甚至只派发 `touchmove` 不派发 `pointermove`，于是过滤把 move 永远挡死。现在回归 v2.5 最朴素的**单状态机**：任一流的 down 建立拖动、任一流的 move 推动、任一流的 up 收尾，不做任何 id 过滤（同坐标重复派发由内部去重，多流只是同值多写一次 style）。同时去掉 `setPointerCapture`——它会把后续 click 重定向到 Dock，部分 WebView 还会误发 `lostpointercapture` 把刚建立的拖动当场杀死
+- **`touch-action` 收紧**：收支切换控件由 `pan-y` 改为 `none`，Dock 的 tab 与切换按钮也显式设为 `none`。旧值会让 Android WebView 把手势当「可垂直滚动」候选，判定期间发 `pointercancel`，体感就是「按不住 / 拖两下就断」
+- **端侧大模型不再启动即加载（本次重点）**：删掉启动 4s 后的空闲预热（引擎模块 + OCR + 模型释放）。现在启动阶段完全不碰端侧 AI；打开截图面板只温 OCR（几 MB），**491MB 语言模型只在真正推理时加载**——截图识别进入解析阶段、AI 对话发送消息、用户点选「🩺 三师会诊」之后。低端机上「刚打开有点卡」随之消失
+- **诊断探针降开销**：`document` capture 上的 pointermove 探针不再每帧 `querySelector`，改为缓存 Dock 引用（`isConnected` 失效才重取）
+- **构建号自证升级 #22**
 
 **参赛冲刺：组件瘦身 + 跳转补全（构建 #21，对照传智杯评审五维）**
 
