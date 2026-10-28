@@ -1955,15 +1955,26 @@ const App={
     const nav=document.querySelector('.bottom-nav');
     const ind=document.getElementById('navIndicator');
     if(!nav||!ind)return;
+    if(nav._dragBound)return;   // 幂等：init 链兜底轮询可能重复调用，双份监听的闭包会互相打架
+    nav._dragBound=true;
     let dragging=false,moved=false,startX=0,startLeft=0,lastX=0,lastT=0,velX=0,pid=null;
+    let downAt=0,lastTouchEnd=0;   // downAt=最近活跃时间（onDown 置位/onMove 续命）；lastTouchEnd=合成鼠标防御窗
     let navW=0,navLeft=0,indW=0,minDx=0,maxDx=0,visDx=0,centers=[],indLo=0,indHi=0,lastNear=null;
     // 拖动监听挂在整个 Dock 上：选中态 Tab 的图标 z-index 高于玻璃块，
     // 只听玻璃块自己的 pointerdown 会被按钮挡住，按住就拖不动了
     const blockClick=ev=>{ev.stopPropagation();ev.preventDefault();};
     const onDown=e=>{
       if(e.button!==undefined&&e.button!==0)return;
-      if(dragging)return;   // 多点触控：拖拽中忽略第二根手指，防止滑块被另一指劫持跳变
-      dragging=true;moved=false;pid=e.pointerId;
+      if(dragging){
+        // 多点触控：拖拽中忽略第二根手指，防止滑块被另一指劫持跳变
+        // 悬挂自愈（雷电模拟器安卓14 用户反馈）：拖动中 up/cancel 永不送达——PC 鼠标在窗口外松开、
+        // 窗口又没失焦（blur 不触发）→ dragging 卡死 → 之后每次按下都被挡死，滑块再也按不动。
+        // 活跃拖动由 onMove 持续刷新 downAt 永不误杀；真正死掉（无 move 无 up）3 秒后强制收尾放行本次按下
+        if(Date.now()-downAt<3000)return;
+        dragging=false;pid=null;
+        ind.classList.remove('dragging');ind.style.transform='';
+      }
+      dragging=true;moved=false;pid=e.pointerId;downAt=Date.now();
       // 停掉果冻动画：它靠 keyframes 覆盖 transform，会和下面每帧写入的拖拽 transform 打架
       ind.classList.remove('jelly');
       // 冻结当前视觉位置：若玻璃块还在滑动（left 过渡没跑完），
@@ -2000,6 +2011,7 @@ const App={
     };
     const onMove=e=>{
       if(!dragging||(pid!==null&&e.pointerId!==pid))return;
+      downAt=Date.now();   // 活跃续命：move 还在到达就不算悬挂，慢拖多久都不会被自愈打断
       const x=e.clientX;
       const raw=x-startX;
       if(Math.abs(raw)>4){
@@ -2062,8 +2074,9 @@ const App={
       window.addEventListener('pointerup',onUp);
       window.addEventListener('pointercancel',onUp);
       // 安全网：若 WebView 异常丢失指针捕获（pointerup 没送达），也能把拖拽状态收尾，
-      // 防止 dragging 卡死导致滑块再也按不动。正常松手时 dragging 已为 false，此回调是空操作
-      nav.addEventListener('lostpointercapture',onUp);
+      // 防止 dragging 卡死导致滑块再也按不动。正常松手时 dragging 已为 false，此回调是空操作。
+      // 只在 moved 后收尾：个别 WebView 在按下瞬间误发 capture 丢失，会把刚建立的拖拽当场杀死
+      nav.addEventListener('lostpointercapture',()=>{if(moved)onUp(null);});
     }
     // touch 兜底：始终注册（旧版只在"无 PointerEvent"时注册，导致 PointerEvent 环境下
     // 模拟器/魔改内核若不派发 pointer，滑块就彻底按不动）。标准浏览器 pointerdown 先于
@@ -2093,6 +2106,26 @@ const App={
     // dragging 永远卡在 true → 滑块再也按不动。强制收尾恢复可用状态
     window.addEventListener('blur',()=>{if(dragging)onUp(null);});
     document.addEventListener('visibilitychange',()=>{if(document.hidden&&dragging)onUp(null);});
+    // 鼠标兜底（最后防线）：个别模拟器/魔改内核 pointer、touch 都不派发给页面，只剩 mouse 层可达。
+    // pid=-1 标识鼠标流，与 pointer（≥0）/ touch（0）流经同一套过滤互斥；合成鼠标防御：
+    // 触摸派发的 mousedown 带 firesTouchEvents 标记、touch 结束 700ms 窗口内的也跳过——
+    // 标准环境下 pointerdown 先建流，本路径全程被 dragging 挡住，零干扰
+    nav.addEventListener('mousedown',e=>{
+      if(e.button!==undefined&&e.button!==0)return;
+      if(dragging)return;
+      if(e.sourceCapabilities&&e.sourceCapabilities.firesTouchEvents)return;
+      if(Date.now()-lastTouchEnd<700)return;
+      onDown({clientX:e.clientX,clientY:e.clientY,pointerId:-1,button:0,
+        stopPropagation(){e.stopPropagation();},preventDefault(){e.preventDefault();}});
+    });
+    window.addEventListener('mousemove',e=>{
+      if(!dragging||pid!==-1)return;
+      onMove({clientX:e.clientX,clientY:e.clientY,pointerId:-1,
+        stopPropagation(){},preventDefault(){e.preventDefault();}});
+    },{passive:false});
+    window.addEventListener('mouseup',e=>{if(dragging&&pid===-1)onUp({pointerId:-1});});
+    window.addEventListener('touchend',()=>{lastTouchEnd=Date.now();},{passive:true});
+    window.addEventListener('touchcancel',()=>{lastTouchEnd=Date.now();},{passive:true});
     // Dock 触控跟随光斑：指针在胶囊上移动时柔光跟到哪（rAF 合帧写 CSS 变量，
     // gBCR 只在按下后取一次缓存，拖拽/悬停都生效，松手淡出）
     if(!this._dockLightBound){
@@ -2121,12 +2154,20 @@ const App={
     const tg=document.getElementById('typeToggle');
     const sl=document.getElementById('ttSlider');
     if(!tg||!sl)return;   // 旧版此处要求 window.PointerEvent，无 pointer 层的环境直接放弃拖拽；
-                          // 现在补了下方 touch 兜底，任何输入环境都能拖
+                          // 现在补了下方 touch/鼠标兜底，任何输入环境都能拖
+    if(tg._dragBound)return;   // 幂等：init 链兜底轮询可能重复调用，双份监听会互相打架
+    tg._dragBound=true;
     let dragging=false,moved=false,pid=null,startX=0,basePx=0,curPx=0,slW=0,target=null;
+    let downAt=0,lastTouchEnd=0;   // 同 Dock 滑块：悬挂自愈时间戳 + 合成鼠标防御窗
     const onDown=e=>{
       if(e.button!==undefined&&e.button!==0)return;
-      if(dragging)return;   // 多点触控：拖拽中忽略第二根手指
-      dragging=true;moved=false;pid=e.pointerId;target=null;
+      if(dragging){
+        if(Date.now()-downAt<3000)return;   // 多点触控：拖拽中忽略第二根手指
+        // 悬挂自愈（同 Dock 滑块）：up/cancel 永不送达时 3 秒后强制收尾，滑块不会永久卡死
+        dragging=false;pid=null;
+        sl.classList.remove('dragging');sl.style.transform='';
+      }
+      dragging=true;moved=false;pid=e.pointerId;downAt=Date.now();target=null;
       sl.classList.remove('jelly');
       sl.classList.add('dragging');
       startX=e.clientX;
@@ -2137,6 +2178,7 @@ const App={
     };
     const onMove=e=>{
       if(!dragging||(pid!==null&&e.pointerId!==pid))return;
+      downAt=Date.now();   // 活跃续命：同 Dock 滑块
       const dx=e.clientX-startX;
       if(Math.abs(dx)>4&&!moved){moved=true;try{tg.setPointerCapture&&tg.setPointerCapture(e.pointerId);}catch(err){}}
       if(moved)e.preventDefault();
@@ -2201,6 +2243,23 @@ const App={
     window.addEventListener('touchcancel',tEnd);
     // 防卡死：拖动中失焦强制收尾（PC/模拟器鼠标不发 pointercancel，否则 dragging 永久卡死）
     window.addEventListener('blur',()=>{if(dragging)finish(null,true);});
+    // 鼠标兜底（同 Dock 滑块最后防线）：pointer、touch 都不派发时走 mouse 层；pid=-1 流互斥
+    tg.addEventListener('mousedown',e=>{
+      if(e.button!==undefined&&e.button!==0)return;
+      if(dragging)return;
+      if(e.sourceCapabilities&&e.sourceCapabilities.firesTouchEvents)return;
+      if(Date.now()-lastTouchEnd<700)return;
+      onDown({clientX:e.clientX,clientY:e.clientY,pointerId:-1,button:0,
+        stopPropagation(){e.stopPropagation();},preventDefault(){e.preventDefault();}});
+    });
+    window.addEventListener('mousemove',e=>{
+      if(!dragging||pid!==-1)return;
+      onMove({clientX:e.clientX,clientY:e.clientY,pointerId:-1,
+        stopPropagation(){},preventDefault(){e.preventDefault();}});
+    },{passive:false});
+    window.addEventListener('mouseup',e=>{if(dragging&&pid===-1)finish({pointerId:-1},true);});
+    window.addEventListener('touchend',()=>{lastTouchEnd=Date.now();},{passive:true});
+    window.addEventListener('touchcancel',()=>{lastTouchEnd=Date.now();},{passive:true});
   },
   updateDateTime(){
     // 性能门控：页面隐藏或不在记页（碎银时钟所在页）时直接返回。
@@ -4271,7 +4330,12 @@ const App={
   // 解析结果只回填表单，绝不自动保存；必须由用户核对后手动点「记一笔」才写入 localStorage。
   _aiBase:null,_aiMod:null,_aiOcr:null,_aiLlm:null,_aiBusy:false,
   _aiBasePath(){
-    if(!this._aiBase)this._aiBase=new URL('assets/offline-ai/',location.href).href;
+    if(!this._aiBase){
+      // APK 生产源 http://suiyinji.local 的 assets 根已平铺（offline-ai/ 直接在根下，没有 assets/ 前缀）；
+      // 浏览器仓库根下才有 assets/ 目录。前缀写死错一边 = 模型/OCR 全 404（雷电模拟器实测「本地资源缺失」）
+      const native=!!(window.Native&&location.hostname==='suiyinji.local');
+      this._aiBase=new URL(native?'offline-ai/':'assets/offline-ai/',location.href).href;
+    }
     return this._aiBase;
   },
   _aiStatus(msg,state){
@@ -4357,12 +4421,16 @@ const App={
   },
   async _aiLoadModule(){
     if(this._aiMod)return this._aiMod;
-    try{
-      this._aiMod=await import('./assets/offline-ai/offline-ai.mjs');
-    }catch(e){
-      throw new Error('离线识别引擎加载失败（本地资源缺失，浏览器打开请用本地服务器）');
+    // 环境自适应 + 双路径回退：APK（suiyinji.local）平铺无前缀，浏览器仓库根有 assets/ 前缀；
+    // 任一侧路径组织意外变化也能靠第二路径兜住
+    const native=!!(window.Native&&location.hostname==='suiyinji.local');
+    const tries=native?['./offline-ai/offline-ai.mjs','./assets/offline-ai/offline-ai.mjs']
+                      :['./assets/offline-ai/offline-ai.mjs','./offline-ai/offline-ai.mjs'];
+    for(let i=0;i<tries.length;i++){
+      try{this._aiMod=await import(tries[i]);break;}catch(err){this._aiMod=null;}
     }
-    if(!this._aiMod||!this._aiMod.PaddleOCR||!this._aiMod.Wllama)throw new Error('离线识别引擎不完整');
+    if(!this._aiMod)throw new Error('离线识别引擎加载失败（本地资源缺失，浏览器打开请用本地服务器）');
+    if(!this._aiMod.PaddleOCR||!this._aiMod.Wllama)throw new Error('离线识别引擎不完整');
     return this._aiMod;
   },
   async _aiEnsureModel(){
@@ -6256,6 +6324,25 @@ const App={
 
 // ===== Init =====
 document.addEventListener('DOMContentLoaded',()=>App.init());
+</script>
+<script>
+/* ===== 滑块拖拽绑定兜底（独立于 App.init 链，雷电模拟器安卓14 用户反馈）=====
+   症状：能点 Tab 切页（onclick 内联），但按住滑块拖不动——典型 init 链在个别 WebView 环境
+   中途抛错：initNavDrag/initTypeDrag 位于链尾，一次抛错就永远绑不上监听。
+   这里独立轮询补齐绑定（initNavDrag/initTypeDrag 内部幂等标记防重复），与 init 链完全解耦 */
+(function(){
+  var tries=0;
+  var t=setInterval(function(){
+    tries++;
+    try{
+      // App 是 const 声明（全局词法环境，不挂 window）——必须用 typeof 词法访问，window.App 永远 undefined
+      if(typeof App!=='undefined'&&typeof App.initNavDrag==='function'&&typeof App.initTypeDrag==='function'){
+        App.initNavDrag();App.initTypeDrag();   // 已绑定则幂等空转
+      }
+    }catch(e){}
+    if(tries>=40)clearInterval(t);   // 40 × 1.5s = 60s 后停（成功绑定后空转到此自然结束）
+  },1500);
+})();
 </script>
 </body>
 </html>

@@ -1,13 +1,26 @@
 # 更新日志
-## v3.0（当前发布，versionCode 18）
+## v3.0（当前发布，versionCode 19）
 
 ### 本次更新
 
-**修复：滑块拖拽输入兼容（雷电模拟器安卓14 用户反馈）**
-- 按住底部 Dock 玻璃滑块/收支切换滑块无法拖动：拖动中窗口失焦时 PC 鼠标不会收到 pointercancel，dragging 永久卡死 → 滑块再也按不动。新增失焦/切后台强制收尾
+**修复：滑块拖拽输入兼容（雷电模拟器安卓14 用户反馈，两轮加固）**
+
+第二轮（安装 APK 实测仍复现后的纵深防御，四项根因逐一堵死）：
+- **悬挂自愈**：拖动中 up/cancel 永不送达——PC 鼠标在窗口外松开、窗口又没失焦（blur 不触发）→ dragging 永久卡死 → 之后每次按下都被多指防护挡死，滑块再也按不动。现在 3 秒无 move/up 强制收尾放行本次按下；活跃拖动由 onMove 持续续命，慢拖多久都不会被误杀
+- **鼠标层最后防线**：个别模拟器/魔改内核 pointer、touch 都不派发给页面，只剩 mouse 层可达 → 新增 mousedown/mousemove/mouseup 兜底（pid=-1 流标识与 pointer/touch 互斥）；合成鼠标防御（firesTouchEvents 标记 + touch 结束 700ms 窗口）保证标准环境零干扰
+- **init 链兜底绑定**：「能点 Tab 却拖不动滑块」的典型根因是 initNavDrag/initTypeDrag 位于 init 链尾，链上任一步在个别 WebView 环境抛错就永远绑不上监听（Tab 是内联 onclick 所以还能点）。新增独立 script 轮询补齐绑定（内部幂等标记防双绑）；并修复轮询用 window.App 恒为 undefined（App 是 const 声明不挂 window）导致兜底从未生效的自伤
+- **lostpointercapture 收尾门控**：个别 WebView 在按下瞬间误发 capture 丢失会把刚建立的拖拽当场杀死 → 只在 moved 后收尾（安全网语义不变：capture 只有拖动后才存在）
+
+第一轮（pointer/touch 双路径）：
+- 按住底部 Dock 玻璃滑块/收支切换滑块无法拖动：拖动中窗口失焦时 PC 鼠标不会收到 pointercancel，dragging 永久卡死 → 新增失焦/切后台强制收尾
 - 部分模拟器/魔改内核在有 PointerEvent 的环境下不派发 pointer 事件，旧代码的 touch 兜底只在"无 PointerEvent"时才注册，等于没有兜底 → touch 双路径始终注册（标准浏览器 pointerdown 先到自动挡住 touch 零干扰；pid=0 标识 touch 流互不串扰）
 - 旧 touch 路径给 Touch 宿主对象强设 pointerId 会静默失败（一条从未真正跑过的死代码），改为显式包装对象并把 preventDefault/stopPropagation 转发给原生事件
 - 头像裁剪弹窗：失焦后指针 Map 残留旧触点，导致下次打开误判多指状态拒收按下 → 失焦即清空
+
+**修复：端侧 AI 资源路径 404（APK 内实测「本地资源缺失」）**
+- 现象：APK 里截图识别/AI 对话启动即报「离线识别引擎加载失败（本地资源缺失）」，浏览器里同一份代码正常
+- 根因：浏览器仓库根下资源在 `assets/offline-ai/`，APK 的 assets 根已平铺（`offline-ai/` 直接在根下、没有 assets/ 前缀），页面把 `./assets/offline-ai/` 写死 → APK 内 import、模型 fetch、OCR 资源全部 404
+- 修复：按环境自适应选路径（Native 桥 + `suiyinji.local` 生产源 → 无前缀）+ 双路径回退兜底；`_aiBasePath()` 与 `_aiLoadModule()` 同步修正
 
 **新功能：预算管家 · 统计页组件（本次重点）**
 - 月末支出预测（日均线性外推）、预算燃尽进度条、今日安全可花额度（(预算-已花)/剩余天数）三卡一块看
