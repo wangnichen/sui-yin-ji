@@ -1290,9 +1290,9 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
       </div>
       <div class="section-title">成就</div>
       <div class="achievements" id="achievements"></div>
-      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="App.showGoalForm()">
         <span>存钱目标</span>
-        <button style="font-size:20px;color:var(--p);padding:0 4px" onclick="App.showGoalForm()">+</button>
+        <button style="font-size:20px;color:var(--p);padding:6px 12px;min-width:40px;min-height:36px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px" onclick="event.stopPropagation();App.showGoalForm()">+</button>
       </div>
       <div id="goalsList"></div>
       <div class="section-title">设置</div>
@@ -5152,7 +5152,9 @@ const App={
     const goals=s.goals||[];
     const c=document.getElementById('goalsList');
     if(goals.length===0){
-      c.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px;font-size:13px">还没有存钱目标，点 + 添加一个吧</div>';
+      // 整块空状态可点：之前只有右上角 20px 的 + 能开新建表单，手机上几乎点不中，
+      // 用户感知为「存钱目标点了没反应」（标题与空状态文案都没有点击行为）
+      c.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px;font-size:13px;cursor:pointer;border:1px dashed var(--glass-border);border-radius:12px;background:var(--glass-bg)" onclick="App.showGoalForm()">还没有存钱目标<br>点这里新建一个 🎯</div>';
       return;
     }
     c.innerHTML=goals.map(g=>{
