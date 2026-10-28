@@ -18,10 +18,13 @@
       for(i=0;i<localStorage.length;i++){k=localStorage.key(i);d[k]=localStorage.getItem(k);}
       Native.legacyExport(JSON.stringify(d));
     }else if(typeof Native.legacyImport==='function'){
+      // 护栏：已成功迁移过则不再导入，防止旧快照覆盖新数据（桥接缺失/版本错配场景）
+      if(localStorage.getItem('xzb__migrated')==='1')return;
       var s=Native.legacyImport();
       if(s){
         var o=JSON.parse(s);
         for(var kk in o)if(Object.prototype.hasOwnProperty.call(o,kk))localStorage.setItem(kk,o[kk]);
+        localStorage.setItem('xzb__migrated','1');
         if(typeof Native.legacyImportDone==='function')Native.legacyImportDone();
       }
     }
@@ -1060,7 +1063,7 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
   <!-- Top Bar -->
   <div class="top-bar">
     <div style="display:flex;align-items:center;gap:7px;min-width:0">
-      <div class="title" id="pageTitle">碎银记v2.9</div>
+      <div class="title" id="pageTitle">碎银记</div>
       <button class="btn-icon" onclick="App.showScreenshotImport()" title="拍照／图片识别记账" style="width:auto;padding:0 11px;border-radius:17px;gap:5px;align-items:center"><span style="font-size:15px;line-height:1">📷</span><span style="font-size:12px;font-weight:600;line-height:1">拍照识别</span></button>
     </div>
     <div class="actions">
@@ -1168,6 +1171,11 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
           <div style="text-align:center;margin-bottom:8px">
             <button style="font-size:13px;color:var(--p);cursor:pointer;padding:6px 14px;border-radius:20px;border:1px solid var(--p);transition:all .2s;background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);box-shadow:var(--glass-inset-top)" onclick="App.showPersonality()" onmousedown="this.style.transform='scale(.95)'" onmouseup="this.style.transform=''" onmouseleave="this.style.transform=''">🎭 测测你的消费人格</button>
           </div>
+        </div>
+        <!-- 预算管家 -->
+        <div class="widget-box" data-widget="budget">
+          <div class="section-title">预算管家</div>
+          <div class="card" id="budgetMgr"></div>
         </div>
         <!-- 碎银诗歌 -->
         <div class="widget-box" data-widget="poem">
@@ -1309,7 +1317,7 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
       <div class="author-card">
         <div class="author-name">🎓 我不要芒果</div>
         <div class="author-bio" style="line-height:1.7;color:var(--t2)">大一计算机科学与技术专业在读，<br>用 Trae + DeepSeek 打磨的纯本地记账工具。<br>没有广告与会员，数据只存在你的设备里。</div>
-        <div class="author-ver">碎银记 v2.9 · 持续更新中</div>
+        <div class="author-ver">碎银记 v3.1 · 持续更新中</div>
       </div>
     </div>
   </div>
@@ -1482,7 +1490,13 @@ const App={
   _save(k,v){
     this._val[k]=v;
     try{const s=JSON.stringify(v);localStorage.setItem('xzb_'+k,s);this._raw[k]=s;}
-    catch(e){this._raw[k]=null;}  // 写入失败时下次读回旧缓存值
+    catch(e){
+      this._raw[k]=null;  // 写入失败时下次读回旧缓存值
+      // 配额写满/隐私模式：存储层已拒写，必须明确警告，否则 UI 照常提示「成功」，
+      // 重启后数据回滚，用户感知为「记账丢数据」
+      const quota=e&&(e.name==='QuotaExceededError'||e.code===22||e.code===1014);
+      this.showToast(quota?'⚠️ 存储空间已满，本次修改未保存，请导出备份':'⚠️ 保存失败，请检查存储权限');
+    }
     this._ver++;                  // 任一数据变更 → 全局版本号 +1，切页渲染据此跳过无变化的重建
   },
   _ver:0,
@@ -1602,7 +1616,7 @@ const App={
 
   // ===== Welcome Announcement =====
   _showWelcome(){
-    const ver='2.9.0';
+    const ver='3.1.0';
     const s=this.getSettings();
     if(s.welcomeVer===ver)return;
     setTimeout(()=>{
@@ -1643,15 +1657,15 @@ const App={
         '</div></div>'+
 
         '<div style="background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(139,92,246,.1));border-radius:12px;padding:11px 13px;margin-bottom:12px;border:1px solid rgba(99,102,241,.15)">'+
-        '<div style="font-weight:700;color:var(--p);font-size:13px;margin-bottom:7px">🆕 v2.9 新鲜出炉</div>'+
+        '<div style="font-weight:700;color:var(--p);font-size:13px;margin-bottom:7px">🆕 v3.0 大版本更新</div>'+
         '<div style="font-size:12px;line-height:2;color:var(--t2)">'+
-        '🫧 收支滑块 · 按住玻璃块直接拖<br>'+
-        '👆 页面横滑 · 跟手度大幅优化<br>'+
-        '🛡 兼容加固 · 老机型 WebView 更稳'+
+        '🩺 AI三师会诊 · 三位AI医生联合问诊<br>'+
+        '💰 预算管家 · 月末预测+今日可花额度<br>'+
+        '🛡 全面加固 · 老机型稳定性大幅提升'+
         '</div></div>'+
 
         '<div style="text-align:center;font-size:11px;color:var(--t3);line-height:1.7;padding:2px 0 6px">'+
-        '纯本地运行 · 不联网 · 不上传<br>'+
+        '账目数据只存本机 · 不上传 · 不售卖<br>'+
         '<span style="color:var(--p)">愿它陪你把日子过得明明白白 ✨</span>'+
         '</div>'
       );
@@ -1759,7 +1773,7 @@ const App={
     if(activeItem)activeItem.classList.add('active');
     this.positionNavIndicator(page);
     this._jelly();
-    const titles={record:'碎银记v2.9',bills:'账单',stats:'统计',profile:'我的'};
+    const titles={record:'碎银记',bills:'账单',stats:'统计',profile:'我的'};
     document.getElementById('pageTitle').textContent=titles[page];
     // 顶栏扫一道液态反光，标记页面切换
     const tb=document.querySelector('.top-bar');
@@ -2227,7 +2241,7 @@ const App={
           if(data.datetime)serverTime=new Date(data.datetime).getTime();
           else if(data.dateTime)serverTime=new Date(data.dateTime).getTime();
           else if(data.time)serverTime=new Date(data.date+'T'+data.time).getTime();
-          if(serverTime){
+          if(serverTime&&!isNaN(serverTime)){
             const rtt=t1-t0;
             this._ntpOffset=Math.round(serverTime-(t0+rtt/2));
             console.log('[NTP] 已校准，偏差 '+this._ntpOffset+'ms');
@@ -2273,7 +2287,8 @@ const App={
     s.dark=document.body.classList.contains('dk');
     this.saveSettings(s);
     this.updateDarkModeUI();
-    // Canvas 使用硬编码颜色，无需随主题重绘，避免切换卡顿
+    // 趋势/心跳等 canvas 按当前主题选色，切主题后需重绘，否则图表仍用旧配色
+    if(this.curPage==='stats')this.renderStats();
   },
   updateDarkModeUI(){
     const s=this.getSettings();
@@ -2431,6 +2446,10 @@ const App={
     const o=document.getElementById('modalOverlay');
     if(!o.classList.contains('show'))return;
     this._avatarSheet=false;
+    // 释放弹窗持有的大对象（统计图 basePNG 可达数 MB），别挂在 window 上等 GC
+    window._statImageDataUrl=null;
+    window._reportText=null;
+    window._importResults=null;
     // 防御性清理：closeModal 可以被用户点遮罩、系统返回键、或任何地方触发，
     // 走不到 _cropCancel/_cropConfirm 时也要把裁切状态清干净，
     // 否则 body.crop-open 类会泄漏（裁切完毛玻璃永远不恢复）、
@@ -2444,7 +2463,8 @@ const App={
     }
     o.classList.add('closing');
     document.body.style.overflow='';
-    setTimeout(()=>{o.classList.remove('show','closing')},200);
+    if(this._modalTimer)clearTimeout(this._modalTimer); // 竞态：关闭后立刻开新弹窗时，旧定时器会把新弹窗的 show 类也摘掉
+    this._modalTimer=setTimeout(()=>{o.classList.remove('show','closing')},200);
   },
 
   // ===== Record Page =====
@@ -2576,6 +2596,10 @@ const App={
   },
 
   submitRecord(){
+    // 防连点：双击/狂点会瞬间记入两笔同额账单，用时间戳节流 400ms
+    const nowTs=Date.now();
+    if(this._lastSubmitTs&&nowTs-this._lastSubmitTs<400)return;
+    this._lastSubmitTs=nowTs;
     const amt=parseFloat(document.getElementById('inputAmount').value);
     if(!amt||amt<=0){this.haptic('error');this.showToast('请输入金额');return}
     // 分类非必选：不选就存空值（未分类），展示端一律不显示分类，也不再归入「其他」
@@ -2658,18 +2682,20 @@ const App={
     // Switch page first to ensure DOM is ready
     this.switchPage('record');
     // Then set values on the now-visible DOM
+    // 注意：setType 内部会用 savedAmounts 槽位覆盖金额输入框，必须先恢复类型，
+    // 再写金额，否则编辑模式打开时金额被陈旧槽位值顶掉
+    this.setType(data.type);
+    this.selectCat(data.cat);
+    if(data.mood)this.setMood(data.mood);
     document.getElementById('inputAmount').value=data.amt;
     document.getElementById('inputNote').value=data.note||'';
     document.getElementById('inputDate').value=data.date;
     // Restore time field
     const timeEl=document.getElementById('inputTime');
-    if(timeEl&&data.time){
-      timeEl.value=data.time;
-      this._timeManual=true;
+    if(timeEl){
+      if(data.time){timeEl.value=data.time;this._timeManual=true;}
+      else{timeEl.value='';this._timeManual=false;} // 缺失时显式清空，避免残留上一条的时间
     }
-    this.setType(data.type);
-    this.selectCat(data.cat);
-    if(data.mood)this.setMood(data.mood);
     document.getElementById('btnSubmit').textContent='保存修改';
   },
 
@@ -2700,9 +2726,12 @@ const App={
       const today=dstr(new Date());
       filtered=filtered.filter(r=>r.date===today);
     }else if(filterKey==='week'){
+      // 周筛选用日期字符串比较：new Date('YYYY-MM-DD') 按 UTC 解析，
+      // 在东八区会把边界日期错判一天
       const now=new Date();
-      const weekAgo=new Date(now.getFullYear(),now.getMonth(),now.getDate()-7);
-      filtered=filtered.filter(r=>new Date(r.date)>=weekAgo);
+      const ws=new Date(now.getFullYear(),now.getMonth(),now.getDate()-7);
+      const weekAgoStr=dstr(ws);
+      filtered=filtered.filter(r=>r.date>=weekAgoStr);
     }else if(filterKey==='month'){
       const m=mstr(new Date());
       filtered=filtered.filter(r=>r.date.startsWith(m));
@@ -2868,9 +2897,11 @@ const App={
     this.saveRecords(records);
     this.renderBills();
     this.undoData=deleted;
+    // 闭包捕获 deleted（而非读 this.undoData）：连续删除两条时 toast 回调
+    // 会在第二条删除后被触发，读 this.undoData 会错拿第二条的记录
     this.showToast('已删除','撤销',()=>{
       const rs=this.getRecords();
-      rs.push(this.undoData);
+      rs.push(deleted);
       rs.sort(recSort);
       this.saveRecords(rs);
       this.renderBills();
@@ -2881,6 +2912,7 @@ const App={
   // ===== Stats Page =====
   STATS_WIDGETS:[
     {id:'insights',name:'智能洞察',icon:'💡',desc:'AI消费分析与理财建议'},
+    {id:'budget',name:'预算管家',icon:'💰',desc:'月末预测与今日可花额度'},
     {id:'poem',name:'碎银诗歌',icon:'📜',desc:'把本月花销写成一首诗'},
     {id:'heartbeat',name:'财务心跳',icon:'💓',desc:'最近14天支出心跳图'},
     {id:'starmap',name:'消费星图',icon:'🌌',desc:'你的专属财务星座'},
@@ -2900,7 +2932,7 @@ const App={
     if(!s[key]){
       // 组件模式默认空白，让用户自行添加；列表模式默认展示常用组件
       if(view==='grid')return [];
-      return ['insights','pie','calendar','trend','ranking','monthcompare'];
+      return ['insights','budget','pie','calendar','trend','ranking','monthcompare'];
     }
     return s[key];
   },
@@ -2996,6 +3028,7 @@ const App={
   },
   renderStats(){
     this.applyWidgetVisibility();
+    this.renderBudgetManager();
     this.renderInsights();
     this.renderPoem();
     this.renderHeartbeat();
@@ -3009,13 +3042,65 @@ const App={
     this.renderRanking();
   },
 
+  // ===== 预算管家：月末支出预测 + 燃尽进度 + 今日安全可花 =====
+  renderBudgetManager(){
+    const el=document.getElementById('budgetMgr');
+    if(!el)return;
+    const s=this.getSettings();
+    const budget=+s.budget||0;
+    if(budget<=0){
+      el.innerHTML='<div style="text-align:center;padding:14px 10px">'+
+        '<div style="font-size:32px;margin-bottom:6px">🎯</div>'+
+        '<div style="font-size:13px;color:var(--t2);line-height:1.8">设置月度预算后，管家会帮你预测月末花销、<br>算出今天还能安心花多少</div>'+
+        '<button class="btn-primary" style="margin-top:10px;padding:9px 22px;font-size:13px" onclick="App.showBudget()">去设置预算</button>'+
+        '</div>';
+      return;
+    }
+    const now=new Date();
+    const monthPrefix=mstr(now);
+    const spent=this.getRecords()
+      .filter(r=>r.date&&r.date.startsWith(monthPrefix)&&r.type==='expense')
+      .reduce((sum,r)=>sum+r.amt,0);
+    const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    const day=now.getDate();
+    const remainingDays=Math.max(1,daysInMonth-day+1);      // 含今天
+    const forecast=spent/day*daysInMonth;                    // 日均线性外推
+    const remain=Math.max(0,budget-spent);
+    const safePerDay=remain/remainingDays;                   // 今日安全可花
+    const barPct=Math.min(100,spent/budget*100);
+    const ratio=forecast/budget;
+    const color=ratio<=1?'#34c759':ratio<=1.2?'#ff9500':'#ff3b30';
+    const statusText=ratio<=1?'状态稳健':ratio<=1.2?'需要留意':'即将超支';
+    const over=spent>budget;
+    el.innerHTML=
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">'+
+        '<span style="font-size:12px;color:var(--t2)">本月已花 <b class="tabnum" style="color:'+(over?'var(--red)':'var(--text)')+'">¥'+spent.toFixed(2)+'</b> / ¥'+budget.toFixed(0)+'</span>'+
+        '<span style="font-size:11px;padding:3px 9px;border-radius:999px;color:'+color+';background:'+color+'1a;font-weight:600">'+statusText+'</span>'+
+      '</div>'+
+      '<div style="height:10px;border-radius:6px;background:var(--glass-bg-strong);border:1px solid var(--glass-border);overflow:hidden;margin-bottom:9px">'+
+        '<div style="width:'+barPct+'%;height:100%;border-radius:6px;background:linear-gradient(90deg,'+color+'99,'+color+');transition:width .8s var(--spring-entrance)"></div>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;font-size:12px">'+
+        '<div style="background:var(--glass-bg-strong);border-radius:10px;padding:8px 10px">'+
+          '<div style="color:var(--t3);font-size:11px">月末预测</div>'+
+          '<div class="tabnum" style="font-weight:700;color:'+color+';font-size:15px;margin-top:2px">¥'+forecast.toFixed(0)+'</div>'+
+        '</div>'+
+        '<div style="background:var(--glass-bg-strong);border-radius:10px;padding:8px 10px">'+
+          '<div style="color:var(--t3);font-size:11px">今日安全可花</div>'+
+          '<div class="tabnum" style="font-weight:700;color:var(--green);font-size:15px;margin-top:2px">¥'+safePerDay.toFixed(0)+'</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="font-size:11px;color:var(--t3);margin-top:8px;line-height:1.6">'+
+        (over?('⚠️ 已超出预算 ¥'+(spent-budget).toFixed(0)+'，管住手，下月再战'):(safePerDay<10?'🤏 只剩 ¥'+remain.toFixed(0)+' 额度，省着点花':'距月底 '+remainingDays+' 天 · 剩余额度 ¥'+remain.toFixed(0)))+
+      '</div>';
+  },
+
   renderInsights(){
     const records=this.getRecords();
     const now=new Date();
     const thisMonth=mstr(now);
     const lastMonth=mstr(new Date(now.getFullYear(),now.getMonth()-1,1));
     const today=dstr(now);
-
     const monthRecords=records.filter(r=>r.date.startsWith(thisMonth)&&r.type==='expense');
     const lastMonthRecords=records.filter(r=>r.date.startsWith(lastMonth)&&r.type==='expense');
     const todayRecords=records.filter(r=>r.date===today&&r.type==='expense');
@@ -3233,8 +3318,9 @@ const App={
   },
 
   renderCalendar(){
+    try{
     const records=this.getRecords();
-    const y=this.calYear,m=this.calMonth;
+    let y=this.calYear,m=this.calMonth;
     // Normalize month
     while(m<0){m+=12;y--}
     while(m>11){m-=12;y++}
@@ -3253,7 +3339,7 @@ const App={
     const dailyNet={};
     const dailyHas={};
     const prefix=y+'-'+String(m+1).padStart(2,'0')+'-';
-    records.filter(r=>r.date.startsWith(prefix)).forEach(r=>{
+    records.filter(r=>r.date&&r.date.startsWith(prefix)).forEach(r=>{
       dailyHas[r.date]=true;
       if(!dailyNet[r.date])dailyNet[r.date]=0;
       dailyNet[r.date]+=r.type==='expense'?-r.amt:r.amt;
@@ -3286,6 +3372,7 @@ const App={
         '<span>'+d+'</span>'+(amtHtml?'<span class="cal-amt">'+amtHtml+'</span>':'')+'</div>';
     }
     document.getElementById('calendarGrid').innerHTML=html;
+    }catch(e){console.warn('renderCalendar error',e)}
   },
   showDayDetail(dateStr){
     const today=dstr(new Date());
@@ -3311,7 +3398,9 @@ const App={
 
     const weekday=['周日','周一','周二','周三','周四','周五','周六'];
     const parts=dateStr.split('-');
-    const dateLabel=parts[0]+'年'+parseInt(parts[1])+'月'+parseInt(parts[2])+'日 '+weekday[new Date(dateStr).getDay()];
+    // 本地解析：避免 new Date('YYYY-MM-DD') 按 UTC 解析导致星期偏移
+    const localDate=parts.length===3?new Date(+parts[0],+parts[1]-1,+parts[2]):new Date(dateStr);
+    const dateLabel=parts[0]+'年'+parseInt(parts[1])+'月'+parseInt(parts[2])+'日 '+weekday[localDate.getDay()];
 
     let html='<div class="day-detail-modal">';
     html+='<div class="day-detail-header">';
@@ -4033,7 +4122,14 @@ const App={
     ctx.fillText('碎银记 · 记好每一笔碎银 ✨',W/2,H-16);
     
     // Show in modal
-    const dataUrl=canvas.toDataURL('image/png');
+    let dataUrl;
+    try{
+      dataUrl=canvas.toDataURL('image/png');
+    }catch(e){
+      // 低内存/老 WebView 上大 canvas 导出会抛错，别让异常裸奔卡死页面
+      this.showToast('图片生成失败，请稍后再试');
+      return;
+    }
     const html='<h3>统计图表</h3><p style="font-size:12px;color:var(--t2);margin-bottom:8px">长按图片保存，或点击下方按钮</p>'+
       '<div style="text-align:center"><img src="'+dataUrl+'" style="width:100%;max-width:300px;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.15)"></div>'+
       '<div style="display:flex;gap:8px;margin-top:12px">'+
@@ -4046,7 +4142,7 @@ const App={
     const dataUrl=window._statImageDataUrl;
     if(!dataUrl){this.showToast('图片未生成');return}
     const b64=dataUrl.split(',')[1];
-    if(b64 && this._nativeSave(b64,'碎银记_统计图_'+dstr(new Date())+'.png','image/png'))return;
+    if(b64 && this._nativeSave(b64,'碎银记_统计图_'+dstr(new Date())+'.png','image/png')){window._statImageDataUrl=null;return}
     this.showToast('保存失败，请长按图片保存');
   },
 
@@ -4152,7 +4248,9 @@ const App={
     el.innerHTML='<span>'+sp+' '+msg+'</span>';
   },
   async _tryExtractFromImage(base64Data){
+    // 双锁统一：OCR 与对话/会诊共用 _aiLlm 单例，并发会互相污染 KV cache，必须串行
     if(this._aiBusy){this.showToast('正在识别中，请稍候…');return;}
+    if(this._aiChatBusy){this.showToast('AI 正在对话/会诊，请稍候…');return;}
     this._aiBusy=true;
     try{
       this._aiStatus('加载离线识别引擎…','load');
@@ -4185,7 +4283,7 @@ const App={
       '<span style="color:var(--t2)">金额</span><b style="color:var(--red);font-size:17px" class="tabnum">¥'+Number(p.amount||0).toFixed(2)+'</b>'+
       '<span style="color:var(--t2)">日期</span><b>'+((p.date&&/^\d{4}-\d{2}-\d{2}$/.test(p.date))?p.date:'未识别（默认今天）')+'</b>'+
       '<span style="color:var(--t2)">分类</span><b>'+(cat?cat.i+' '+cat.n:'—')+'</b>'+
-      '<span style="color:var(--t2)">备注</span><b>'+(p.note?String(p.note).slice(0,40):'—')+'</b>'+
+      '<span style="color:var(--t2)">备注</span><b>'+(p.note?this.escapeHtml(String(p.note).slice(0,40)):'—')+'</b>'+
       '</div>'+
       (short?'<details style="margin-bottom:12px"><summary style="font-size:12px;color:var(--t2);cursor:pointer;padding:6px 0">查看 OCR 识别原文</summary>'+
         '<div style="font-size:12px;color:var(--t3);line-height:1.7;max-height:150px;overflow:auto;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:10px;white-space:pre-wrap;word-break:break-all">'+short+'</div></details>':'')+
@@ -4359,7 +4457,18 @@ const App={
     const s=this.getSettings();
     let out='今天是'+dstr(now)+'。本月支出 ¥'+exp.toFixed(0)+'（'+expN+'笔），收入 ¥'+inc.toFixed(0)+'。';
     if(tops)out+='分类Top：'+tops+'。';
-    if(s.budget>0)out+='月预算 ¥'+Number(s.budget).toFixed(0)+'。';
+    if(s.budget>0){
+      out+='月预算 ¥'+Number(s.budget).toFixed(0)+'。';
+      // 注入预算管家的预测数据，让对话/会诊能给出基于外推的建议
+      const day=now.getDate();
+      const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+      if(day>0&&exp>0){
+        const forecast=exp/day*daysInMonth;
+        const remain=Math.max(0,s.budget-exp);
+        const safePerDay=remain/Math.max(1,daysInMonth-day+1);
+        out+='按当前日均外推月末将花 ¥'+forecast.toFixed(0)+'（'+(forecast>s.budget?'会超支':'未超预算')+'），剩余 '+(daysInMonth-day+1)+' 天，今日安全可花 ¥'+safePerDay.toFixed(0)+'。';
+      }
+    }
     if(recent)out+='最近记录：'+recent+'。';
     return out.slice(0,500);
   },
@@ -4375,7 +4484,9 @@ const App={
     this._aiChat(q);
   },
   async _aiChat(q){
+    // 双锁统一：对话也要等 OCR 忙完（共用 _aiLlm 单例，串行执行）
     if(this._aiChatBusy){this.showToast('AI 正在思考，请稍候…');return;}
+    if(this._aiBusy){this.showToast('正在识别图片中，请稍候…');return;}
     q=(q||'').trim();
     if(!q)return;
     const msgs=document.getElementById('aiChatMsgs');
@@ -4510,11 +4621,17 @@ const App={
     }else{
       tv.style.display='none';cv.style.display='';
       if(btn)btn.textContent='💬 返回对话';
-      if(!this._aiConsultOpened){this._aiConsultOpened=true;this._aiConsultRun();}
+      // 死锁修复：AI 忙时不能消耗 _aiConsultOpened 标记，否则 _aiConsultRun 静默
+      // 返回后标记已被置 true，之后再也触发不了会诊，泳道永远卡在排队
+      if(!this._aiConsultOpened){
+        if(this._aiChatBusy){this.showToast('AI 正在对话/会诊，稍后再看');return;}
+        this._aiConsultOpened=true;this._aiConsultRun();
+      }
     }
   },
   async _aiConsultRun(){
     if(this._aiChatBusy){this.showToast('AI 正在会诊，请稍候…');return;}
+    if(this._aiBusy){this.showToast('正在识别图片中，请稍候…');return;}
     this._aiChatBusy=true;
     const st=document.getElementById('consultStatus');
     const sum=document.getElementById('consultSum');
@@ -4975,12 +5092,15 @@ const App={
   // ===== Achievements =====
   checkStreak(records){
     if(records.length===0)return 0;
-    const dates=new Set(records.map(r=>r.date));
+    // date 兜底：脏记录（无 date/格式不对）不能中断整个 streak 计算
+    const dates=new Set(records.filter(r=>r.date&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)).map(r=>r.date));
     const sorted=[...dates].sort().reverse();
     let streak=0;
     const today=new Date();
     for(let i=0;i<sorted.length;i++){
-      const d=new Date(sorted[i]);
+      // 本地解析 YYYY-MM-DD：new Date(str) 按 UTC 解析会在东八区把日期错移一天
+      const p=sorted[i].split('-');
+      const d=new Date(+p[0],+p[1]-1,+p[2]);
       const expected=new Date(today);
       expected.setDate(expected.getDate()-i);
       if(dstr(d)===dstr(expected))streak++;
@@ -5132,7 +5252,7 @@ const App={
     this.showModal(html);
   },
   saveBudget(){
-    const v=parseFloat(document.getElementById('budgetInput').value)||0;
+    const v=Math.max(0,parseFloat(document.getElementById('budgetInput').value)||0); // 预算不为负
     const s=this.getSettings();
     s.budget=v;
     this.saveSettings(s);
@@ -5326,6 +5446,13 @@ const App={
   },
 
   // ===== Export/Import =====
+  _csvField(v){
+    // CSV 字段转义：含逗号/引号/换行时用引号包裹并双写内部引号；
+    // 以 =+-@ 开头的值加 ' 前缀，防 Excel 公式注入（=HYPERLINK 等）
+    let s=String(v==null?'':v);
+    if(/^[=+\-@]/.test(s))s="'"+s;  // - 必须转义，否则 [+-@] 是范围会误伤数字开头字段
+    return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+  },
   exportData(format){
     const records=this.getRecords();
     if(records.length===0){this.showToast('暂无数据可导出');return}
@@ -5333,7 +5460,9 @@ const App={
     let csv='类型,金额,分类,日期,备注,心情\n';
     records.forEach(r=>{
       const cat=this.getCatData(r.cat);
-      csv+=(r.type==='expense'?'支出':'收入')+','+r.amt.toFixed(2)+','+cat.n+','+r.date+','+(r.note||'')+','+(this.moodLabel(r.mood)||'')+'\n';
+      csv+=[this._csvField(r.type==='expense'?'支出':'收入'),this._csvField(r.amt.toFixed(2)),
+        this._csvField(cat.n),this._csvField(r.date),this._csvField(r.note||''),
+        this._csvField(this.moodLabel(r.mood)||'')].join(',')+'\n';
     });
     if(this._nativeSave(this._strToBase64('\uFEFF'+csv), fileName, 'text/csv'))return;
     this._showExportFallback(csv, fileName);
@@ -5391,11 +5520,16 @@ const App={
       const b64=window._pendingFileBase64;
       window._pendingFileBase64=null;  // 及时释放，避免大字符串常驻 JS 堆
       if(!b64)return;
-      // 解码 base64
+      // 解码 base64 → 按 UTF-8 还原字节序列（逐字节 String.fromCharCode 会把
+      // 「支出」这类中文拆成乱码 Latin-1 字符，导致导入分类/类型全部识别失败）
       const binary=atob(b64);
       let content='';
-      for(let i=0;i<binary.length;i++){
-        content+=String.fromCharCode(binary.charCodeAt(i));
+      try{
+        const bytes=new Uint8Array(binary.length);
+        for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+        content=new TextDecoder('utf-8').decode(bytes);
+      }catch(de){ // 老 WebView 无 TextDecoder 时退化为手动 UTF-8 重组
+        content=decodeURIComponent(escape(binary));
       }
       // 自动检测格式
       const trimmed=content.trim();
@@ -5411,33 +5545,62 @@ const App={
   _onFileError(msg){
     this.showToast(msg||'读取文件失败');
   },
+  _parseCSVLine(line){
+    // 单行 CSV 解析：支持引号包裹字段（内含逗号/双引号），引号外逗号才作分隔
+    const cols=[];let cur='',inQ=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(inQ){
+        if(ch==='"'){
+          if(line[i+1]==='"'){cur+='"';i++;}
+          else inQ=false;
+        }else cur+=ch;
+      }else{
+        if(ch==='"')inQ=true;
+        else if(ch===','){cols.push(cur);cur='';}
+        else cur+=ch;
+      }
+    }
+    cols.push(cur);
+    return cols;
+  },
   _processCSVImport(csvText){
-    const lines=csvText.trim().split('\n');
+    const lines=csvText.replace(/\r\n?/g,'\n').trim().split('\n'); // CRLF 清洗：\r 残留会让「心情」列匹配失败
     if(lines.length<2){this.showToast('文件为空');return}
     const records=[];
     let added=0;
     for(let i=1;i<lines.length;i++){
-      const cols=lines[i].split(',');
+      if(!lines[i].trim())continue;
+      const cols=this._parseCSVLine(lines[i]);
       if(cols.length<4)continue;
       const type=cols[0].trim()==='收入'?'income':'expense';
-      const amt=parseFloat(cols[1]);
+      // 剥离公式防护 ' 前缀：兼容旧版导出文件（旧 _csvField 曾给数字字段误加前缀）
+      const amt=parseFloat(String(cols[1]).trim().replace(/^'/,''));
       if(isNaN(amt)||amt<=0)continue;
-      const catName=cols[2].trim();
+      const catName=String(cols[2]).trim().replace(/^'/,'');
       const cat=CATS.find(c=>c.n===catName)||{k:''};   // CSV 里分类列为空/未知 → 存未分类
-      const rawDate=(cols[3]||'').trim();
+      const rawDate=String(cols[3]||'').trim().replace(/^'/,'');
       const date=/^\d{4}-\d{2}-\d{2}$/.test(rawDate)?rawDate:dstr(new Date());
-      const note=cols[4]||'';
-      const mood=cols[5]||null;
+      const note=(cols[4]||'').trim();
+      const mood=cols[5]||'';
       const moodMap={'值得':'happy','一般':'neutral','后悔':'sad','来之不易':'hard','意外之财':'surprise','小确幸':'lucky','平淡':'calm'};
       records.push({id:'r_'+Date.now()+'_'+i,amt,cat:cat.k,date,note,type,mood:moodMap[mood]||null,ts:Date.now()+i});
       added++;
     }
     if(added===0){this.showToast('未找到有效记录');return}
     const all=this.getRecords();
-    records.forEach(r=>{all.push(r)});
+    // 去重：与现有记录「类型+金额+日期+备注」一致的不重复导入
+    const sig=r=>r.type+'|'+r.amt+'|'+r.date+'|'+(r.note||'');
+    const exist=new Set(all.map(sig));
+    let dup=0;
+    records.forEach(r=>{
+      const s=sig(r);
+      if(exist.has(s)){dup++;return}
+      exist.add(s);all.push(r);
+    });
     all.sort(recSort);
     this.saveRecords(all);
-    this.showToast('成功导入 '+added+' 条记录 ✅');
+    this.showToast('成功导入 '+(added-dup)+' 条记录 ✅'+(dup>0?'（跳过 '+dup+' 条重复）':''));
     if(this.curPage==='bills')this.renderBills();
     else if(this.curPage==='stats')this.renderStats();
   },
@@ -5457,7 +5620,14 @@ const App={
         const id=String(r.id==null?'':r.id).replace(/[^A-Za-z0-9_-]/g,'').slice(0,64)||('r_'+Date.now()+'_'+i);
         if(existingIds.has(id))return;
         existingIds.add(id);
-        all.push({id,amt,cat:String(r.cat||'other'),date:String(r.date||dstr(new Date())).slice(0,10),
+        // date 严格校验：脏数据（如 "2026/1/5" 或带时间戳）会让 checkStreak 的
+        // dstr(new Date(...)) 抛 RangeError，形成重启也修不好的持久崩溃
+        const rawDate=String(r.date||'').trim().slice(0,10);
+        const date=/^\d{4}-\d{2}-\d{2}$/.test(rawDate)?rawDate:dstr(new Date());
+        // cat 白名单：只放行存在的分类 key，未知值归入未分类，防止渲染层查表失败
+        const rawCat=String(r.cat||'other');
+        const cat=CATS.some(c=>c.k===rawCat)?rawCat:'other';
+        all.push({id,amt,cat,date,
           note:String(r.note==null?'':r.note).slice(0,200),type:r.type==='income'?'income':'expense',
           mood:r.mood||null,ts:(+r.ts>0)?+r.ts:Date.now()+i});
         added++;
@@ -5486,12 +5656,16 @@ const App={
     const results=[];
     lines.forEach(line=>{
       line=line.trim();if(!line)return;
-      // Match amount
-      const amtMatch=line.match(/([+-]?\d+(?:\.\d{1,2})?)\s*[元块]?/);
+      // Match amount：优先取带货币单位的数字（35元/¥28/12.5块），
+      // 兜底取「第一个不紧跟『年月日号』的数字」——避免「2026年聚会花了300」「3月15日花了100」把日期当金额
+      let amtMatch=line.match(/(?:¥|￥)?(\d+(?:\.\d{1,2})?)\s*(?:元|块)/);
+      if(!amtMatch)amtMatch=line.match(/(?:^|[^\d.])([+-]?\d+(?:\.\d{1,2})?)(?!\s*[年月日号])/);
       if(!amtMatch)return;
       let amt=parseFloat(amtMatch[1]);
       let type='expense';
-      if(amt<0||line.includes('收入')||line.includes('到账')||line.includes('工资')||line.includes('红包')||line.includes('退款')||line.includes('理财')){
+      // 收入方向：只认明确的入账词；「理财」本身是买卖双向的（亏了500会误记成+500），
+      // 由「收益/利息/分红/赚」等入账词决定方向，理财只作分类关键词
+      if(amt<0||/(收入|到账|工资|薪水|红包|退款|返还|收益|利息|分红|盈利|赚)/.test(line)){
         type='income';amt=Math.abs(amt);
       }
       // Guess category
@@ -5597,8 +5771,18 @@ const App={
   _copyReport(){
     const text=window._reportText||'';
     navigator.clipboard.writeText(text).then(()=>this.showToast('已复制到剪贴板')).catch(()=>{
+      // 降级：div 无 select() 方法，必须用 Range 选中内容再 execCommand
       const el=document.getElementById('rptContent');
-      if(el){el.select();document.execCommand('copy');this.showToast('已复制')}
+      if(!el){this.showToast('复制失败，请长按文本手动复制');return}
+      try{
+        const range=document.createRange();
+        range.selectNodeContents(el);
+        const sel=window.getSelection();
+        sel.removeAllRanges();sel.addRange(range);
+        if(document.execCommand('copy'))this.showToast('已复制');
+        else this.showToast('复制失败，请长按文本手动复制');
+        sel.removeAllRanges();
+      }catch(e){this.showToast('复制失败，请长按文本手动复制')}
     });
   },
 
@@ -5691,7 +5875,7 @@ const App={
     const dayTotals={};
     expRecords.forEach(r=>{dayTotals[r.date]=(dayTotals[r.date]||0)+r.amt});
     const topDay=Object.entries(dayTotals).sort((a,b)=>b[1]-a[1])[0];
-    if(topDay)insights.push({icon:'📅',text:'花钱最多的一天是 '+topDay[0]+'，花了 ¥'+topDay[1].toFixed(0),type:'info'});
+    if(topDay)insights.push({icon:'📅',text:'花钱最多的一天是 '+this.escapeHtml(topDay[0])+'，花了 ¥'+topDay[1].toFixed(0),type:'info'});
 
     // ===== 生成建议 =====
     const suggestions=[];

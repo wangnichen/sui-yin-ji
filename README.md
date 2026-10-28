@@ -19,6 +19,7 @@
 - **端侧离线 AI**：PP-OCRv6 tiny 小票识别 + Qwen2.5-0.5B-Instruct（Q4_K_M，469MB）对话记账与理财报告，wllama（llama.cpp WASM）推理
 - **AI 三师会诊（多 Agent 财务看板）**：记账师 / 分析师 / 毒舌教练三位端侧顾问依次会诊同一账本，泳道看板呈现流水线状态与逐 token 流式输出，主持人自动合并为 3 条行动清单
 - **统计可视化**：饼图、趋势、分类排行、时光轴、星图、万花筒、月度 AI 报告、记账人格测试
+- **预算管家**：月末日均外推预测、今日安全可花额度、三色超支预警，与 AI 报告上下文联动
 - **液态玻璃 UI**：SDF 折射 / 色散 / 菲涅尔边缘高光，启动时帧耗时基准实测，低端机自动降级
 - **手感细节**：果冻 Dock 滑块、支出/收入滑块 1:1 跟手拖动、横滑方向锁定（弧度手势容错）、过中线触觉反馈
 - **其他**：深浅色自动秒切、NTP 校时碎银时钟、CSV 导入导出、头像裁剪
@@ -55,6 +56,34 @@ export KS_PASS=你的keystore密码
 
 # 4. 安装
 adb install xiaozhangben.apk
+```
+
+### 依赖清单
+
+| 复现层级 | 依赖 | 版本要求 | 说明 |
+| --- | --- | --- | --- |
+| 浏览器运行 | 现代浏览器 | Chrome 90+ / Edge 90+ / Safari 15+ 等 | **零第三方依赖**：无 npm、无 node_modules、无构建步骤 |
+| APK 构建 | JDK | **17**（勿用 JDK 25） | JDK 25 与 build-tools 34 的 d8 不兼容（实测踩坑，见 CHANGELOG v2.x） |
+| APK 构建 | Android SDK build-tools | 34.0.0 | 需要 aapt2 / apksigner |
+| APK 构建 | Android SDK platforms | android-34 | javac 编译 android.jar |
+| APK 构建 | adb | platform-tools | 仅安装调试用 |
+| 可选：AI 运行时重组 | Node.js + esbuild | Node 18+ | `node tools/build-offline-ai.mjs` |
+| 可选：端侧模型 | model.gguf（469MB）、PP-OCR 模型 | — | 体积大不入库，放置路径见 `android/app/src/main/assets/offline-ai/README.md` |
+
+### 环境变量模板
+
+浏览器方式（方式一）**无需任何环境变量**；APK 构建需要以下三项。复制为 `.env` 或直接 export：
+
+```bash
+# ===== APK 构建环境变量模板 =====
+export ANDROID_HOME=$HOME/Android/Sdk     # Android SDK 根目录（含 build-tools/34.0.0）
+export JAVA_HOME=/usr/lib/jvm/jdk-17      # JDK 17 路径（勿用 JDK 25：与 build-tools 34 d8 不兼容）
+export KS_PASS=你的keystore密码            # 签名 keystore 密码（自行 keytool 生成，不入库）
+
+# 可选：adb 不在 PATH 时
+# export PATH=$ANDROID_HOME/platform-tools:$PATH
+
+# 无默认值，缺失时 build_apk.sh 会给出明确报错提示
 ```
 
 ### （可选）重新组装端侧 AI 运行时
@@ -112,4 +141,4 @@ OCR / LLM 模型文件体积较大，不入 git 仓库（.gitignore 已排除）
 
 ## 版本历史
 
-见 [CHANGELOG.md](CHANGELOG.md)——从 v1.0 基础记账到 v3.0 的每一轮迭代：每处 bug 的现象、根因、修复方案与浏览器实测结论。
+见 [CHANGELOG.md](CHANGELOG.md)——从 v1.0 基础记账到 v3.1（v3.1 新增预算管家组件并完成 28 项全面体检修复）的每一轮迭代：每处 bug 的现象、根因、修复方案与浏览器实测结论。
