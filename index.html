@@ -2064,25 +2064,35 @@ const App={
       // 安全网：若 WebView 异常丢失指针捕获（pointerup 没送达），也能把拖拽状态收尾，
       // 防止 dragging 卡死导致滑块再也按不动。正常松手时 dragging 已为 false，此回调是空操作
       nav.addEventListener('lostpointercapture',onUp);
-    }else{
-      // 老 WebView 没有 PointerEvent：上面整段会静默失灵。把 touch 事件适配成
-      // pointer 风格（补一个 pointerId），复用同一套 onDown/onMove/onUp 逻辑。
-      // touchstart 保持 passive——onDown 只读坐标，不改默认行为
-      nav.addEventListener('touchstart',e=>{
-        if(e.touches.length!==1)return;
-        const t=e.touches[0];t.pointerId=0;onDown(t);
-      },{passive:true});
-      window.addEventListener('touchmove',e=>{
-        if(!dragging||e.touches.length!==1)return;
-        const t=e.touches[0];t.pointerId=0;onMove(t);
-      },{passive:false});
-      const tEnd=e=>{
-        const t=e.changedTouches&&e.changedTouches[0];
-        if(t){t.pointerId=0;onUp(t);}
-      };
-      window.addEventListener('touchend',tEnd,{passive:false});
-      window.addEventListener('touchcancel',tEnd);
     }
+    // touch 兜底：始终注册（旧版只在"无 PointerEvent"时注册，导致 PointerEvent 环境下
+    // 模拟器/魔改内核若不派发 pointer，滑块就彻底按不动）。标准浏览器 pointerdown 先于
+    // touchstart → touchstart 被 dragging 挡住零干扰；接管时 pid=0 标识 touch 流，
+    // 与 pointer 流经 onMove/onUp 的 pid 过滤互不串扰（雷电模拟器安卓14 实测问题）
+    nav.addEventListener('touchstart',e=>{
+      if(dragging||e.touches.length!==1)return;
+      const t=e.touches[0];
+      // 显式包装：给 Touch 宿主对象强设 pointerId 属性会静默失败（pid 变 undefined 被过滤挡死），
+      // preventDefault/stopPropagation 必须转发给原生事件（touchmove 注册 passive:false 才生效）
+      onDown({clientX:t.clientX,clientY:t.clientY,pointerId:0,
+        stopPropagation(){e.stopPropagation();},preventDefault(){e.preventDefault();}});
+    },{passive:true});
+    window.addEventListener('touchmove',e=>{
+      if(!dragging||pid!==0||e.touches.length!==1)return;
+      const t=e.touches[0];
+      onMove({clientX:t.clientX,clientY:t.clientY,pointerId:0,
+        stopPropagation(){},preventDefault(){e.preventDefault();}});
+    },{passive:false});
+    const tEnd=e=>{
+      if(!dragging||pid!==0)return;
+      if(e.changedTouches&&e.changedTouches[0])onUp({pointerId:0});
+    };
+    window.addEventListener('touchend',tEnd,{passive:false});
+    window.addEventListener('touchcancel',tEnd);
+    // 防卡死：拖动中窗口失焦/切后台时 PC/模拟器鼠标不会收到 pointercancel，
+    // dragging 永远卡在 true → 滑块再也按不动。强制收尾恢复可用状态
+    window.addEventListener('blur',()=>{if(dragging)onUp(null);});
+    document.addEventListener('visibilitychange',()=>{if(document.hidden&&dragging)onUp(null);});
     // Dock 触控跟随光斑：指针在胶囊上移动时柔光跟到哪（rAF 合帧写 CSS 变量，
     // gBCR 只在按下后取一次缓存，拖拽/悬停都生效，松手淡出）
     if(!this._dockLightBound){
@@ -2110,7 +2120,8 @@ const App={
   initTypeDrag(){
     const tg=document.getElementById('typeToggle');
     const sl=document.getElementById('ttSlider');
-    if(!tg||!sl||!window.PointerEvent)return;
+    if(!tg||!sl)return;   // 旧版此处要求 window.PointerEvent，无 pointer 层的环境直接放弃拖拽；
+                          // 现在补了下方 touch 兜底，任何输入环境都能拖
     let dragging=false,moved=false,pid=null,startX=0,basePx=0,curPx=0,slW=0,target=null;
     const onDown=e=>{
       if(e.button!==undefined&&e.button!==0)return;
@@ -2162,10 +2173,34 @@ const App={
     };
     const onUp=e=>finish(e,true);
     const onCancel=e=>finish(e,false);
-    tg.addEventListener('pointerdown',onDown);
-    window.addEventListener('pointermove',onMove,{passive:false});
-    window.addEventListener('pointerup',onUp);
-    window.addEventListener('pointercancel',onCancel);
+    if(window.PointerEvent){
+      tg.addEventListener('pointerdown',onDown);
+      window.addEventListener('pointermove',onMove,{passive:false});
+      window.addEventListener('pointerup',onUp);
+      window.addEventListener('pointercancel',onCancel);
+    }
+    // touch 兜底（同 Dock 滑块）：模拟器/魔改内核只派发 touch 不派发 pointer 时接管，
+    // pid=0 标识 touch 流；标准环境 pointerdown 先到，touchstart 被 dragging 挡住零干扰
+    tg.addEventListener('touchstart',e=>{
+      if(dragging||e.touches.length!==1)return;
+      const t=e.touches[0];
+      onDown({clientX:t.clientX,clientY:t.clientY,pointerId:0,
+        stopPropagation(){e.stopPropagation();},preventDefault(){e.preventDefault();}});
+    },{passive:true});
+    window.addEventListener('touchmove',e=>{
+      if(!dragging||pid!==0||e.touches.length!==1)return;
+      const t=e.touches[0];
+      onMove({clientX:t.clientX,clientY:t.clientY,pointerId:0,
+        stopPropagation(){},preventDefault(){e.preventDefault();}});
+    },{passive:false});
+    const tEnd=e=>{
+      if(!dragging||pid!==0)return;
+      if(e.changedTouches&&e.changedTouches[0])onUp({pointerId:0});
+    };
+    window.addEventListener('touchend',tEnd,{passive:false});
+    window.addEventListener('touchcancel',tEnd);
+    // 防卡死：拖动中失焦强制收尾（PC/模拟器鼠标不发 pointercancel，否则 dragging 永久卡死）
+    window.addEventListener('blur',()=>{if(dragging)finish(null,true);});
   },
   updateDateTime(){
     // 性能门控：页面隐藏或不在记页（碎银时钟所在页）时直接返回。
@@ -4969,6 +5004,9 @@ const App={
     const up=e=>{this._ptrs.delete(e.pointerId);};
     stage.addEventListener('pointerup',up);
     stage.addEventListener('pointercancel',up);
+    // 防残留：拖动中窗口失焦 pointerup 不送达 → Map 残留旧指针，下次打开裁剪误判
+    // 多指状态（size>=2 直接拒收）。失焦即清空，与 Dock/收支滑块的防卡死同思路
+    window.addEventListener('blur',()=>{if(this._ptrs&&this._ptrs.size)this._ptrs.clear();});
   },
   _cropZoom(v){
     const c=this._crop;if(!c)return;
