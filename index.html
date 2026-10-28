@@ -1317,7 +1317,8 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
       <div class="author-card">
         <div class="author-name">🎓 我不要芒果</div>
         <div class="author-bio" style="line-height:1.7;color:var(--t2)">大一计算机科学与技术专业在读，<br>用 Trae + DeepSeek 打磨的纯本地记账工具。<br>没有广告与会员，数据只存在你的设备里。</div>
-        <div class="author-ver">碎银记 v3.0 · 持续更新中</div>
+        <div class="author-ver">碎银记 v3.0 · 构建 #20 · 持续更新中</div>
+        <div id="sliderDiagLine" style="font-size:11px;color:var(--t3);margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.6"></div>
       </div>
     </div>
   </div>
@@ -1612,6 +1613,20 @@ const App={
     setTimeout(function(){self.renderProfile();self.renderAchievements();},250);
     // 启动公告
     this._showWelcome();
+    // 端侧 AI 启动空闲预热：4s 后借空闲窗口加载引擎模块 + OCR 引擎（几 MB）+ 首次模型释放
+    //（Java 后台线程，仅首次安装需要）。LLM 491MB 故意不在此加载——避免首启内存尖峰，
+    // 只在用户点开截图面板时由 _aiWarm 拉起
+    setTimeout(()=>{
+      const idle=window.requestIdleCallback||function(f){setTimeout(f,1200);};
+      idle(()=>{
+        try{
+          this._aiLoadModule().then(mod=>{
+            this._aiEnsureOcr(mod).catch(()=>{});
+            this._aiEnsureModel().catch(()=>{});
+          }).catch(()=>{});
+        }catch(e){}
+      });
+    },4000);
   },
 
   // ===== Welcome Announcement =====
@@ -1963,8 +1978,18 @@ const App={
     // 拖动监听挂在整个 Dock 上：选中态 Tab 的图标 z-index 高于玻璃块，
     // 只听玻璃块自己的 pointerdown 会被按钮挡住，按住就拖不动了
     const blockClick=ev=>{ev.stopPropagation();ev.preventDefault();};
+    // 运行时自诊断（关于页展示）：暴露「逻辑 down 次数/走的哪条流/自愈次数」，
+    // 真机上按住滑一次再打开「我的」页截图即可一锤定音定位故障层
+    const diag=(k,v)=>{const g=window.__sliderDiag;if(!g)return;
+      if(k==='down'){g.downN++;g.last=g._stream||'-';}
+      else if(k==='move')g.moveN++;
+      else if(k==='up')g.upN++;
+      else if(k==='heal')g.heal++;
+      else if(k==='stream')g._stream=v;};
     const onDown=e=>{
-      if(e.button!==undefined&&e.button!==0)return;
+      // 只挡右键/中键：个别魔改内核 pointerdown.button 会是 -1 或未知值，
+      // 旧判断 button!==0 会把这些合法按下全部挡死（2.5 能拖 3.0 不能拖的可疑面之一）
+      if(e.button!==undefined&&e.button>0)return;
       if(dragging){
         // 多点触控：拖拽中忽略第二根手指，防止滑块被另一指劫持跳变
         // 悬挂自愈（雷电模拟器安卓14 用户反馈）：拖动中 up/cancel 永不送达——PC 鼠标在窗口外松开、
@@ -1973,8 +1998,10 @@ const App={
         if(Date.now()-downAt<3000)return;
         dragging=false;pid=null;
         ind.classList.remove('dragging');ind.style.transform='';
+        diag('heal');
       }
       dragging=true;moved=false;pid=e.pointerId;downAt=Date.now();
+      diag('down');diag('stream',(e.pointerId===-1?'mouse':e.pointerId===0?'touch':'pointer')+'#'+e.pointerId);
       // 停掉果冻动画：它靠 keyframes 覆盖 transform，会和下面每帧写入的拖拽 transform 打架
       ind.classList.remove('jelly');
       // 冻结当前视觉位置：若玻璃块还在滑动（left 过渡没跑完），
@@ -2010,8 +2037,18 @@ const App={
       e.stopPropagation();
     };
     const onMove=e=>{
-      if(!dragging||(pid!==null&&e.pointerId!==pid))return;
+      if(!dragging)return;
+      if(pid!==null&&e.pointerId!==pid){
+        // 魔改内核流改绑（雷电/模拟器按住拖不动的结构性防御）：down 与 move 走了不同输入流
+        //（如 pointerdown 之后只派发 touchmove、或同流 pointerId 每次重新分配）时，
+        // 旧过滤会把 move 永远挡死 → 按得住但拖不动。真正拖动起来之前跟随首个有效 move 改绑；
+        // 第二指（isPrimary=false）不允许劫持，已拖动后也不改绑（交给悬挂自愈兜底）
+        if(e.isPrimary===false||moved||Date.now()-downAt>=1500)return;
+        pid=e.pointerId;
+        diag('stream','rebind>'+(e.pointerId===-1?'mouse':e.pointerId===0?'touch':'pointer')+'#'+e.pointerId);
+      }
       downAt=Date.now();   // 活跃续命：move 还在到达就不算悬挂，慢拖多久都不会被自愈打断
+      diag('move');
       const x=e.clientX;
       const raw=x-startX;
       if(Math.abs(raw)>4){
@@ -2040,8 +2077,11 @@ const App={
     };
     const onUp=e=>{
       if(!dragging)return;
-      if(pid!==null&&e&&e.pointerId!==undefined&&e.pointerId!==pid)return;
+      // pid 不一致的 up：轻点窗口内（未真正拖动）放行收尾，避免魔改内核 up 流错位卡死；
+      // 已拖动则仍拒绝（可能是第二指误抬），交给悬挂自愈兜底
+      if(pid!==null&&e&&e.pointerId!==undefined&&e.pointerId!==pid&&!(moved===false&&Date.now()-downAt<1500))return;
       dragging=false;pid=null;
+      diag('up');
       // 轻点（没真正拖动）：立刻恢复过渡并 flush 样式，然后直接返回（不走下面的拖拽收尾逻辑）。
       // flush 很关键：不加会和紧随其后的 click → switchPage 写 left 合并成一次样式变更，
       // 导致过渡前样式仍是 transition:none → 玻璃块瞬移，果冻动画完全看不到
@@ -2091,7 +2131,8 @@ const App={
         stopPropagation(){e.stopPropagation();},preventDefault(){e.preventDefault();}});
     },{passive:true});
     window.addEventListener('touchmove',e=>{
-      if(!dragging||pid!==0||e.touches.length!==1)return;
+      // 不再挡 pid!==0：混搭流（pointerdown 后只来 touchmove）由 onMove 的流改绑统一接管
+      if(!dragging||e.touches.length!==1)return;
       const t=e.touches[0];
       onMove({clientX:t.clientX,clientY:t.clientY,pointerId:0,
         stopPropagation(){},preventDefault(){e.preventDefault();}});
@@ -2111,7 +2152,7 @@ const App={
     // 触摸派发的 mousedown 带 firesTouchEvents 标记、touch 结束 700ms 窗口内的也跳过——
     // 标准环境下 pointerdown 先建流，本路径全程被 dragging 挡住，零干扰
     nav.addEventListener('mousedown',e=>{
-      if(e.button!==undefined&&e.button!==0)return;
+      if(e.button!==undefined&&e.button>0)return;
       if(dragging)return;
       if(e.sourceCapabilities&&e.sourceCapabilities.firesTouchEvents)return;
       if(Date.now()-lastTouchEnd<700)return;
@@ -2119,7 +2160,8 @@ const App={
         stopPropagation(){e.stopPropagation();},preventDefault(){e.preventDefault();}});
     });
     window.addEventListener('mousemove',e=>{
-      if(!dragging||pid!==-1)return;
+      // 同 touchmove：不挡 pid，混搭流交给 onMove 流改绑
+      if(!dragging)return;
       onMove({clientX:e.clientX,clientY:e.clientY,pointerId:-1,
         stopPropagation(){},preventDefault(){e.preventDefault();}});
     },{passive:false});
@@ -2160,7 +2202,9 @@ const App={
     let dragging=false,moved=false,pid=null,startX=0,basePx=0,curPx=0,slW=0,target=null;
     let downAt=0,lastTouchEnd=0;   // 同 Dock 滑块：悬挂自愈时间戳 + 合成鼠标防御窗
     const onDown=e=>{
-      if(e.button!==undefined&&e.button!==0)return;
+      // 只挡右键/中键：个别魔改内核 pointerdown.button 会是 -1 或未知值，
+      // 旧判断 button!==0 会把这些合法按下全部挡死（2.5 能拖 3.0 不能拖的可疑面之一）
+      if(e.button!==undefined&&e.button>0)return;
       if(dragging){
         if(Date.now()-downAt<3000)return;   // 多点触控：拖拽中忽略第二根手指
         // 悬挂自愈（同 Dock 滑块）：up/cancel 永不送达时 3 秒后强制收尾，滑块不会永久卡死
@@ -2177,7 +2221,12 @@ const App={
       curPx=basePx;
     };
     const onMove=e=>{
-      if(!dragging||(pid!==null&&e.pointerId!==pid))return;
+      if(!dragging)return;
+      if(pid!==null&&e.pointerId!==pid){
+        // 同 Dock 滑块流改绑：混搭流/pointerId 重分配时跟随首个有效 move（第二指与已拖动后不改绑）
+        if(e.isPrimary===false||moved||Date.now()-downAt>=1500)return;
+        pid=e.pointerId;
+      }
       downAt=Date.now();   // 活跃续命：同 Dock 滑块
       const dx=e.clientX-startX;
       if(Math.abs(dx)>4&&!moved){moved=true;try{tg.setPointerCapture&&tg.setPointerCapture(e.pointerId);}catch(err){}}
@@ -2191,7 +2240,8 @@ const App={
     };
     const finish=(e,commit)=>{
       if(!dragging)return;
-      if(pid!==null&&e&&e.pointerId!==undefined&&e.pointerId!==pid)return;
+      // 轻点窗口内 pid 不一致也放行收尾（同 Dock 滑块），防魔改内核 up 流错位卡死
+      if(pid!==null&&e&&e.pointerId!==undefined&&e.pointerId!==pid&&!(moved===false&&Date.now()-downAt<1500))return;
       dragging=false;pid=null;
       // 轻点（没真正拖动）：立刻恢复过渡并 flush 样式，让紧随的 click → setType
       // 的滑动+果冻动画完整可见（同 Dock 滑块的处理）
@@ -2230,7 +2280,8 @@ const App={
         stopPropagation(){e.stopPropagation();},preventDefault(){e.preventDefault();}});
     },{passive:true});
     window.addEventListener('touchmove',e=>{
-      if(!dragging||pid!==0||e.touches.length!==1)return;
+      // 不挡 pid：混搭流交给 onMove 流改绑（同 Dock 滑块）
+      if(!dragging||e.touches.length!==1)return;
       const t=e.touches[0];
       onMove({clientX:t.clientX,clientY:t.clientY,pointerId:0,
         stopPropagation(){},preventDefault(){e.preventDefault();}});
@@ -2245,7 +2296,7 @@ const App={
     window.addEventListener('blur',()=>{if(dragging)finish(null,true);});
     // 鼠标兜底（同 Dock 滑块最后防线）：pointer、touch 都不派发时走 mouse 层；pid=-1 流互斥
     tg.addEventListener('mousedown',e=>{
-      if(e.button!==undefined&&e.button!==0)return;
+      if(e.button!==undefined&&e.button>0)return;
       if(dragging)return;
       if(e.sourceCapabilities&&e.sourceCapabilities.firesTouchEvents)return;
       if(Date.now()-lastTouchEnd<700)return;
@@ -2253,7 +2304,8 @@ const App={
         stopPropagation(){e.stopPropagation();},preventDefault(){e.preventDefault();}});
     });
     window.addEventListener('mousemove',e=>{
-      if(!dragging||pid!==-1)return;
+      // 同 touchmove：不挡 pid，混搭流交给 onMove 流改绑
+      if(!dragging)return;
       onMove({clientX:e.clientX,clientY:e.clientY,pointerId:-1,
         stopPropagation(){},preventDefault(){e.preventDefault();}});
     },{passive:false});
@@ -4268,6 +4320,8 @@ const App={
       '<input id="ssNote" placeholder="备注（可选）" class="m-inp">'+
       '<button class="btn-primary" id="btnImportScreenshot" onclick="App._confirmScreenshotImport()" style="display:none">确认导入</button></div>';
     this.showModal(html,'sheet');
+    // 打开截图导入面板即预热（模块+模型释放+LLM+OCR 并行）：用户拍图/挑图的时间里引擎静默就绪
+    try{this._aiWarm();}catch(e){}
   },
   _pickScreenshotImage(mode){
     this._pickTarget='screenshot';
@@ -4450,16 +4504,7 @@ const App={
     throw new Error('模型准备超时');
   },
   async _aiRunOcr(mod,base64Data){
-    const base=this._aiBasePath();
-    if(!this._aiOcr){
-      this._aiOcr=await mod.PaddleOCR.create({
-        textDetectionModelName:'PP-OCRv6_tiny_det',
-        textDetectionModelAsset:{url:base+'ocr/models/PP-OCRv6_tiny_det.tar'},
-        textRecognitionModelName:'PP-OCRv6_tiny_rec',
-        textRecognitionModelAsset:{url:base+'ocr/models/PP-OCRv6_tiny_rec.tar'},
-        ortOptions:{backend:'wasm',wasmPaths:base+'ocr/ort/'}
-      });
-    }
+    await this._aiEnsureOcr(mod);   // 单例化：启动/面板预热已创建则直接复用，冷路径与预热路径同一实现
     const bin=atob(base64Data);
     const arr=new Uint8Array(bin.length);
     for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
@@ -4493,24 +4538,65 @@ const App={
     if(onProgress)onProgress(100);
     return new Blob(chunks,{type:'application/octet-stream'});
   },
-  // 加载（或复用）端侧 LLM 单例；onProgress(pct) 可选，默认把进度写到截图导入的状态条
+  // 加载（或复用）端侧 LLM 单例；onProgress(pct) 可选，默认把进度写到截图导入的状态条。
+  // promise 级单例：预热与识别流程可能并发进入，双份 491MB 加载会直接打爆移动端内存——
+  // 后到者复用同一 promise，谁先谁后拿到的都是同一个引擎实例
   async _aiEnsureLlm(onProgress){
     if(this._aiLlm)return this._aiLlm;
+    if(this._aiLlmP)return this._aiLlmP;
     const base=this._aiBasePath();
-    const mod=await this._aiLoadModule();
-    const noCache={isSupported(){return false},read(){return Promise.resolve(null)},write(){return Promise.resolve()},getSize(){return Promise.resolve(-1)},list(){return Promise.resolve([])},delete(){return Promise.resolve()},deleteMany(){return Promise.resolve()},clear(){return Promise.resolve()}};
-    const llm=new mod.Wllama({default:base+'llm/wasm/wllama.wasm'},{suppressNativeLog:true,cacheManager:noCache});
-    const rep=p=>{
-      if(typeof onProgress==='function')onProgress(p);
-      else this._aiStatus(p<100?('加载语言模型 '+p+'%'):'初始化语言模型…','load');
-    };
-    const blob=await this._aiFetchModel(base+'llm/model.gguf',rep);
-    await llm.loadModel([blob],{
-      n_ctx:1024,
-      n_threads:Math.max(1,Math.min(4,(navigator.hardwareConcurrency||2)-1))
-    });
-    this._aiLlm=llm;
-    return llm;
+    this._aiLlmP=(async()=>{
+      const mod=await this._aiLoadModule();
+      const noCache={isSupported(){return false},read(){return Promise.resolve(null)},write(){return Promise.resolve()},getSize(){return Promise.resolve(-1)},list(){return Promise.resolve([])},delete(){return Promise.resolve()},deleteMany(){return Promise.resolve()},clear(){return Promise.resolve()}};
+      const llm=new mod.Wllama({default:base+'llm/wasm/wllama.wasm'},{suppressNativeLog:true,cacheManager:noCache});
+      const rep=p=>{
+        if(typeof onProgress==='function')onProgress(p);
+        else this._aiStatus(p<100?('加载语言模型 '+p+'%'):'初始化语言模型…','load');
+      };
+      const blob=await this._aiFetchModel(base+'llm/model.gguf',rep);
+      await llm.loadModel([blob],{
+        n_ctx:1024,
+        // 上限 4→6：小参数量模型吃线程，模拟器/新SoC（8核普遍）下首 token 更快；
+        // 低端机 hardwareConcurrency 低时自动跟随，不强推
+        n_threads:Math.max(1,Math.min(6,(navigator.hardwareConcurrency||2)-1))
+      });
+      this._aiLlm=llm;
+      return llm;
+    })();
+    try{return await this._aiLlmP;}catch(e){this._aiLlmP=null;throw e;}
+  },
+  // 创建（或复用）端侧 OCR 引擎单例：体积极小（几 MB 模型 + WASM），启动空闲与选图预热都会拉起。
+  // promise 级单例：启动预热与用户操作可能并发进入，防双份 create 竞态覆写
+  async _aiEnsureOcr(mod){
+    if(this._aiOcr)return this._aiOcr;
+    if(this._aiOcrP)return this._aiOcrP;
+    const base=this._aiBasePath();
+    this._aiOcrP=(async()=>{
+      this._aiOcr=await mod.PaddleOCR.create({
+        textDetectionModelName:'PP-OCRv6_tiny_det',
+        textDetectionModelAsset:{url:base+'ocr/models/PP-OCRv6_tiny_det.tar'},
+        textRecognitionModelName:'PP-OCRv6_tiny_rec',
+        textRecognitionModelAsset:{url:base+'ocr/models/PP-OCRv6_tiny_rec.tar'},
+        ortOptions:{backend:'wasm',wasmPaths:base+'ocr/ort/'}
+      });
+      return this._aiOcr;
+    })();
+    try{return await this._aiOcrP;}catch(e){this._aiOcrP=null;throw e;}
+  },
+  // 端侧 AI 预热：用户点开截图（意图已明确）就并行拉起 引擎模块+模型释放+LLM 加载，
+  // 挑图/拍图/OCR 的时间里 LLM 静默就绪——感知等待从「OCR+LLM加载+推理」缩到「OCR+推理」
+  _aiWarm(){
+    if(this._aiWarmP)return this._aiWarmP;
+    this._aiWarmP=(async()=>{
+      const mod=await this._aiLoadModule();
+      await Promise.all([
+        this._aiEnsureModel().catch(e=>{console.warn('[预热]模型释放',e);}),
+        this._aiEnsureLlm().catch(e=>{console.warn('[预热]LLM',e);}),
+        this._aiEnsureOcr(mod).catch(e=>{console.warn('[预热]OCR',e);})
+      ]);
+      return true;
+    })().catch(e=>{this._aiWarmP=null;throw e;});
+    return this._aiWarmP;
   },
   async _aiRunLlm(mod,text){
     await this._aiEnsureLlm();
@@ -4933,6 +5019,16 @@ const App={
       const s=this.getSettings();
       const today=dstr(new Date());
       fl.textContent=s.fortuneDate===today?s.fortuneLevel:'未抽';
+    }
+    // 滑块拖拽诊断：探针=事件是否进页面，逻辑=主处理器是否收到，流=走的哪条输入流。
+    // 真机按住滑一次再打开本页截图：探针 0 → 输入没到 WebView（模拟器/壳层）；
+    // 探针有数逻辑 0 → 绑定层；都有数仍拖不动 → 拖拽逻辑层
+    const dl=document.getElementById('sliderDiagLine');
+    if(dl){
+      const g=window.__sliderDiag;
+      dl.textContent=g?('拖拽诊断 · 探针 down'+g.pDown+'/touch'+g.pTouch+'/mouse'+g.pMouse+'/move'+g.pMove+
+        ' · 逻辑 down'+g.downN+'/move'+g.moveN+'/up'+g.upN+' · 流 '+(g.last||'-')+
+        ' · 绑定'+(g.navBound?'✓':'✗')+' · 自愈'+g.heal+(g.bindErr?(' · err:'+g.bindErr):'')):'';
     }
   },
 
@@ -6326,11 +6422,24 @@ const App={
 document.addEventListener('DOMContentLoaded',()=>App.init());
 </script>
 <script>
-/* ===== 滑块拖拽绑定兜底（独立于 App.init 链，雷电模拟器安卓14 用户反馈）=====
-   症状：能点 Tab 切页（onclick 内联），但按住滑块拖不动——典型 init 链在个别 WebView 环境
-   中途抛错：initNavDrag/initTypeDrag 位于链尾，一次抛错就永远绑不上监听。
-   这里独立轮询补齐绑定（initNavDrag/initTypeDrag 内部幂等标记防重复），与 init 链完全解耦 */
+/* ===== 滑块拖拽：事件探针 + 绑定兜底（独立于 App.init 链，雷电模拟器安卓14 两轮实测反馈）=====
+   1) 探针：capture 阶段只记数不干预——无论主逻辑是否绑定成功，都能证明「事件有没有进页面」。
+      关于页展示诊断值：探针有数而逻辑 down=0 → 绑定层故障；探针也无数 → 输入根本没到 WebView
+      （模拟器按键映射/壳层问题）。真机按住滑一次再打开「我的」页截图即可一锤定音。
+   2) 兜底：init 链中途抛错会让链尾的 initNavDrag/initTypeDrag 永远绑不上（Tab 内联 onclick 照常），
+      这里独立轮询补齐（内部幂等标记防双绑）。800ms 首 tick 足够快，绑定成功即停 */
 (function(){
+  window.__sliderDiag={ver:20,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
+    pDown:0,pTouch:0,pMouse:0,pMove:0,bindErr:''};
+  var d=window.__sliderDiag;
+  function inNav(e){var n=e.target;var nav=document.querySelector('.bottom-nav');
+    return !!(nav&&n&&n.nodeType===1&&nav.contains(n));}
+  // 探针（document capture，零干预）
+  document.addEventListener('pointerdown',function(e){if(inNav(e))d.pDown++;},true);
+  document.addEventListener('touchstart',function(e){if(inNav(e))d.pTouch++;},true);
+  document.addEventListener('mousedown',function(e){if(inNav(e))d.pMouse++;},true);
+  document.addEventListener('pointermove',function(e){if(inNav(e))d.pMove++;},true);
+  // 绑定兜底轮询
   var tries=0;
   var t=setInterval(function(){
     tries++;
@@ -6339,9 +6448,12 @@ document.addEventListener('DOMContentLoaded',()=>App.init());
       if(typeof App!=='undefined'&&typeof App.initNavDrag==='function'&&typeof App.initTypeDrag==='function'){
         App.initNavDrag();App.initTypeDrag();   // 已绑定则幂等空转
       }
-    }catch(e){}
-    if(tries>=40)clearInterval(t);   // 40 × 1.5s = 60s 后停（成功绑定后空转到此自然结束）
-  },1500);
+      var nav=document.querySelector('.bottom-nav');
+      d.navBound=!!(nav&&nav._dragBound);
+      if(d.navBound&&tries>2)clearInterval(t);   // 绑上后多跑两拍确认稳态即停
+    }catch(e){d.bindErr=String(e&&e.message||e);}
+    if(tries>=75)clearInterval(t);   // 75 × 0.8s = 60s 后停
+  },800);
 })();
 </script>
 </body>
