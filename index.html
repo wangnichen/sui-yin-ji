@@ -1299,7 +1299,7 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
       <div class="author-card">
         <div class="author-name">🎓 我不要芒果</div>
         <div class="author-bio" style="line-height:1.7;color:var(--t2)">大一计算机科学与技术专业在读，<br>用 Trae + DeepSeek 打磨的纯本地记账工具。<br>没有广告与会员，数据只存在你的设备里。</div>
-        <div class="author-ver">碎银记 v3.0 · 构建 #22 · 持续更新中</div>
+        <div class="author-ver">碎银记 v3.0 · 构建 #23 · 持续更新中</div>
         <div id="sliderDiagLine" style="font-size:11px;color:var(--t3);margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.6"></div>
       </div>
     </div>
@@ -1367,6 +1367,30 @@ const CATS=[
   {k:'other',n:'其他',i:'📋',c:'#78909c',bg:'#f0f2f5'},
 ];
 const EC=['food','transport','shopping','entertain','housing','medical','edu','shower','other'];
+// ===== 分类关键词表（构建 #23）=====
+// 两处共用：文本导入的关键词猜测 + 截图 OCR 的本地规则预解析。
+// 顺序即优先级，越具体的排越前——注意「三江学院_南区食堂_餐费支出」这类真实账单，
+// 收款方带「学院」极易被误判成教育，所以 food 必须压过 edu，且 edu 不收「学院」这种泛词。
+const CAT_KW=[
+  ['food',/(食堂|餐费|餐饮|餐厅|饭店|小吃|外卖|美团|饿了么|肯德基|麦当劳|汉堡|披萨|星巴克|瑞幸|喜茶|蜜雪|奶茶|咖啡|早餐|午餐|晚餐|夜宵|火锅|烧烤|烘焙|面包|米线|面馆|快餐|食品|生鲜|菜市场|超市.{0,4}(菜|食品))/],
+  ['entertain',/(电影|影院|游戏|KTV|演出|演唱会|门票|剧本杀|密室|网吧|会员|爱奇艺|腾讯视频|优酷|B站|哔哩)/i],
+  ['transport',/(地铁|公交|打车|滴滴|出租车|高铁|火车票|机票|加油|停车|高速|单车|船票|交通)/],
+  ['shower',/(洗浴|洗澡|淋浴|澡堂|热水|理发|美发|足浴|按摩|SPA)/i],
+  ['medical',/(医院|药房|药店|挂号|诊所|门诊|体检|牙科|医保|医疗)/],
+  ['edu',/(学费|培训|文具|书店|教材|课程|网课|考试费|补习|辅导|学术|论文)/],
+  ['housing',/(房租|租金|水费|电费|燃气|物业|宽带|维修|家政)/],
+  ['shopping',/(淘宝|天猫|京东|拼多多|超市|商城|购物|百货|服饰|服装|鞋|化妆品|数码|家电|便利店|日用品)/],
+  ['salary',/(工资|薪资|薪水|发薪|月薪|劳务|报销)/],
+  ['gift',/(红包|礼金|压岁钱|份子)/],
+  ['invest',/(理财|基金|股票|证券|收益|利息|分红|定投|余额宝)/],
+  ['refund',/(退款|退回|返还|退费)/],
+];
+// 按优先级匹配分类代码；全部未命中返回 ''（保持未分类，不硬塞「其他」）
+function catByKeywords(text){
+  const t=String(text||'');
+  for(let i=0;i<CAT_KW.length;i++){if(CAT_KW[i][1].test(t))return CAT_KW[i][0];}
+  return '';
+}
 // 日期字符串一律按「本地时区」取。旧版直接 toISOString()（UTC）有两个真 bug：
 // ① 每天 00:00~07:59（北京时间）会算成前一天，凌晨记账日期凭空早一天；
 // ② new Date(y,m,1) 这类「本地零点」永远落在 UTC 的前一天——「上月统计」实际取到的是上上月。
@@ -4197,6 +4221,61 @@ const App={
     const sp=state==='load'?'<span class="ai-spin"></span>':(state==='err'?'⚠️ ':'✅ ');
     el.innerHTML='<span>'+sp+' '+msg+'</span>';
   },
+  // ===== 本地规则预解析（构建 #23）=====
+  // 真实账单截图的字段有很强的结构特征（大字号金额、日期时间、「商品说明/收款方」、分类词），
+  // 用规则就能稳定命中 —— 命中时完全不加载 491MB 语言模型，识别从「几十秒」降到「一秒内」。
+  // 0.5B 小模型本来就不擅长「三江学院_南区食堂_餐费支出」这种中文分类映射，规则反而更准。
+  // 返回 null 表示字段不足，交给端侧 LLM 兜底。
+  _aiRuleParse(text){
+    const raw=String(text||'');
+    const lines=raw.split(/\n/).map(function(s){return s.trim();}).filter(Boolean);
+    // —— 金额 ——
+    let amt=0;
+    const pats=[
+      /(?:实付|付款金额|支付金额|交易金额|消费金额|合计|总计|订单金额|金额)[：:\s]*[¥￥]?\s*([-+]?\d{1,7}(?:\.\d{1,2})?)/,
+      /[¥￥]\s*([-+]?\d{1,7}(?:\.\d{1,2})?)/
+    ];
+    for(let i=0;i<pats.length&&!amt;i++){
+      const m=raw.match(pats[i]);
+      if(m){const v=parseFloat(m[1].replace(/[^\d.]/g,''));if(v>0)amt=v;}
+    }
+    if(!amt){
+      // 支付宝/微信账单里金额常独立成行、带两位小数（-13.00 / 13.00 / +13.00）
+      for(let i=0;i<lines.length;i++){
+        const m=lines[i].match(/^[-\u2212+]?\s*([1-9]\d{0,5}\.\d{2})\s*$/);
+        if(m){amt=parseFloat(m[1]);break;}
+      }
+    }
+    if(!amt||!isFinite(amt)||amt<=0||amt>1e7)return null;
+    // —— 日期 ——（严格校验，且不许未来日期）
+    const today=dstr(new Date());
+    let date=today;
+    const dm=raw.match(/(20\d{2})\s*[-年\/.]\s*(\d{1,2})\s*[-月\/.]\s*(\d{1,2})/);
+    if(dm){
+      const c=dm[1]+'-'+('0'+dm[2]).slice(-2)+'-'+('0'+dm[3]).slice(-2);
+      if(/^\d{4}-\d{2}-\d{2}$/.test(c)&&c<=today&&c>='2000-01-01')date=c;
+    }
+    // —— 分类 ——
+    const cat=catByKeywords(raw);
+    // —— 备注 ——：优先结构化字段，避免整段 OCR 噪声塞进备注
+    let note='';
+    const nm=raw.match(/(?:商品说明|商品名称|收款方全称|收款方|商户名称|交易说明|备注)[：:\s]*([^\n]{1,30})/);
+    if(nm)note=nm[1].trim();
+    if(!note&&lines.length){
+      // 兜底：取「含分类关键词且最短」的一行（通常是商户名/商品名）
+      const cand=lines.filter(function(l){return l.length<=20&&catByKeywords(l);});
+      if(cand.length)note=cand.sort(function(a,b){return a.length-b.length;})[0];
+    }
+    note=note.replace(/[<>]/g,'').replace(/\s+/g,' ').slice(0,30);
+    if(!cat&&!note){
+      // 文本含交易语义（钱确实动过）→ 金额已可信，分类留空让用户选，
+      // 也比为猜一个分类去跑 90 秒小模型划算（构建 #23）
+      const strong=/(支付|转账|付款|交易|收款|消费|扣款|订单)/.test(raw);
+      if(strong)return {amount:Math.round(amt*100)/100,cat:'',date:date,note:''};
+      return null;   // 金额之外的字段一点没提到 → 交 LLM
+    }
+    return {amount:Math.round(amt*100)/100,cat:cat,date:date,note:note};
+  },
   async _tryExtractFromImage(base64Data){
     // 双锁统一：OCR 与对话/会诊共用 _aiLlm 单例，并发会互相污染 KV cache，必须串行
     if(this._aiBusy){this.showToast('正在识别中，请稍候…');return;}
@@ -4205,10 +4284,18 @@ const App={
     try{
       this._aiStatus('加载离线识别引擎…','load');
       const mod=await this._aiLoadModule();
-      await this._aiEnsureModel();
       this._aiStatus('OCR 识别图片文字…','load');
       const text=await this._aiRunOcr(mod,base64Data);
       if(!text)throw new Error('未识别到文字，请换一张清晰截图');
+      // 本地规则优先：字段齐全就直接出结果，不释放也不加载大模型（构建 #23）
+      const rule=this._aiRuleParse(text);
+      if(rule){
+        this._aiStatus('本地规则解析完成 · 未调用大模型','');
+        if(!document.getElementById('ssStatus'))return;
+        this._aiShowResult(rule,text);
+        return;
+      }
+      await this._aiEnsureModel();
       this._aiStatus('端侧 AI 解析金额/分类/日期…','load');
       const p=await this._aiRunLlm(mod,text);
       if(!document.getElementById('ssStatus'))return; // 弹窗已关闭则放弃回填
@@ -4398,10 +4485,12 @@ const App={
   },
   async _aiRunLlm(mod,text){
     await this._aiEnsureLlm();
-    const sys='你是记账信息提取器。根据支付截图的OCR文字提取账单，只输出一个JSON对象，禁止输出任何其他内容。格式：{"amount":金额数字,"cat":"分类代码","note":"简短备注","date":"YYYY-MM-DD"}。cat只能取：food,transport,shopping,entertain,housing,medical,edu,shower,other,salary,gift,invest,refund。没有明确日期时date填null。';
+    // 分类项带上中文释义（构建 #23）：0.5B 小模型对纯英文代码的映射能力差，
+    // 「食堂/餐费 → 餐饮」这类线索直接写进 prompt 比让它自己推更可靠
+    const sys='提取账单JSON，只输出JSON，不要解释。格式：{"amount":数字,"cat":"代码","note":"15字内","date":"YYYY-MM-DD或null"}。cat从这些里选：food餐饮(食堂/餐费/外卖/奶茶/咖啡)、transport交通、shopping购物、entertain娱乐、housing居住、medical医疗、edu教育、shower洗浴、salary工资、gift红包、invest理财、refund退款、other其它。';
     const resp=await this._aiLlm.createChatCompletion({
-      messages:[{role:'system',content:sys},{role:'user',content:String(text).slice(0,1500)}],
-      max_tokens:180,temperature:0.1
+      messages:[{role:'system',content:sys},{role:'user',content:String(text).slice(0,900)}],
+      max_tokens:120,temperature:0.1
     });
     const out=((resp&&resp.choices&&resp.choices[0]&&resp.choices[0].message&&resp.choices[0].message.content)||'').trim();
     let obj=null;
@@ -4436,16 +4525,15 @@ const App={
       if(r.cat)byCat[r.cat]=(byCat[r.cat]||0)+r.amt;
     });
     const tops=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]).slice(0,4)
-      .map(k=>{const c=this.getCatData(k);return (c.n||k)+' ¥'+byCat[k].toFixed(0)+'（'+(exp>0?Math.round(byCat[k]/exp*100):0)+'%）';}).join('、');
-    const recent=records.slice(0,5).map(r=>{
+      .map(k=>{const c=this.getCatData(k);return (c.n||k)+'¥'+byCat[k].toFixed(0)+'('+(exp>0?Math.round(byCat[k]/exp*100):0)+'%)';}).join(' ');
+    const recent=records.slice(0,3).map(r=>{
       const c=r.cat?this.getCatData(r.cat):null;
-      return r.date.slice(5)+' '+(r.type==='income'?'+':'-')+r.amt.toFixed(0)+(c&&c.n?(' '+c.n):'')+(r.note?(' '+String(r.note).slice(0,10)):'');
-    }).join('；');
+      return r.date.slice(5)+' '+(r.type==='income'?'+':'-')+r.amt.toFixed(0)+(c&&c.n?c.n:'');
+    }).join(';');
     const s=this.getSettings();
-    let out='今天是'+dstr(now)+'。本月支出 ¥'+exp.toFixed(0)+'（'+expN+'笔），收入 ¥'+inc.toFixed(0)+'。';
-    if(tops)out+='分类Top：'+tops+'。';
+    let out='本月支出¥'+exp.toFixed(0)+'/'+expN+'笔，收入¥'+inc.toFixed(0)+'。';
+    if(tops)out+='分类：'+tops+'。';
     if(s.budget>0){
-      out+='月预算 ¥'+Number(s.budget).toFixed(0)+'。';
       // 注入预算管家的预测数据，让对话/会诊能给出基于外推的建议
       const day=now.getDate();
       const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
@@ -4453,11 +4541,79 @@ const App={
         const forecast=exp/day*daysInMonth;
         const remain=Math.max(0,s.budget-exp);
         const safePerDay=remain/Math.max(1,daysInMonth-day+1);
-        out+='按当前日均外推月末将花 ¥'+forecast.toFixed(0)+'（'+(forecast>s.budget?'会超支':'未超预算')+'），剩余 '+(daysInMonth-day+1)+' 天，今日安全可花 ¥'+safePerDay.toFixed(0)+'。';
+        out+='预算¥'+s.budget.toFixed(0)+'，剩¥'+remain.toFixed(0)+'，日均¥'+(exp/day).toFixed(0)+'，月末外推¥'+forecast.toFixed(0)+(forecast>s.budget?'(会超)':'(未超)')+'，今日可花¥'+safePerDay.toFixed(0)+'。';
       }
     }
-    if(recent)out+='最近记录：'+recent+'。';
-    return out.slice(0,500);
+    if(recent)out+='最近：'+recent+'。';
+    // 压缩到 200 字：prompt 越短端侧小模型 prefill 越快（构建 #23，原 500 字在手机上要多花十几秒）
+    return out.slice(0,200);
+  },
+  // ===== 本地秒答（构建 #23）=====
+  // 用户最高频的四类问题（花哪了 / 最多 / 预算还剩 / 怎么省）完全可以由账本直接算出来，
+  // 结果确定、0 秒返回 —— 比让 0.5B 小模型跑 90 秒还答非所问强得多。实测真机就是这么翻车的。
+  // 返回 null 表示不是高频问题，交给端侧模型自由问答。
+  _aiQuickAnswer(q){
+    const t=String(q||'').replace(/\s/g,'');
+    if(!t||t.length>20)return null;   // 长问题交模型，避免规则误判
+    const now=new Date(),ym=dstr(now).slice(0,7);
+    const recs=this.getRecords().filter(r=>r.date&&String(r.date).indexOf(ym)===0);
+    if(!recs.length)return '这个月还没有记账。先记几笔，我就能看出你的钱花在哪了。';
+    let exp=0,inc=0,n=0;const byCat={};
+    recs.forEach(r=>{if(r.type==='income'){inc+=r.amt;return;}exp+=r.amt;n++;if(r.cat)byCat[r.cat]=(byCat[r.cat]||0)+r.amt;});
+    const rank=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]);
+    const top=rank[0]?this.getCatData(rank[0]):null;
+    const s=this.getSettings();
+    const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    const dayNow=Math.max(1,now.getDate());
+    // ① 钱花哪了 / 支出多少
+    if(/(花哪|花在|花到|消费|支出|花了多少|账单)/.test(t)){
+      let a='本月花了 ¥'+exp.toFixed(2)+'，共 '+n+' 笔';
+      if(rank.length){
+        const seg=rank.slice(0,3).map(k=>{const c=this.getCatData(k);return (c.n||k)+' ¥'+byCat[k].toFixed(0)+'（'+(exp>0?Math.round(byCat[k]/exp*100):0)+'%）';}).join('、');
+        a+='。花得最多的是 '+seg;
+      }else{a+='。都还没选分类，选上分类能看出钱的结构';}
+      if(exp>0)a+='。日均 ¥'+(exp/dayNow).toFixed(1)+'，按这个节奏月底约 ¥'+(exp/dayNow*daysInMonth).toFixed(0);
+      return a+'。';
+    }
+    // ② 花最多的是
+    if(/(最多|最大|最贵|占大头)/.test(t)){
+      if(!top)return '这个月的支出还没分类。给账目选上分类，我就能告诉你哪一类花得最多。';
+      return '花得最多的是 '+top.i+' '+top.n+'，¥'+byCat[rank[0]].toFixed(2)+'，占本月支出的 '+(exp>0?Math.round(byCat[rank[0]]/exp*100):0)+'%，在 '+rank.length+' 个分类里排第一。';
+    }
+    // ③ 预算 / 还剩
+    if(/(预算|还剩|剩多少|还能花|超支)/.test(t)){
+      if(!(Number(s.budget)>0))return '还没设月度预算。去「我的 → 预算设置」填一个数，我就能帮你盯着花。';
+      const remain=Number(s.budget)-exp,left=daysInMonth-now.getDate()+1;
+      if(remain<0)return '已经超预算 ¥'+Math.abs(remain).toFixed(2)+'（预算 ¥'+Number(s.budget).toFixed(0)+'）。建议先停掉非必需支出，剩下 '+left+' 天只花在吃饭和通勤上。';
+      return '预算 ¥'+Number(s.budget).toFixed(0)+'，已花 ¥'+exp.toFixed(0)+'，还剩 ¥'+remain.toFixed(0)+'，剩下 '+left+' 天，每天可花 ¥'+(remain/Math.max(1,left)).toFixed(0)+'。';
+    }
+    // ④ 怎么省钱 / 建议
+    if(/(省|建议|怎么办|控制|超了)/.test(t)){
+      const arr=[];
+      if(top&&exp>0&&byCat[rank[0]]/exp>0.4)arr.push('「'+top.n+'」占了 '+Math.round(byCat[rank[0]]/exp*100)+'%，是最大头，从这里砍最容易见效');
+      if(Number(s.budget)>0){
+        const remain=Number(s.budget)-exp;
+        if(remain<0)arr.push('已超预算 ¥'+Math.abs(remain).toFixed(0)+'，先冻结所有非必需消费');
+        else arr.push('预算还剩 ¥'+remain.toFixed(0)+'，拆到每天约 ¥'+(remain/Math.max(1,daysInMonth-now.getDate()+1)).toFixed(0)+'，超了就停');
+      }
+      arr.push(n<5?('本月只记了 '+n+' 笔，先把账记全，漏记的往往才是最大的黑洞'):('本月已记 '+n+' 笔，习惯不错，保持住'));
+      return arr.map(function(x,i){return (i+1)+'. '+x;}).join(' ');
+    }
+    return null;
+  },
+  // 复读检测：0.5B 小模型最常见的失败就是把用户的问题原样反问回来
+  _aiLooksParrot(ans,q){
+    const a=String(ans||'').trim();
+    if(!a||a.length<4)return true;
+    if(/您.{0,14}(吗|呢)\s*[？?]/.test(a)&&!/[¥\d]/.test(a))return true;
+    const norm=function(s){return String(s).replace(/[\s，。、？！,.\?!的了吗呢我你]/g,'');};
+    const qq=norm(q),aa=norm(a);
+    if(qq.length>=4&&aa.length<=qq.length*1.5){
+      let hit=0;const set=new Set(qq);
+      set.forEach(function(ch){if(aa.indexOf(ch)>=0)hit++;});
+      if(hit/Math.max(1,set.size)>=0.85)return true;
+    }
+    return false;
   },
   _aiChatSend(){
     const inp=document.getElementById('aiChatInput');
@@ -4521,13 +4677,7 @@ const App={
     };
     let rafId=0;
     try{
-      // 0. 端侧大模型（仅首次需要加载，之后常驻内存复用）
-      if(!this._aiLlm){
-        const st0=addStep('📦','加载端侧大模型（469MB，仅首次）');
-        await this._aiEnsureLlm(function(p){st0.meta.textContent=p+'%';});
-        endStep(st0,true,'✓');
-      }
-      // 1. 读取本月账本
+      // 1. 读取本月账本（构建 #23：491MB 模型加载下移到真正推理之前，秒答路径完全不碰它）
       const st1=addStep('📖','读取本月账本');
       const ctx=this._aiChatSummary();
       endStep(st1,true,ctx.length+' 字摘要');
@@ -4535,7 +4685,25 @@ const App={
       const st2=addStep('🧩','构建离线上下文');
       const hist=this._aiChatHist.slice(-2);
       endStep(st2,true,hist.length+' 轮历史');
-      // 3. 端侧流式推理：逐 token 回调 → rAF 合帧渲染，避免高频 DOM 写入
+      // 2.5 本地秒答：高频问题直接用账本算，0 秒返回（构建 #23）
+      // 真机实测 0.5B 回答「我这个月钱花哪儿了」会复读问题、耗时 92s，这类问题规则答案更快更准
+      const quick=this._aiQuickAnswer(q);
+      if(quick){
+        const stq=addStep('⚡','本地账本计算（未调用大模型）');
+        endStep(stq,true,'0.0s');
+        atext.textContent=quick;
+        this._aiChatHist.push({role:'user',content:q},{role:'assistant',content:quick});
+        if(this._aiChatHist.length>6)this._aiChatHist=this._aiChatHist.slice(-4);
+        msgs.scrollTop=msgs.scrollHeight;
+        return;
+      }
+      // 3. 端侧大模型（仅首次需要加载，之后常驻内存复用）——只有走到这里才真正需要它
+      if(!this._aiLlm){
+        const st0=addStep('📦','加载端侧大模型（469MB，仅首次）');
+        await this._aiEnsureLlm(function(p){st0.meta.textContent=p+'%';});
+        endStep(st0,true,'✓');
+      }
+      // 4. 端侧流式推理：逐 token 回调 → rAF 合帧渲染，避免高频 DOM 写入
       const st3=addStep('🧠','端侧模型推理中');
       let full='',toks=0;
       const msgsRef=msgs,atextRef=atext,st3Ref=st3;
@@ -4557,12 +4725,14 @@ const App={
         st3Ref.meta.textContent=toks+' tokens';
         if(!rafId)rafId=requestAnimationFrame(flush);
       };
-      const messages=[{role:'system',content:'你是「碎银记」的理财顾问。所有数据来自用户手机本地账本摘要，只依据摘要回答，不要编造数据。用口语化中文，不超过120字，给1-2条具体建议。'}]
+      // 小模型指令遵循很脆弱：账本放进 system（比塞在 user 里权重更高），并硬约束「不要反问」，
+      // 这是压住复读的关键；温度 0.7→0.25 防发散（构建 #23）
+      const messages=[{role:'system',content:'你在用户手机上离线运行。用户账本：'+ctx+'\n只依据上面的数字回答。中文，80字内，直接给结论和建议，不要反问用户，不要重复用户的问题。'}]
         .concat(hist.map(function(h){return {role:h.role,content:h.content};}))
-        .concat([{role:'user',content:'账本摘要：'+ctx+'\n\n我的问题：'+q}]);
+        .concat([{role:'user',content:q}]);
       const resp=await this._aiLlm.createChatCompletion({
         messages:messages,
-        max_tokens:220,temperature:0.7,
+        max_tokens:110,temperature:0.25,top_k:40,top_p:0.9,penalty_repeat:1.15,
         stream:true,onData:onData
       });
       // 兜底：引擎不支持流式回调时 full 为空，退回一次性结果
@@ -4570,6 +4740,10 @@ const App={
         full=((resp&&resp.choices&&resp.choices[0]&&resp.choices[0].message&&resp.choices[0].message.content)||'').trim();
       }
       if(rafId){cancelAnimationFrame(rafId);rafId=0;}
+      // 复读兜底：小模型把问题反问回来时，用本地账本答案顶上去（构建 #23）
+      if(this._aiLooksParrot(full,q)){
+        full=this._aiQuickAnswer(q)||'账本我已经读到了，但端侧模型这次没答好。点下面的快捷问题试试，那些是直接按你的账本算出来的。';
+      }
       atext.textContent=full;
       const secs=(Date.now()-t0)/1000;
       endStep(st3,true,toks>0?(toks+' tokens · '+secs.toFixed(1)+'s'):'✓');
@@ -4648,9 +4822,9 @@ const App={
       }
       const ctx=this._aiChatSummary();
       const roles=[
-        '你是「碎银记」的记账师老周，作风严谨。只依据用户账本摘要核对账目，指出最多3条异常、可疑或可能漏记之处；摘要里没有的信息不要编造。口语化中文，100字以内。',
-        '你是「碎银记」的数据分析师小析。只依据账本摘要做结构化分析：找出最大支出、占比与异常波动，给出2-3条数据结论。数字只能来自摘要，口语化中文，100字以内。',
-        '你是「碎银记」的毒舌理财教练阿燃，一针见血但不攻击人。只依据账本摘要，指出最坏的1个消费习惯，并给1条今天就能做的行动。60字以内。'
+        '你是「碎银记」的记账师老周，作风严谨。只依据用户账本摘要核对账目，指出最多3条异常、可疑或可能漏记之处；摘要里没有的信息不要编造。口语化中文，60字以内。',
+        '你是「碎银记」的数据分析师小析。只依据账本摘要做结构化分析：找出最大支出、占比与异常波动，给出2-3条数据结论。数字只能来自摘要，口语化中文，60字以内。',
+        '你是「碎银记」的毒舌理财教练阿燃，一针见血但不攻击人。只依据账本摘要，指出最坏的1个消费习惯，并给1条今天就能做的行动。40字以内。'
       ];
       // 1-3. 三位顾问依次会诊（单实例无法真并行，泳道以流水线状态呈现）
       for(let i=0;i<3;i++){
@@ -4681,7 +4855,7 @@ const App={
         };
         const resp=await this._aiLlm.createChatCompletion({
           messages:[{role:'system',content:roles[i]},{role:'user',content:'账本摘要：'+ctx}],
-          max_tokens:120,temperature:0.7,stream:true,onData:onData
+          max_tokens:90,temperature:0.4,stream:true,onData:onData
         });
         if(!full){
           full=((resp&&resp.choices&&resp.choices[0]&&resp.choices[0].message&&resp.choices[0].message.content)||'').trim();
@@ -4702,7 +4876,7 @@ const App={
           {role:'user',content:'账本摘要：'+ctx+'\n\n记账师：'+results[0]+'\n分析师：'+results[1]+'\n教练：'+results[2]
             +'\n\n现在输出3行，格式为「1.核对：具体动作」「2.控支：具体动作」「3.今日：具体动作」，每行动作20字以内，必须依据上面三位顾问的意见填写，禁止输出分析、解释或复述数据。'}
         ],
-        max_tokens:110,temperature:0.3
+        max_tokens:80,temperature:0.3
       });
       let sumTxt=((sumResp&&sumResp.choices&&sumResp.choices[0]&&sumResp.choices[0].message&&sumResp.choices[0].message.content)||'').trim();
       // 清洗小模型输出的 markdown 标记并去重（同质化行只保留一条）
@@ -5670,20 +5844,8 @@ const App={
       if(amt<0||/(收入|到账|工资|薪水|红包|退款|返还|收益|利息|分红|盈利|赚)/.test(line)){
         type='income';amt=Math.abs(amt);
       }
-      // Guess category
-      let cat='';   // 没命中关键词就保持未分类（不显示分类）
-      if(line.includes('餐')||line.includes('饭')||line.includes('食')||line.includes('外卖')||line.includes('奶茶')||line.includes('咖啡'))cat='food';
-      else if(line.includes('车')||line.includes('交通')||line.includes('地铁')||line.includes('公交')||line.includes('打车')||line.includes('加油'))cat='transport';
-      else if(line.includes('买')||line.includes('购')||line.includes('衣服')||line.includes('鞋')||line.includes('淘宝')||line.includes('京东'))cat='shopping';
-      else if(line.includes('玩')||line.includes('游戏')||line.includes('电影')||line.includes('KTV')||line.includes('娱乐'))cat='entertain';
-      else if(line.includes('房')||line.includes('租')||line.includes('水电')||line.includes('物业')||line.includes('居住'))cat='housing';
-      else if(line.includes('药')||line.includes('医')||line.includes('看病')||line.includes('体检'))cat='medical';
-      else if(line.includes('学')||line.includes('书')||line.includes('课')||line.includes('教育')||line.includes('培训'))cat='edu';
-      else if(line.includes('洗澡')||line.includes('洗浴')||line.includes('淋浴')||line.includes('澡堂')||line.includes('热水'))cat='shower';
-      else if(line.includes('工资')||line.includes('薪水')||line.includes('薪资'))cat='salary';
-      else if(line.includes('红包')||line.includes('礼金'))cat='gift';
-      else if(line.includes('理财')||line.includes('基金')||line.includes('股票')||line.includes('收益')||line.includes('利息'))cat='invest';
-      else if(line.includes('退款')||line.includes('退')||line.includes('返还'))cat='refund';
+      // Guess category：统一走全局关键词表（构建 #23，与截图识别共用同一套词表）
+      const cat=catByKeywords(line);   // 没命中关键词就保持未分类（不显示分类）
       results.push({amt,type,cat,note:line.replace(amtMatch[0],'').trim()});
     });
     const preview=document.getElementById('importPreview');
@@ -6231,7 +6393,7 @@ document.addEventListener('DOMContentLoaded',()=>App.init());
    2) 兜底：init 链中途抛错会让链尾的 initNavDrag/initTypeDrag 永远绑不上（Tab 内联 onclick 照常），
       这里独立轮询补齐（内部幂等标记防双绑）。800ms 首 tick 足够快，绑定成功即停 */
 (function(){
-  window.__sliderDiag={ver:22,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
+  window.__sliderDiag={ver:23,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
     pDown:0,pTouch:0,pMouse:0,pMove:0,bindErr:''};
   var d=window.__sliderDiag;
   // nav 元素缓存：探针挂在 document capture 上，每个 pointermove 都跑一次 querySelector 是纯浪费
