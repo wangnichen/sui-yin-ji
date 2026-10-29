@@ -1299,7 +1299,7 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
       <div class="author-card">
         <div class="author-name">🎓 我不要芒果</div>
         <div class="author-bio" style="line-height:1.7;color:var(--t2)">大一计算机科学与技术专业在读，<br>用 Trae + DeepSeek 打磨的纯本地记账工具。<br>没有广告与会员，数据只存在你的设备里。</div>
-        <div class="author-ver">碎银记 v3.0 · 构建 #23 · 持续更新中</div>
+        <div class="author-ver">碎银记 v3.0 · 构建 #24 · 持续更新中</div>
         <div id="sliderDiagLine" style="font-size:11px;color:var(--t3);margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.6"></div>
       </div>
     </div>
@@ -4782,12 +4782,25 @@ const App={
     }else{
       tv.style.display='none';cv.style.display='';
       if(btn)btn.textContent='💬 返回对话';
-      // 死锁修复：AI 忙时不能消耗 _aiConsultOpened 标记，否则 _aiConsultRun 静默
-      // 返回后标记已被置 true，之后再也触发不了会诊，泳道永远卡在排队
-      if(!this._aiConsultOpened){
-        if(this._aiChatBusy){this.showToast('AI 正在对话/会诊，稍后再看');return;}
-        this._aiConsultOpened=true;this._aiConsultRun();
+      // 按需会诊：点开页面只渲染空闲态，用户点「开始会诊」才加载模型并推理；
+      // 已有结果时原样保留（返回再进不清空），是否再来一轮由用户决定
+      const st=document.getElementById('consultStatus');
+      const start=document.getElementById('consultStart');
+      const rerun=document.getElementById('consultRerun');
+      let hasResult=false;
+      for(let i=0;i<3;i++){
+        const b=document.getElementById('consultBody'+i);
+        if(b&&b.textContent){hasResult=true;break;}
       }
+      if(!hasResult&&!this._aiChatBusy){
+        for(let i=0;i<3;i++){
+          const s=document.getElementById('consultState'+i);
+          if(s)s.textContent='待开始';
+        }
+        if(st){st.textContent='点「开始会诊」启动三位顾问 · 首次需加载模型，之后常驻内存秒开';st.className='consult-status';}
+      }
+      if(start)start.style.display=(hasResult||this._aiChatBusy)?'none':'';
+      if(rerun)rerun.style.display=hasResult?'':'none';
     }
   },
   async _aiConsultRun(){
@@ -4798,10 +4811,12 @@ const App={
     const sum=document.getElementById('consultSum');
     const btn=document.getElementById('aiConsultBtn');
     const rerun=document.getElementById('consultRerun');
+    const start=document.getElementById('consultStart');
     const inp=document.getElementById('aiChatInput'),send=document.getElementById('aiChatSend');
     if(inp)inp.disabled=true;
     if(send)send.disabled=true;
-    if(rerun)rerun.disabled=true;
+    if(start)start.style.display='none';
+    if(rerun){rerun.disabled=true;rerun.style.display='';}
     if(btn)btn.disabled=true;
     const results=['','',''];
     for(let i=0;i<3;i++){
@@ -4815,10 +4830,12 @@ const App={
     const setSt=function(t,err){if(st){st.textContent=t;st.className='consult-status'+(err?' err':'');}};
     const t0=Date.now();
     try{
-      // 0. 端侧模型（复用单例，仅首次加载）
+      // 0. 端侧模型（复用单例：仅首次真正加载，之后常驻内存直接推理）
       if(!this._aiLlm){
-        setSt('首次加载端侧模型（469MB）…');
+        setSt('首次加载端侧模型（469MB），之后常驻…');
         await this._aiEnsureLlm(function(p){setSt('加载语言模型 '+p+'%');});
+      }else{
+        setSt('模型已就绪（常驻内存）· 直接本地分析');
       }
       const ctx=this._aiChatSummary();
       const roles=[
@@ -4912,7 +4929,6 @@ const App={
       const secs=((Date.now()-t0)/1000).toFixed(1);
       if(note)note.textContent='端侧模型单实例，三位顾问依次会诊 · 账本数据未离开本机 · 总耗时 '+secs+'s';
       setSt('会诊完成 · 总耗时 '+secs+'s');
-      this._aiConsultOpened=true;
     }catch(e){
       const msg=(e&&e.message)?String(e.message):'未知错误';
       setSt('会诊中断：'+msg.slice(0,44),true);
@@ -6194,13 +6210,13 @@ const App={
     ];
     html+='<div id="aiConsult" style="display:none">'
       +'<div class="consult-head"><span class="consult-title">🩺 AI 三师会诊</span>'
-      +'<span class="consult-status" id="consultStatus">三位顾问已就位</span></div>'
+      +'<span class="consult-status" id="consultStatus">点「开始会诊」启动三位顾问</span></div>'
       +'<div class="consult-lanes">';
     consultLanes.forEach(function(L,i){
       html+='<div class="consult-lane" id="consultLane'+i+'">'
         +'<div class="lane-head"><span class="lane-avatar">'+L.a+'</span>'
         +'<div><div class="lane-name">'+L.n+'</div><div class="lane-role">'+L.r+'</div></div>'
-        +'<span class="lane-state" id="consultState'+i+'">排队中</span></div>'
+        +'<span class="lane-state" id="consultState'+i+'">待开始</span></div>'
         +'<div class="lane-body" id="consultBody'+i+'"></div>'
         +'<div class="lane-meta" id="consultMeta'+i+'"></div>'
         +'</div>';
@@ -6211,7 +6227,8 @@ const App={
       +'<ol id="consultSumList"></ol>'
       +'<div class="consult-sum-note" id="consultSumNote"></div></div>'
       +'<div class="consult-actions">'
-      +'<button type="button" class="primary" id="consultRerun" onclick="App._aiConsultRun()">🔄 再会诊一次</button>'
+      +'<button type="button" class="primary" id="consultStart" onclick="App._aiConsultRun()">🚀 开始会诊</button>'
+      +'<button type="button" class="primary" id="consultRerun" style="display:none" onclick="App._aiConsultRun()">🔄 再会诊一次</button>'
       +'<button type="button" id="consultBack" onclick="App._aiConsultToggle()">← 返回对话</button>'
       +'</div></div>';
     html+='</div>';// 关闭 ai-chat-box
@@ -6393,7 +6410,7 @@ document.addEventListener('DOMContentLoaded',()=>App.init());
    2) 兜底：init 链中途抛错会让链尾的 initNavDrag/initTypeDrag 永远绑不上（Tab 内联 onclick 照常），
       这里独立轮询补齐（内部幂等标记防双绑）。800ms 首 tick 足够快，绑定成功即停 */
 (function(){
-  window.__sliderDiag={ver:23,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
+  window.__sliderDiag={ver:24,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
     pDown:0,pTouch:0,pMouse:0,pMove:0,bindErr:''};
   var d=window.__sliderDiag;
   // nav 元素缓存：探针挂在 document capture 上，每个 pointermove 都跑一次 querySelector 是纯浪费
