@@ -1027,6 +1027,55 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
   #app{box-shadow:0 0 64px rgba(99,102,241,.10)}
   body.dk #app{box-shadow:0 0 64px rgba(0,0,0,.45)}
 }
+/* ===== 快捷记账：固定开销一键记（构建 #25） ===== */
+.quick-pad{margin-top:14px;border-radius:var(--r);background:var(--glass-bg-strong);border:1px solid var(--glass-border-strong);overflow:hidden}
+.qp-head{display:flex;align-items:center;gap:8px;width:100%;padding:12px 14px;font-family:inherit;color:var(--text);text-align:left;background:none;border:none}
+.qp-head:active{background:var(--glass-bg)}
+.qp-ico{font-size:16px;flex-shrink:0}
+.qp-title{font-size:13px;font-weight:700;flex-shrink:0}
+.qp-sub{font-size:11px;color:var(--t3);margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qp-arrow{font-size:11px;color:var(--t3);flex-shrink:0;transition:transform .25s var(--spring-smooth)}
+.quick-pad.open .qp-arrow{transform:rotate(180deg)}
+.qp-body{padding:10px 12px 12px;border-top:1px dashed var(--border)}
+.qp-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.qp-item{position:relative;display:flex;align-items:center;gap:8px;padding:10px;border-radius:10px;background:var(--card);border:1px solid var(--border);color:var(--text);text-align:left;min-width:0;cursor:pointer;user-select:none;-webkit-user-select:none;transition:transform .12s var(--spring-smooth)}
+.qp-item:active{transform:scale(.96)}
+.qp-item-ico{font-size:15px;flex-shrink:0}
+.qp-item-info{min-width:0;flex:1;display:flex;flex-direction:column;gap:1px}
+.qp-item-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qp-item-amt{font-size:10.5px;color:var(--t3);font-variant-numeric:tabular-nums}
+.qp-item-del{display:none;position:absolute;top:-6px;right:-6px;width:19px;height:19px;border-radius:50%;background:var(--red);color:#fff;font-size:10px;line-height:19px;text-align:center;border:none;padding:0;font-family:inherit;z-index:2}
+.quick-pad.manage .qp-item-del{display:block}
+.qp-empty{font-size:11.5px;color:var(--t3);text-align:center;padding:10px 0 12px;line-height:1.7}
+.qp-actions{display:flex;gap:8px;margin-top:10px}
+.qp-actions button{flex:1;font-family:inherit;height:34px;border-radius:9px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:12px}
+.qp-actions button:active{opacity:.7}
+.qp-actions button.primary{background:var(--p);color:#fff;border:none}
+/* 快捷记账 · 添加固定开销表单 */
+.qf-tip{font-size:11px;color:var(--t3);line-height:1.7;margin-bottom:14px}
+.qf-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.qf-row label{font-size:13px;color:var(--t2);width:44px;flex-shrink:0}
+.qf-row input{flex:1;min-width:0;height:42px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);padding:0 12px;font-size:14px;-webkit-appearance:none}
+.qf-row input:focus{border-color:var(--p)}
+.qf-cats{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 16px}
+.qf-cats button{font-family:inherit;font-size:12px;padding:7px 12px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--text)}
+.qf-cats button.active{background:var(--p);color:#fff;border-color:var(--p)}
+.qf-save{width:100%;height:44px;border-radius:12px;background:var(--p);color:#fff;font-family:inherit;font-size:14px;font-weight:600;border:none}
+.qf-save:active{opacity:.85}
+/* 删除记录二次确认 */
+.confirm-rec{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:16px}
+.confirm-rec-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.confirm-rec-cat{font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.confirm-rec-amt{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0}
+.confirm-rec-amt.expense{color:var(--red)}
+.confirm-rec-amt.income{color:var(--green)}
+.confirm-rec-note{font-size:12px;color:var(--t2);margin-top:6px;word-break:break-word}
+.confirm-rec-date{font-size:11px;color:var(--t3);margin-top:4px;font-variant-numeric:tabular-nums}
+.confirm-actions{display:flex;gap:10px}
+.confirm-actions button{flex:1;height:44px;border-radius:12px;font-family:inherit;font-size:14px;font-weight:600;border:none}
+.confirm-cancel{background:var(--card2);color:var(--text);border:1px solid var(--border)!important}
+.confirm-ok{background:var(--red);color:#fff}
+.confirm-ok:active,.confirm-cancel:active{opacity:.8}
 
 </style>
 </head>
@@ -1131,6 +1180,22 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
         <button data-mood="sad" onclick="App.setMood('sad')">😔 后悔</button>
       </div>
       <button class="btn-primary" id="btnSubmit" onclick="App.submitRecord()">记一笔</button>
+      <!-- 快捷记账：固定开销一键记（朋友需求：点开小框，一按就记一笔，如吹头发） -->
+      <div class="quick-pad" id="quickPad">
+        <button type="button" class="qp-head" onclick="App.toggleQuickPad()">
+          <span class="qp-ico">⚡</span>
+          <span class="qp-title">快捷记账</span>
+          <span class="qp-sub" id="qpSub">固定开销，一按记一笔</span>
+          <span class="qp-arrow">▾</span>
+        </button>
+        <div class="qp-body" id="qpBody" style="display:none">
+          <div id="qpGrid"></div>
+          <div class="qp-actions">
+            <button type="button" class="primary" onclick="App.showQuickForm()">＋ 添加固定开销</button>
+            <button type="button" id="qpManageBtn" onclick="App.toggleQuickManage()">管理</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Page 2: Bills -->
@@ -1299,7 +1364,7 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
       <div class="author-card">
         <div class="author-name">🎓 我不要芒果</div>
         <div class="author-bio" style="line-height:1.7;color:var(--t2)">大一计算机科学与技术专业在读，<br>用 Trae + DeepSeek 打磨的纯本地记账工具。<br>没有广告与会员，数据只存在你的设备里。</div>
-        <div class="author-ver">碎银记 v3.0 · 构建 #24 · 持续更新中</div>
+        <div class="author-ver">碎银记 v3.0 · 构建 #25 · 持续更新中</div>
         <div id="sliderDiagLine" style="font-size:11px;color:var(--t3);margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.6"></div>
       </div>
     </div>
@@ -2757,6 +2822,7 @@ const App={
     const tg0=document.getElementById('typeToggle');
     if(tg0)tg0.classList.toggle('income',this.curType==='income');
     document.getElementById('btnSubmit').textContent=this.editId!==null?'保存修改':'记一笔';
+    this.renderQuickPad();
   },
 
   // Edit mode
@@ -2975,6 +3041,25 @@ const App={
   },
   deleteRecord(id){
     const records=this.getRecords();
+    const r=records.find(x=>x.id===id);
+    if(!r)return;
+    // 二次确认（朋友反馈：误触 🗑 就删掉了，容易丢账）——先展示这笔的关键信息再让用户决定
+    const cat=this.getCatData(r.cat);
+    this.showModal('<h3>删除这笔记录？</h3>'
+      +'<div class="confirm-rec">'
+      +'<div class="confirm-rec-top"><span class="confirm-rec-cat">'+(r.cat?cat.i+' '+cat.n:'📋 未分类')+'</span>'
+      +'<span class="confirm-rec-amt '+(r.type==='expense'?'expense':'income')+'">'+(r.type==='expense'?'-':'+')+'¥'+Number(r.amt).toFixed(2)+'</span></div>'
+      +(r.note?'<div class="confirm-rec-note">'+this.escapeHtml(r.note)+'</div>':'')
+      +'<div class="confirm-rec-date">'+this.escapeHtml(r.date)+(r.time?' '+this.escapeHtml(r.time):'')+'</div>'
+      +'</div>'
+      +'<div class="confirm-actions">'
+      +'<button type="button" class="confirm-cancel" onclick="App.closeModal()">取消</button>'
+      +'<button type="button" class="confirm-ok" onclick="App._deleteRecordDo(\''+r.id+'\')">确认删除</button>'
+      +'</div>');
+  },
+  _deleteRecordDo(id){
+    this.closeModal();
+    const records=this.getRecords();
     const idx=records.findIndex(r=>r.id===id);
     if(idx<0)return;
     this.haptic('medium');
@@ -2992,6 +3077,134 @@ const App={
       this.renderBills();
       this.undoData=null;
     });
+  },
+
+  // ===== 快捷记账：固定开销一键记（构建 #25，朋友需求）=====
+  // 用户自建固定开销（如「吹头发 ¥30」），点一下即按当前日期/时间记一笔，不用每次填表单
+  getQuickItems(){return this._load('quick',[])},
+  saveQuickItems(v){this._save('quick',v)},
+  toggleQuickPad(){
+    const pad=document.getElementById('quickPad');
+    const body=document.getElementById('qpBody');
+    if(!pad||!body)return;
+    this.haptic('light');
+    const open=body.style.display!=='none';
+    if(open){
+      body.style.display='none';
+      pad.classList.remove('open','manage');
+      const mb=document.getElementById('qpManageBtn');
+      if(mb)mb.textContent='管理';
+    }else{
+      body.style.display='';
+      pad.classList.add('open');
+      this.renderQuickPad();
+    }
+  },
+  renderQuickPad(){
+    const grid=document.getElementById('qpGrid');
+    const sub=document.getElementById('qpSub');
+    const mb=document.getElementById('qpManageBtn');
+    if(!grid)return;
+    const items=this.getQuickItems();
+    if(sub)sub.textContent=items.length?items.length+' 项 · 一按记一笔':'固定开销，一按记一笔';
+    if(mb)mb.style.display=items.length?'':'none';
+    if(!items.length){
+      grid.innerHTML='<div class="qp-empty">还没有固定开销<br>点下面「＋ 添加」，比如「吹头发 ¥30」</div>';
+      return;
+    }
+    grid.innerHTML='<div class="qp-grid">'+items.map(it=>{
+      const cat=this.getCatData(it.cat);
+      return '<div class="qp-item" role="button" tabindex="0" onclick="App.quickRecord(\''+it.id+'\')">'
+        +'<span class="qp-item-ico">'+(it.cat?cat.i:'⚡')+'</span>'
+        +'<span class="qp-item-info"><span class="qp-item-name">'+this.escapeHtml(it.name)+'</span>'
+        +'<span class="qp-item-amt">'+'¥'+Number(it.amt).toFixed(2)+'</span></span>'
+        +'<button type="button" class="qp-item-del" onclick="event.stopPropagation();App.deleteQuickItem(\''+it.id+'\')">✕</button>'
+        +'</div>';
+    }).join('')+'</div>';
+  },
+  quickRecord(id){
+    // 防连点：同一次误触双击不应记成两笔
+    const nowTs=Date.now();
+    if(this._lastQuickTs&&nowTs-this._lastQuickTs<400)return;
+    this._lastQuickTs=nowTs;
+    const it=this.getQuickItems().find(x=>x.id===id);
+    if(!it)return;
+    const now=new Date(Date.now()+(this._ntpOffset||0));
+    const records=this.getRecords();
+    records.push({
+      id:'r_'+nowTs+'_q',
+      amt:it.amt,
+      cat:it.cat||'',
+      date:dstr(now),
+      note:it.name,
+      type:it.type||'expense',
+      mood:null,
+      time:String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'),
+      ts:nowTs
+    });
+    this.saveRecords(records);
+    this.haptic('success');
+    this.showToast('已记 '+(it.type==='income'?'+':'-')+'¥'+Number(it.amt).toFixed(2)+' · '+this.escapeHtml(it.name));
+    this.updateTodaySummary();
+    this.updateBudgetReminder();
+    this.renderBills();
+  },
+  showQuickForm(){
+    this._qfCat='';
+    const cats=EC.map(k=>{
+      const c=this.getCatData(k);
+      return '<button type="button" data-k="'+k+'" onclick="App._qfPick(this,\''+k+'\')">'+c.i+' '+c.n+'</button>';
+    }).join('');
+    this.showModal('<h3>添加固定开销</h3>'
+      +'<div class="qf-tip">保存后，在「快捷记账」里点一下就会按当前日期记一笔；名称与金额随时可删掉重加。</div>'
+      +'<div class="qf-row"><label>名称</label><input id="qfName" type="text" maxlength="12" placeholder="如：吹头发"></div>'
+      +'<div class="qf-row"><label>金额</label><input id="qfAmt" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00"></div>'
+      +'<div class="qf-cats" id="qfCats">'+cats+'</div>'
+      +'<button type="button" class="qf-save" onclick="App.saveQuickItem()">保存</button>','sheet');
+  },
+  _qfPick(btn,k){
+    this._qfCat=k;
+    const box=document.getElementById('qfCats');
+    if(box)box.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+    if(btn)btn.classList.add('active');
+    this.haptic('light');
+  },
+  saveQuickItem(){
+    const nameEl=document.getElementById('qfName');
+    const amtEl=document.getElementById('qfAmt');
+    const name=nameEl?nameEl.value.trim():'';
+    const amt=amtEl?parseFloat(amtEl.value):NaN;
+    if(!name){this.haptic('error');this.showToast('请填写名称');return}
+    if(!amt||amt<=0||!isFinite(amt)){this.haptic('error');this.showToast('请输入有效金额');return}
+    const items=this.getQuickItems();
+    if(items.length>=12){this.showToast('最多 12 项固定开销');return}
+    if(items.some(x=>x.name===name)){this.showToast('已经有同名的一项了');return}
+    items.push({id:'q_'+Date.now(),name:name,amt:Math.round(amt*100)/100,cat:this._qfCat||'',type:'expense'});
+    this.saveQuickItems(items);
+    this._qfCat='';
+    this.closeModal();
+    // 保存后自动展开面板，让用户立刻看到并试用
+    const pad=document.getElementById('quickPad');
+    const body=document.getElementById('qpBody');
+    if(pad&&body&&body.style.display==='none'){body.style.display='';pad.classList.add('open');}
+    this.renderQuickPad();
+    this.haptic('success');
+    this.showToast('已添加 · 点一下就能记账 ⚡');
+  },
+  deleteQuickItem(id){
+    this.saveQuickItems(this.getQuickItems().filter(x=>x.id!==id));
+    this.renderQuickPad();
+    this.haptic('medium');
+    this.showToast('已移除');
+  },
+  toggleQuickManage(){
+    const pad=document.getElementById('quickPad');
+    const mb=document.getElementById('qpManageBtn');
+    if(!pad)return;
+    const on=!pad.classList.contains('manage');
+    pad.classList.toggle('manage',on);
+    if(mb)mb.textContent=on?'完成':'管理';
+    this.haptic('light');
   },
 
   // ===== Stats Page =====
@@ -6410,7 +6623,7 @@ document.addEventListener('DOMContentLoaded',()=>App.init());
    2) 兜底：init 链中途抛错会让链尾的 initNavDrag/initTypeDrag 永远绑不上（Tab 内联 onclick 照常），
       这里独立轮询补齐（内部幂等标记防双绑）。800ms 首 tick 足够快，绑定成功即停 */
 (function(){
-  window.__sliderDiag={ver:24,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
+  window.__sliderDiag={ver:25,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
     pDown:0,pTouch:0,pMouse:0,pMove:0,bindErr:''};
   var d=window.__sliderDiag;
   // nav 元素缓存：探针挂在 document capture 上，每个 pointermove 都跑一次 querySelector 是纯浪费
