@@ -3147,7 +3147,8 @@ const App={
     this.showToast('已记 '+(it.type==='income'?'+':'-')+'¥'+Number(it.amt).toFixed(2)+' · '+this.escapeHtml(it.name));
     this.updateTodaySummary();
     this.updateBudgetReminder();
-    this.renderBills();
+    // 账单页不在这里重建：_save 已让 _ver 失效，切到账单页时会自动重建，
+    // 避免在记账页每按一次都重建整个账单列表 DOM
   },
   showQuickForm(){
     this._qfCat='';
