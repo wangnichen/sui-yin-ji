@@ -1062,6 +1062,26 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
 .qf-cats button.active{background:var(--p);color:#fff;border-color:var(--p)}
 .qf-save{width:100%;height:44px;border-radius:12px;background:var(--p);color:#fff;font-family:inherit;font-size:14px;font-weight:600;border:none}
 .qf-save:active{opacity:.85}
+/* 微信/支付宝账单导入（构建 #26） */
+.bill-guide{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--card2)}
+.bill-guide-t{font-size:12px;font-weight:700;padding:9px 12px 2px;color:var(--text)}
+.bill-guide-b{font-size:11.5px;color:var(--t2);line-height:1.65;padding:0 12px 9px}
+.bill-guide-t+.bill-guide-b{border-bottom:1px dashed var(--border)}
+.bill-sum{display:flex;gap:8px;margin-bottom:12px}
+.bill-sum-item{flex:1;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:9px 8px;text-align:center;min-width:0}
+.bill-sum-item span{display:block;font-size:10.5px;color:var(--t3);margin-bottom:2px}
+.bill-sum-item b{font-size:13px;font-variant-numeric:tabular-nums;word-break:break-all}
+.bill-rows{border:1px solid var(--border);border-radius:10px;overflow:hidden;max-height:230px;overflow-y:auto}
+.bill-row{display:flex;align-items:center;gap:8px;padding:8px 10px;font-size:12px;border-bottom:1px solid var(--border);min-width:0}
+.bill-row:last-child{border-bottom:none}
+.bill-row-cat{flex-shrink:0;color:var(--t2);font-size:11px}
+.bill-row-note{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.bill-row-amt{flex-shrink:0;font-variant-numeric:tabular-nums;font-weight:600}
+.bill-row-amt.expense{color:var(--red)}
+.bill-row-amt.income{color:var(--green)}
+.bill-more{font-size:11px;color:var(--t3);text-align:center;padding:8px}
+.bill-hint{font-size:11px;color:var(--t3);line-height:1.7;margin-top:8px}
+
 /* 删除记录二次确认 */
 .confirm-rec{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:16px}
 .confirm-rec-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -1364,7 +1384,7 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
       <div class="author-card">
         <div class="author-name">🎓 我不要芒果</div>
         <div class="author-bio" style="line-height:1.7;color:var(--t2)">大一计算机科学与技术专业在读，<br>用 Trae + DeepSeek 打磨的纯本地记账工具。<br>没有广告与会员，数据只存在你的设备里。</div>
-        <div class="author-ver">碎银记 v3.0 · 构建 #25 · 持续更新中</div>
+        <div class="author-ver">碎银记 v3.0 · 构建 #26 · 持续更新中</div>
         <div id="sliderDiagLine" style="font-size:11px;color:var(--t3);margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.6"></div>
       </div>
     </div>
@@ -5682,9 +5702,11 @@ const App={
     const html='<h3>导入数据</h3>'+
       '<p style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px">选择一种方式将数据导入到碎银记</p>'+
       '<div style="display:flex;flex-direction:column;gap:10px">'+
+      '<button class="btn-primary" style="background:linear-gradient(135deg,#07c160,#059e4e)" onclick="App.closeModal();setTimeout(()=>App.showBillImport(),250)">🧾 微信 / 支付宝账单</button>'+
       '<button class="btn-primary" style="background:var(--blue)" onclick="App.closeModal();setTimeout(()=>App.importData(),250)">📁 选择文件导入</button>'+
       '<button class="btn-primary" style="background:var(--p)" onclick="App.closeModal();setTimeout(()=>App.showTextImport(),250)">🧠 智能文字导入</button>'+
-      '<button class="btn-primary" style="background:var(--orange)" onclick="App.closeModal();setTimeout(()=>App.showScreenshotImport(),250)">📷 截图识别导入</button></div>';
+      '<button class="btn-primary" style="background:var(--orange)" onclick="App.closeModal();setTimeout(()=>App.showScreenshotImport(),250)">📷 截图识别导入</button>'+
+      '<button class="btn-primary" style="background:var(--t2)" onclick="App._clipboardImport()">📋 剪贴板识别（复制支付通知即记）</button></div>';
     this.showModal(html);
   },
   copyShareText(){
@@ -5926,25 +5948,25 @@ const App={
       const b64=window._pendingFileBase64;
       window._pendingFileBase64=null;  // 及时释放，避免大字符串常驻 JS 堆
       if(!b64)return;
-      // 解码 base64 → 按 UTF-8 还原字节序列（逐字节 String.fromCharCode 会把
-      // 「支出」这类中文拆成乱码 Latin-1 字符，导致导入分类/类型全部识别失败）
       const binary=atob(b64);
-      let content='';
-      try{
-        const bytes=new Uint8Array(binary.length);
-        for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-        content=new TextDecoder('utf-8').decode(bytes);
-      }catch(de){ // 老 WebView 无 TextDecoder 时退化为手动 UTF-8 重组
-        content=decodeURIComponent(escape(binary));
-      }
-      // 自动检测格式
+      const bytes=new Uint8Array(binary.length);
+      for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+      // 编码自适应：微信账单 UTF-8、支付宝导出常为 GBK（见 _decodeFileContent）
+      const content=this._decodeFileContent(binary,bytes);
       const trimmed=content.trim();
+      if(!trimmed){this.showToast('文件为空');return}
+      // 自动检测格式
       if(trimmed.charAt(0)==='{'||trimmed.charAt(0)==='['){
         this._processJSONImport(trimmed);
-      }else if(trimmed.indexOf(',')>-1 && trimmed.split('\n').length>1){
-        this._processCSVImport(trimmed);
       }else{
-        this.showToast('无法识别文件格式');
+        // 微信/支付宝官方账单优先：表头特征与碎银记导出的 CSV 完全不同，不会误判
+        const kind=this._detectBillKind(trimmed);
+        if(kind){this._processBillCSV(trimmed,kind);return;}
+        if(trimmed.indexOf(',')>-1&&trimmed.split('\n').length>1){
+          this._processCSVImport(trimmed);
+        }else{
+          this.showToast('无法识别文件格式');
+        }
       }
     }catch(e){this.showToast('文件解析失败')}
   },
@@ -6010,6 +6032,249 @@ const App={
     if(this.curPage==='bills')this.renderBills();
     else if(this.curPage==='stats')this.renderStats();
   },
+  // ===== 微信 / 支付宝官方账单导入（构建 #26）=====
+  // 老师评语：微信支付后不可能再手动录一遍。本功能直接读官方导出的账单文件，
+  // 一键把整月/整年支付记录搬进账本；全程本地解析，不上传任何数据。
+  showBillImport(){
+    const html='<h3>🧾 微信 / 支付宝账单</h3>'
+      +'<p style="font-size:12px;color:var(--t2);line-height:1.7;margin-bottom:12px">把官方导出的账单文件直接导入，不用一条条手打。文件只在本机解析、不会上传。</p>'
+      +'<div class="bill-guide">'
+      +'<div class="bill-guide-t">微信</div>'
+      +'<div class="bill-guide-b">我 → 服务 → 钱包 → 账单 → 右上角「常见问题」→ 下载账单 → 用于个人对账 → 解压后选 .csv</div>'
+      +'<div class="bill-guide-t">支付宝</div>'
+      +'<div class="bill-guide-b">我的 → 账单 → 右上角「…」→ 开具交易流水证明 → 用于个人对账 → 解压后选 .csv</div>'
+      +'</div>'
+      +'<button class="btn-primary" style="margin-top:14px" onclick="App._pickBillFile()">📁 选择账单文件</button>'
+      +'<div class="bill-hint">自动识别微信 / 支付宝格式与编码（UTF-8 / GBK）；同一条记录重复导入会自动跳过。</div>';
+    this.showModal(html,'sheet');
+  },
+  _pickBillFile(){
+    this.closeModal();
+    if(window.Native&&typeof Native.openFilePicker==='function'){
+      try{Native.openFilePicker();this.showToast('请选择账单 CSV 文件');return;}catch(e){}
+    }
+    // 浏览器环境兜底：标准 input[type=file]，复用同一套解析流程，
+    // 评审/朋友不用装 APK 也能直接试账单导入
+    try{
+      const inp=document.createElement('input');
+      inp.type='file';inp.accept='.csv,.txt,text/csv,text/plain';inp.style.display='none';
+      const self=this;
+      inp.onchange=function(){
+        const f=inp.files&&inp.files[0];
+        if(!f){inp.remove();return;}
+        const fr=new FileReader();
+        fr.onload=function(){
+          try{
+            const bytes=new Uint8Array(fr.result);
+            let binary='';const CH=0x8000;
+            for(let i=0;i<bytes.length;i+=CH)binary+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH));
+            const content=self._decodeFileContent(binary,bytes);
+            const t=content.trim();
+            if(!t){self.showToast('文件为空');inp.remove();return;}
+            const kind=self._detectBillKind(t);
+            if(kind)self._processBillCSV(t,kind);
+            else self.showToast('没识别到微信/支付宝账单格式');
+          }catch(e){self.showToast('解析失败')}
+          inp.remove();
+        };
+        fr.onerror=function(){self.showToast('读取失败');inp.remove();};
+        fr.readAsArrayBuffer(f);
+      };
+      document.body.appendChild(inp);
+      inp.click();
+    }catch(e){this.showToast('当前环境不支持文件选择')}
+  },
+  // 编码自适应：微信账单是 UTF-8，支付宝导出常为 GBK。
+  // 先严格 UTF-8 解码，遇到非法字节序列直接抛错 → 回退 GBK（安卓 WebView 均支持）
+  _decodeFileContent(binary,bytes){
+    try{return new TextDecoder('utf-8',{fatal:true}).decode(bytes).replace(/^\uFEFF/,'');}
+    catch(e){
+      try{return new TextDecoder('gbk').decode(bytes).replace(/^\uFEFF/,'');}
+      catch(e2){
+        try{return decodeURIComponent(escape(binary));}catch(e3){return '';}
+      }
+    }
+  },
+  _detectBillKind(text){
+    const t=String(text||'').slice(0,8000);
+    if(/微信支付账单/.test(t))return 'wechat';
+    if(/支付宝(交易记录|账单)/.test(t))return 'alipay';
+    // 没有标题行时按表头特征判断：支付平台账单都有「收/支」「交易对方」「金额」三列。
+    // 碎银记自己导出的 CSV 是「类型,金额,分类,日期,备注,心情」，不会被误判
+    const head=t.split('\n').slice(0,40).join('\n');
+    if(/(收\/支|收支)/.test(head)&&/交易对方/.test(head)&&/金额/.test(head))return 'bill';
+    return '';
+  },
+  _processBillCSV(text,kind){
+    const lines=String(text||'').replace(/\r\n?/g,'\n').split('\n');
+    const norm=x=>x.replace(/\s/g,'').replace(/（/g,'(').replace(/）/g,')');
+    // 1. 定位表头：不同年份/平台的导出列名会变，所以按「必备列特征」而不是固定列名匹配。
+    //    微信：交易时间/交易对方/商品/收\/支/金额(元)/当前状态/交易单号
+    //    支付宝旧版：交易号/付款时间/交易对方/商品名称/金额（元）/收\/支/交易状态
+    //    支付宝新版：交易时间/交易分类/交易对方/商品说明/收\/支/金额/交易订单号
+    let hi=-1,cols=null;
+    for(let i=0;i<lines.length;i++){
+      const c=this._parseCSVLine(lines[i]).map(norm);
+      const hasIO=c.indexOf('收/支')>=0||c.indexOf('收支')>=0;
+      const hasTime=c.indexOf('交易时间')>=0||c.indexOf('付款时间')>=0||c.indexOf('交易创建时间')>=0;
+      const hasAmt=c.indexOf('金额(元)')>=0||c.indexOf('金额')>=0;
+      if(hasIO&&hasTime&&hasAmt){hi=i;cols=c;break;}
+    }
+    if(hi<0||!cols){this.showToast('没找到账单表头，请确认是官方导出的 CSV');return;}
+    const pick=function(names){
+      for(let i=0;i<names.length;i++){const k=cols.indexOf(names[i]);if(k>=0)return k;}
+      return -1;
+    };
+    const cIO=pick(['收/支','收支']);
+    const cAmt=pick(['金额(元)','金额']);
+    const cPeer=pick(['交易对方','对方','收款方']);
+    const cGoods=pick(['商品','商品名称','商品说明']);
+    const cStatus=pick(['当前状态','交易状态']);
+    const cRef=pick(['交易单号','交易号','交易订单号','交易订单']);
+    const cTime=pick(['交易时间']);
+    const cPayTime=pick(['付款时间']);
+    const cCreateTime=pick(['交易创建时间']);
+    if(cIO<0||cAmt<0||(cTime<0&&cPayTime<0&&cCreateTime<0)){
+      this.showToast('账单列名不完整，暂不支持该版本导出');
+      return;
+    }
+    // 2. 逐行解析
+    const recs=[];let skipped=0;
+    const today=dstr(new Date());
+    for(let i=hi+1;i<lines.length;i++){
+      if(!lines[i].trim())continue;
+      const raw=this._parseCSVLine(lines[i]);
+      if(raw.length<=cAmt)continue;
+      const io=String(raw[cIO]||'').trim();
+      if(io!=='支出'&&io!=='收入'){skipped++;continue;}   // 不计收支（提现/充值等）跳过
+      const status=cStatus>=0?String(raw[cStatus]||'').trim():'';
+      // 跳过未成功/已关闭/已全额退款；「已收款」「已存入零钱」是成功态，必须保留
+      if(status&&/关闭|失败|未付款|等待付款|全额退款/.test(status)){skipped++;continue;}
+      const amt=parseFloat(String(raw[cAmt]||'').replace(/[¥￥,\s]/g,''));
+      if(!isFinite(amt)||amt<=0){skipped++;continue;}
+      // 3. 交易时间：支付宝的付款时间可能为空，退回交易创建时间
+      const cands=[];
+      if(cPayTime>=0)cands.push(raw[cPayTime]);
+      if(cCreateTime>=0)cands.push(raw[cCreateTime]);
+      if(cTime>=0)cands.push(raw[cTime]);
+      let timeStr='';
+      for(let k=0;k<cands.length;k++){
+        const s=String(cands[k]||'').trim();
+        if(/^\d{4}-\d{2}-\d{2}/.test(s)){timeStr=s;break;}
+      }
+      if(!timeStr){skipped++;continue;}
+      const date=timeStr.slice(0,10);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>today){skipped++;continue;}  // 脏日期/未来日期不入库
+      const tm=/^\d{4}-\d{2}-\d{2}[ T](\d{2}:\d{2})/.exec(timeStr);
+      // 4. 备注：交易对方 + 商品（去掉「消费/其他」这类无信息量的占位词）
+      const peer=cPeer>=0?String(raw[cPeer]||'').trim():'';
+      const goods=cGoods>=0?String(raw[cGoods]||'').trim():'';
+      const usefulGoods=goods&&!/^(消费|其他|商户消费|即时到账交易|转账)$/.test(goods)?goods:'';
+      let note=peer||usefulGoods;
+      if(usefulGoods&&usefulGoods!==peer)note=note?(note+'·'+usefulGoods):usefulGoods;
+      if(note.length>40)note=note.slice(0,40);
+      recs.push({
+        amt:Math.round(amt*100)/100,
+        type:io==='收入'?'income':'expense',
+        cat:catByKeywords(note+' '+usefulGoods),
+        date:date,
+        time:tm?tm[1]:'',
+        note:note,
+        ref:cRef>=0?String(raw[cRef]||'').trim():''
+      });
+    }
+    if(!recs.length){
+      this.showToast('没有解析到记录'+(skipped?'（已跳过 '+skipped+' 条不计收支/未成功交易）':''));
+      return;
+    }
+    // 5. 去重：优先交易单号（最可靠），无单号时退回「类型+金额+日期+备注」
+    const exist=this.getRecords();
+    const refSet=new Set(exist.filter(r=>r.ref).map(r=>r.ref));
+    const sig=r=>r.type+'|'+r.amt+'|'+r.date+'|'+(r.note||'');
+    const sigSet=new Set(exist.map(sig));
+    let dup=0;const fresh=[];
+    recs.forEach(r=>{
+      if((r.ref&&refSet.has(r.ref))||(!r.ref&&sigSet.has(sig(r)))){dup++;return;}
+      fresh.push(r);
+    });
+    if(!fresh.length){this.showToast('这些记录都已经在账本里了（跳过 '+dup+' 条重复）');return;}
+    window._billImport={records:fresh};
+    const exp=fresh.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amt,0);
+    const inc=fresh.filter(r=>r.type==='income').reduce((s,r)=>s+r.amt,0);
+    const rows=fresh.slice(0,8).map(r=>{
+      const c=this.getCatData(r.cat);
+      return '<div class="bill-row"><span class="bill-row-cat">'+(r.cat?c.i+' '+c.n:'未分类')+'</span>'
+        +'<span class="bill-row-note">'+this.escapeHtml(r.note||'无备注')+'</span>'
+        +'<span class="bill-row-amt '+(r.type==='expense'?'expense':'income')+'">'+(r.type==='expense'?'-':'+')+'¥'+r.amt.toFixed(2)+'</span></div>';
+    }).join('');
+    const html='<h3>账单解析结果</h3>'
+      +'<div class="bill-sum">'
+      +'<div class="bill-sum-item"><span>可导入</span><b>'+fresh.length+' 条</b></div>'
+      +'<div class="bill-sum-item"><span>支出</span><b style="color:var(--red)">¥'+exp.toFixed(2)+'</b></div>'
+      +'<div class="bill-sum-item"><span>收入</span><b style="color:var(--green)">¥'+inc.toFixed(2)+'</b></div>'
+      +'</div>'
+      +'<div class="bill-rows">'+rows+(fresh.length>8?'<div class="bill-more">… 还有 '+(fresh.length-8)+' 条</div>':'')+'</div>'
+      +'<div class="bill-hint">'+(dup?'已自动跳过 '+dup+' 条重复记录。':'逐条去重已开启。')+(skipped?'另有 '+skipped+' 条不计收支或未成功的交易被跳过。':'')+'</div>'
+      +'<button class="btn-primary" style="margin-top:14px" onclick="App._confirmBillImport()">导入 '+fresh.length+' 条到账本</button>'
+      +'<button class="btn-primary" style="margin-top:8px;background:var(--t2)" onclick="App.closeModal()">取消</button>';
+    this.showModal(html,'sheet');
+  },
+  _confirmBillImport(){
+    const s=window._billImport||{records:[]};
+    window._billImport=null;
+    const list=s.records||[];
+    if(!list.length){this.closeModal();return;}
+    const all=this.getRecords();
+    const ts=Date.now();
+    list.forEach((r,i)=>{
+      all.push({id:'r_'+ts+'_b'+i,amt:r.amt,cat:r.cat||'',date:r.date,time:r.time||'',
+        note:r.note||'',type:r.type,mood:null,ts:ts+i,ref:r.ref||''});
+    });
+    all.sort(recSort);
+    this.saveRecords(all);
+    this.closeModal();
+    this.haptic('success');
+    this.showToast('已导入 '+list.length+' 条 ✔');
+    if(this.curPage==='bills')this.renderBills();
+    else if(this.curPage==='stats')this.renderStats();
+    this.updateTodaySummary();
+    this.updateBudgetReminder();
+  },
+
+  // ===== 剪贴板识别（构建 #26）：复制支付通知 → 打开即记账 =====
+  // APK 内走原生桥读剪贴板（http 源不是安全上下文，navigator.clipboard 不可用）；
+  // 浏览器里回退标准 Clipboard API
+  async _readClipboardText(){
+    let text='';
+    try{
+      if(window.Native&&typeof Native.readClipboard==='function')text=String(Native.readClipboard()||'');
+    }catch(e){}
+    if(!text&&navigator.clipboard&&navigator.clipboard.readText){
+      try{text=await navigator.clipboard.readText();}catch(e){}
+    }
+    return text||'';
+  },
+  async _clipboardImport(){
+    const text=await this._readClipboardText();
+    this.closeModal();
+    if(!text.trim()){
+      this.showToast('剪贴板是空的，复制支付通知后再试');
+      setTimeout(()=>this.showTextImport(),300);
+      return;
+    }
+    setTimeout(()=>{
+      this.showTextImport();
+      const ta=document.getElementById('importText');
+      if(ta){ta.value=text.slice(0,2000);this.parseTextImport();}
+    },250);
+  },
+  async _fillFromClipboard(){
+    const text=await this._readClipboardText();
+    const ta=document.getElementById('importText');
+    if(!text.trim()){this.showToast('剪贴板是空的，请先复制支付通知');return;}
+    if(ta){ta.value=text.slice(0,2000);this.parseTextImport();}
+  },
+
   _processJSONImport(jsonStr){
     try{
       const data=JSON.parse(jsonStr);
@@ -6050,16 +6315,49 @@ const App={
   showTextImport(){
     const html='<h3>智能文字导入</h3><p style="font-size:12px;color:var(--t2);margin-bottom:8px">粘贴记账文字，自动识别金额和分类。示例：午餐35元、打车28、工资到账5000</p>'+
       '<textarea class="text-import-area" id="importText" placeholder="粘贴你的记账文字..."></textarea>'+
+      '<button class="btn-primary" style="margin-top:8px;background:var(--card2);color:var(--text);border:1px solid var(--border)" onclick="App._fillFromClipboard()">📋 从剪贴板读取</button>'+
       '<button class="btn-primary" style="margin-top:10px" onclick="App.parseTextImport()">开始识别</button>'+
       '<div class="import-preview" id="importPreview"></div>'+
       '<button class="btn-primary" style="margin-top:10px;display:none" id="btnImportAll" onclick="App.confirmTextImport()">一键导入</button>';
     this.showModal(html,'sheet');
   },
+  // 支付凭证解析（构建 #26）：微信/支付宝的「支付成功」通知是多行文本，
+  // 按行拆会把金额、商户拆散，所以整段当一个凭证解析
+  _parseReceiptText(text){
+    const t=String(text||'').replace(/\r/g,'\n');
+    let amt=NaN;
+    let m=/(?:¥|￥)\s*(\d+(?:\.\d{1,2})?)/.exec(t);
+    if(!m)m=/(\d+(?:\.\d{1,2})?)\s*元/.exec(t);
+    if(m)amt=parseFloat(m[1]);
+    if(!isFinite(amt)||amt<=0)return null;
+    let type='expense';
+    if(/(已收款|收款成功|收入|到账|退款成功|已退款|红包入账)/.test(t))type='income';
+    let note='';
+    const mm=/(?:收款方|收款商户|商户名称|交易对方|付款给)\s*[:：]?\s*([^\n]{1,30})/.exec(t);
+    if(mm)note=mm[1].trim();
+    if(!note){
+      const noise=/^(微信支付|支付宝|支付成功|付款成功|交易成功|账单详情|查看详情|支付金额|付款金额|交易单号|商户单号|当前状态|支付方式|收起|展开|账单|详情)$/;
+      const cleaned=t.split('\n').map(s=>s.trim()).filter(Boolean)
+        .filter(s=>!/^\d{4}[-/年]/.test(s))
+        .filter(s=>!noise.test(s))
+        .map(s=>s.replace(/[¥￥]\s*\d+(?:\.\d+)?/g,'').replace(/订单号[:：]?\s*\S+/g,'').replace(/[：:]/g,' ').trim())
+        .filter(s=>s&&/[\u4e00-\u9fa5]/.test(s));
+      cleaned.sort((a,b)=>b.length-a.length);
+      note=(cleaned[0]||'').slice(0,40);
+    }
+    return {amt,type,cat:catByKeywords(note+' '+t),note:note};
+  },
   parseTextImport(){
     const text=document.getElementById('importText').value.trim();
     if(!text){this.showToast('请粘贴文字');return}
-    const lines=text.split(/[\n,，;；。]/);
+    // 支付凭证（多行通知）整体解析；普通「午餐35元」清单仍按行拆
     const results=[];
+    const isReceipt=/(微信支付|支付宝|支付成功|付款成功|交易成功)/.test(text)&&/(?:¥|￥)\s*\d/.test(text);
+    if(isReceipt){
+      const one=this._parseReceiptText(text);
+      if(one)results.push(one);
+    }else{
+    const lines=text.split(/[\n,，;；。]/);
     lines.forEach(line=>{
       line=line.trim();if(!line)return;
       // Match amount：优先取带货币单位的数字（35元/¥28/12.5块），
@@ -6078,6 +6376,7 @@ const App={
       const cat=catByKeywords(line);   // 没命中关键词就保持未分类（不显示分类）
       results.push({amt,type,cat,note:line.replace(amtMatch[0],'').trim()});
     });
+    }
     const preview=document.getElementById('importPreview');
     const btn=document.getElementById('btnImportAll');
     if(results.length===0){
@@ -6624,7 +6923,7 @@ document.addEventListener('DOMContentLoaded',()=>App.init());
    2) 兜底：init 链中途抛错会让链尾的 initNavDrag/initTypeDrag 永远绑不上（Tab 内联 onclick 照常），
       这里独立轮询补齐（内部幂等标记防双绑）。800ms 首 tick 足够快，绑定成功即停 */
 (function(){
-  window.__sliderDiag={ver:25,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
+  window.__sliderDiag={ver:26,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
     pDown:0,pTouch:0,pMouse:0,pMove:0,bindErr:''};
   var d=window.__sliderDiag;
   // nav 元素缓存：探针挂在 document capture 上，每个 pointermove 都跑一次 querySelector 是纯浪费

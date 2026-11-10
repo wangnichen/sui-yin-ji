@@ -1,6 +1,8 @@
 package com.xiaozhangben.app;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -32,7 +34,8 @@ public class MainActivity extends Activity {
     private static final int PICK_FILE = 1001;
     private static final int IMAGE_PICK = 1002;
     private static final int TAKE_PHOTO = 1003;
-    private static final int MAX_FILE_SIZE = 1024 * 1024;
+    // 账单导入放宽到 4MB：微信/支付宝一年的流水 CSV 可能超过 1MB（原先会被静默截断）
+    private static final int MAX_FILE_SIZE = 4 * 1024 * 1024;
     private static final int MAX_IMAGE_SIZE = 1024 * 1024 * 2;
 
     // 本地资源承载源：端侧离线 AI（Web Worker / WASM / fetch）需要 http 源。
@@ -356,11 +359,16 @@ public class MainActivity extends Activity {
         try {
             is = getContentResolver().openInputStream(uri);
             if (is == null) return null;
-            byte[] buffer = new byte[maxSize];
+            // 多读 1 字节用于判断是否超限：旧实现缓冲区刚好填满就静默截断，
+            // 大文件（如年度账单 CSV）会变成半截内容且没有任何提示
+            byte[] buffer = new byte[maxSize + 1];
             int total = 0;
             int n;
             while ((n = is.read(buffer, total, buffer.length - total)) > 0) {
                 total += n;
+            }
+            if (total > maxSize) {
+                throw new IOException("文件超过 " + (maxSize / 1024 / 1024) + "MB 上限");
             }
             return java.util.Arrays.copyOf(buffer, total);
         } finally {
@@ -615,6 +623,25 @@ public class MainActivity extends Activity {
             try {
                 new File(getFilesDir(), "legacy_data.json").delete();
             } catch (Exception ignored) {}
+        }
+
+        /**
+         * 读取系统剪贴板（构建 #26）：页面跑在 http://suiyinji.local 本地源，
+         * 不属于安全上下文，navigator.clipboard 不可用，只能走原生桥。
+         * 用于「复制微信/支付宝支付通知 → 打开碎银记一键识别记账」。
+         */
+        @JavascriptInterface
+        public String readClipboard() {
+            try {
+                ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cm == null || !cm.hasPrimaryClip()) return "";
+                ClipData clip = cm.getPrimaryClip();
+                if (clip == null || clip.getItemCount() == 0) return "";
+                CharSequence text = clip.getItemAt(0).coerceToText(MainActivity.this);
+                return text == null ? "" : text.toString();
+            } catch (Exception e) {
+                return "";
+            }
         }
     }
 }
