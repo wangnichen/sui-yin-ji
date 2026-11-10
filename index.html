@@ -1230,6 +1230,8 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
         <div class="empty-emoji">📝</div>
         <div class="empty-text">这里还空空的</div>
         <div style="font-size:12px;color:var(--t2);margin-top:4px">记下第一笔，就能看到它出现在这里 ✨</div>
+        <!-- 空账本正是「不想手打」意愿最强的时刻，直接给出账单导入入口 -->
+        <button type="button" onclick="App.showBillImport()" style="margin-top:14px;padding:10px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#07c160,#059e4e);color:#fff;font-family:inherit;font-size:13px;font-weight:600">🧾 从微信 / 支付宝账单导入</button>
       </div>
       <div class="record-count" id="recordCount"></div>
     </div>
@@ -1384,7 +1386,7 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
       <div class="author-card">
         <div class="author-name">🎓 我不要芒果</div>
         <div class="author-bio" style="line-height:1.7;color:var(--t2)">大一计算机科学与技术专业在读，<br>用 Trae + DeepSeek 打磨的纯本地记账工具。<br>没有广告与会员，数据只存在你的设备里。</div>
-        <div class="author-ver">碎银记 v3.0 · 构建 #26 · 持续更新中</div>
+        <div class="author-ver">碎银记 v3.0 · 构建 #27 · 持续更新中</div>
         <div id="sliderDiagLine" style="font-size:11px;color:var(--t3);margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.6"></div>
       </div>
     </div>
@@ -2786,6 +2788,8 @@ const App={
       if(idx>=0){
         records[idx]={...records[idx],amt,cat,date,note,type:this.curType,mood:this.curMood,time:recordTime};
         this.saveRecords(records);
+        // 商户分类记忆：用户改过的分类记下来，下次同一商户自动套用
+        if(note&&cat)this.learnMerchant(note,cat);
         this.haptic('success');
         this.showToast('已更新 ✅');
       }
@@ -2795,6 +2799,7 @@ const App={
       const record={id:'r_'+ts,amt,cat,date,note,type:this.curType,mood:this.curMood,time:recordTime,ts};
       records.push(record);
       this.saveRecords(records);
+      if(note&&cat)this.learnMerchant(note,cat);
       this.haptic('success');
       this.showToast('记好了 ✓');
       this._celebrateAnim();
@@ -3103,6 +3108,31 @@ const App={
   // 用户自建固定开销（如「吹头发 ¥30」），点一下即按当前日期/时间记一笔，不用每次填表单
   getQuickItems(){return this._load('quick',[])},
   saveQuickItems(v){this._save('quick',v)},
+  // ===== 商户分类记忆（构建 #27）=====
+  // 用户把「星巴克」改过一次分类，以后同一商户的账单导入 / 截图识别 / 文字识别都自动套用，
+  // 导入的账目会越用越准，不用每次手动调分类
+  getMerchantCats(){return this._load('merchant',{})},
+  _merchantKey(note){
+    const k=String(note||'').split('·')[0].replace(/\s+/g,' ').trim().slice(0,20);
+    return k.length>=2?k:'';
+  },
+  learnMerchant(note,cat){
+    if(!cat||!note)return;
+    const key=this._merchantKey(note);
+    if(!key)return;
+    const m=this.getMerchantCats();
+    if(m[key]===cat)return;
+    m[key]=cat;
+    const keys=Object.keys(m);
+    if(keys.length>300)delete m[keys[0]];   // 上限保护：只留最近 300 个商户
+    this._save('merchant',m);
+  },
+  catForNote(note){
+    const key=this._merchantKey(note);
+    const m=this.getMerchantCats();
+    if(key&&m[key])return m[key];
+    return catByKeywords(note);
+  },
   toggleQuickPad(){
     const pad=document.getElementById('quickPad');
     const body=document.getElementById('qpBody');
@@ -4489,8 +4519,6 @@ const App={
       const c=dm[1]+'-'+('0'+dm[2]).slice(-2)+'-'+('0'+dm[3]).slice(-2);
       if(/^\d{4}-\d{2}-\d{2}$/.test(c)&&c<=today&&c>='2000-01-01')date=c;
     }
-    // —— 分类 ——
-    const cat=catByKeywords(raw);
     // —— 备注 ——：优先结构化字段，避免整段 OCR 噪声塞进备注
     let note='';
     const nm=raw.match(/(?:商品说明|商品名称|收款方全称|收款方|商户名称|交易说明|备注)[：:\s]*([^\n]{1,30})/);
@@ -4501,6 +4529,8 @@ const App={
       if(cand.length)note=cand.sort(function(a,b){return a.length-b.length;})[0];
     }
     note=note.replace(/[<>]/g,'').replace(/\s+/g,' ').slice(0,30);
+    // —— 分类 ——：先查商户分类记忆（用户上次改过的分类），再走关键词表
+    const cat=this.catForNote(note)||catByKeywords(raw);
     if(!cat&&!note){
       // 文本含交易语义（钱确实动过）→ 金额已可信，分类留空让用户选，
       // 也比为猜一个分类去跑 90 秒小模型划算（构建 #23）
@@ -6176,7 +6206,7 @@ const App={
       recs.push({
         amt:Math.round(amt*100)/100,
         type:io==='收入'?'income':'expense',
-        cat:catByKeywords(note+' '+usefulGoods),
+        cat:this.catForNote(note)||catByKeywords(note+' '+usefulGoods),
         date:date,
         time:tm?tm[1]:'',
         note:note,
@@ -6345,7 +6375,7 @@ const App={
       cleaned.sort((a,b)=>b.length-a.length);
       note=(cleaned[0]||'').slice(0,40);
     }
-    return {amt,type,cat:catByKeywords(note+' '+t),note:note};
+    return {amt,type,cat:this.catForNote(note)||catByKeywords(note+' '+t),note:note};
   },
   parseTextImport(){
     const text=document.getElementById('importText').value.trim();
@@ -6372,9 +6402,10 @@ const App={
       if(amt<0||/(收入|到账|工资|薪水|红包|退款|返还|收益|利息|分红|盈利|赚)/.test(line)){
         type='income';amt=Math.abs(amt);
       }
-      // Guess category：统一走全局关键词表（构建 #23，与截图识别共用同一套词表）
-      const cat=catByKeywords(line);   // 没命中关键词就保持未分类（不显示分类）
-      results.push({amt,type,cat,note:line.replace(amtMatch[0],'').trim()});
+      // Guess category：先查商户分类记忆（用户改过的分类优先），再走全局关键词表
+      const note=line.replace(amtMatch[0],'').trim();
+      const cat=this.catForNote(note)||catByKeywords(line);   // 都没命中就保持未分类
+      results.push({amt,type,cat,note:note});
     });
     }
     const preview=document.getElementById('importPreview');
@@ -6923,7 +6954,7 @@ document.addEventListener('DOMContentLoaded',()=>App.init());
    2) 兜底：init 链中途抛错会让链尾的 initNavDrag/initTypeDrag 永远绑不上（Tab 内联 onclick 照常），
       这里独立轮询补齐（内部幂等标记防双绑）。800ms 首 tick 足够快，绑定成功即停 */
 (function(){
-  window.__sliderDiag={ver:26,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
+  window.__sliderDiag={ver:27,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
     pDown:0,pTouch:0,pMouse:0,pMove:0,bindErr:''};
   var d=window.__sliderDiag;
   // nav 元素缓存：探针挂在 document capture 上，每个 pointermove 都跑一次 querySelector 是纯浪费
