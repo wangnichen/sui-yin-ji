@@ -1040,6 +1040,11 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
 .qp-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
 .qp-item{position:relative;display:flex;align-items:center;gap:8px;padding:10px;border-radius:10px;background:var(--card);border:1px solid var(--border);color:var(--text);text-align:left;min-width:0;cursor:pointer;user-select:none;-webkit-user-select:none;transition:transform .12s var(--spring-smooth)}
 .qp-item:active{transform:scale(.96)}
+/* 收入/支出用颜色与左侧色条区分（构建 #28） */
+.qp-item.expense{box-shadow:inset 3px 0 0 rgba(255,59,48,.55)}
+.qp-item.income{box-shadow:inset 3px 0 0 rgba(52,199,89,.6)}
+.qp-item-amt.expense{color:var(--red)}
+.qp-item-amt.income{color:var(--green)}
 .qp-item-ico{font-size:15px;flex-shrink:0}
 .qp-item-info{min-width:0;flex:1;display:flex;flex-direction:column;gap:1px}
 .qp-item-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1053,6 +1058,9 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
 .qp-actions button.primary{background:var(--p);color:#fff;border:none}
 /* 快捷记账 · 添加固定开销表单 */
 .qf-tip{font-size:11px;color:var(--t3);line-height:1.7;margin-bottom:14px}
+.qf-seg{display:flex;gap:8px;margin-bottom:14px}
+.qf-seg button{flex:1;height:40px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-family:inherit;font-size:13px;font-weight:600}
+.qf-seg button.active{background:var(--p);color:#fff;border-color:var(--p)}
 .qf-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .qf-row label{font-size:13px;color:var(--t2);width:44px;flex-shrink:0}
 .qf-row input{flex:1;min-width:0;height:42px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);padding:0 12px;font-size:14px;-webkit-appearance:none}
@@ -1386,7 +1394,7 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
       <div class="author-card">
         <div class="author-name">🎓 我不要芒果</div>
         <div class="author-bio" style="line-height:1.7;color:var(--t2)">大一计算机科学与技术专业在读，<br>用 Trae + DeepSeek 打磨的纯本地记账工具。<br>没有广告与会员，数据只存在你的设备里。</div>
-        <div class="author-ver">碎银记 v3.0 · 构建 #27 · 持续更新中</div>
+        <div class="author-ver">碎银记 v3.0 · 构建 #28 · 持续更新中</div>
         <div id="sliderDiagLine" style="font-size:11px;color:var(--t3);margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.6"></div>
       </div>
     </div>
@@ -1461,12 +1469,12 @@ const EC=['food','transport','shopping','entertain','housing','medical','edu','s
 const CAT_KW=[
   ['food',/(食堂|餐费|餐饮|餐厅|饭店|小吃|外卖|美团|饿了么|肯德基|麦当劳|汉堡|披萨|星巴克|瑞幸|喜茶|蜜雪|奶茶|咖啡|早餐|午餐|晚餐|夜宵|火锅|烧烤|烘焙|面包|米线|面馆|快餐|食品|生鲜|菜市场|超市.{0,4}(菜|食品))/],
   ['entertain',/(电影|影院|游戏|KTV|演出|演唱会|门票|剧本杀|密室|网吧|会员|爱奇艺|腾讯视频|优酷|B站|哔哩)/i],
-  ['transport',/(地铁|公交|打车|滴滴|出租车|高铁|火车票|机票|加油|停车|高速|单车|船票|交通)/],
-  ['shower',/(洗浴|洗澡|淋浴|澡堂|热水|理发|美发|足浴|按摩|SPA)/i],
-  ['medical',/(医院|药房|药店|挂号|诊所|门诊|体检|牙科|医保|医疗)/],
+  ['transport',/(地铁|公交|打车|滴滴|出租车|网约车|顺风车|高铁|火车票|机票|加油|停车|高速|单车|船票|交通)/],
+  ['shower',/(洗浴|洗澡|淋浴|澡堂|热水|理发|美发|足浴|按摩|SPA|洗衣|干洗)/i],
+  ['medical',/(医院|药房|药店|挂号|诊所|门诊|体检|牙科|口腔|医保|医疗)/],
   ['edu',/(学费|培训|文具|书店|教材|课程|网课|考试费|补习|辅导|学术|论文)/],
-  ['housing',/(房租|租金|水费|电费|燃气|物业|宽带|维修|家政)/],
-  ['shopping',/(淘宝|天猫|京东|拼多多|超市|商城|购物|百货|服饰|服装|鞋|化妆品|数码|家电|便利店|日用品)/],
+  ['housing',/(房租|租金|水费|电费|燃气|物业|宽带|话费|流量|手机费|电话费|维修|家政)/],
+  ['shopping',/(淘宝|天猫|京东|拼多多|超市|商城|购物|百货|服饰|服装|鞋|化妆品|数码|家电|便利店|日用品|快递|驿站)/],
   ['salary',/(工资|薪资|薪水|发薪|月薪|劳务|报销)/],
   ['gift',/(红包|礼金|压岁钱|份子)/],
   ['invest',/(理财|基金|股票|证券|收益|利息|分红|定投|余额宝)/],
@@ -3164,10 +3172,11 @@ const App={
     }
     grid.innerHTML='<div class="qp-grid">'+items.map(it=>{
       const cat=this.getCatData(it.cat);
-      return '<div class="qp-item" role="button" tabindex="0" onclick="App.quickRecord(\''+it.id+'\')">'
-        +'<span class="qp-item-ico">'+(it.cat?cat.i:'⚡')+'</span>'
+      const isInc=it.type==='income';
+      return '<div class="qp-item '+(isInc?'income':'expense')+'" role="button" tabindex="0" onclick="App.quickRecord(\''+it.id+'\')">'
+        +'<span class="qp-item-ico">'+(it.cat?cat.i:(isInc?'💰':'⚡'))+'</span>'
         +'<span class="qp-item-info"><span class="qp-item-name">'+this.escapeHtml(it.name)+'</span>'
-        +'<span class="qp-item-amt">'+'¥'+Number(it.amt).toFixed(2)+'</span></span>'
+        +'<span class="qp-item-amt '+(isInc?'income':'expense')+'">'+(isInc?'+':'-')+'¥'+Number(it.amt).toFixed(2)+'</span></span>'
         +'<button type="button" class="qp-item-del" onclick="event.stopPropagation();App.deleteQuickItem(\''+it.id+'\')">✕</button>'
         +'</div>';
     }).join('')+'</div>';
@@ -3202,16 +3211,36 @@ const App={
   },
   showQuickForm(){
     this._qfCat='';
-    const cats=EC.map(k=>{
-      const c=this.getCatData(k);
-      return '<button type="button" data-k="'+k+'" onclick="App._qfPick(this,\''+k+'\')">'+c.i+' '+c.n+'</button>';
-    }).join('');
+    this._qfType='expense';
     this.showModal('<h3>添加固定开销</h3>'
-      +'<div class="qf-tip">保存后，在「快捷记账」里点一下就会按当前日期记一笔；名称与金额随时可删掉重加。</div>'
-      +'<div class="qf-row"><label>名称</label><input id="qfName" type="text" maxlength="12" placeholder="如：吹头发"></div>'
+      +'<div class="qf-tip">保存后，在「快捷记账」里点一下就会按当前日期记一笔；支出和收入都能设。</div>'
+      +'<div class="qf-seg">'
+      +'<button type="button" id="qfTypeExp" class="active" onclick="App._qfSetType(\'expense\')">－ 支出</button>'
+      +'<button type="button" id="qfTypeInc" onclick="App._qfSetType(\'income\')">＋ 收入</button>'
+      +'</div>'
+      +'<div class="qf-row"><label>名称</label><input id="qfName" type="text" maxlength="12" placeholder="如：吹头发 / 生活费"></div>'
       +'<div class="qf-row"><label>金额</label><input id="qfAmt" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00"></div>'
-      +'<div class="qf-cats" id="qfCats">'+cats+'</div>'
+      +'<div class="qf-cats" id="qfCats"></div>'
       +'<button type="button" class="qf-save" onclick="App.saveQuickItem()">保存</button>','sheet');
+    this._qfRenderCats();
+  },
+  _qfSetType(t){
+    this._qfType=t==='income'?'income':'expense';
+    this._qfCat='';
+    const e=document.getElementById('qfTypeExp'),n=document.getElementById('qfTypeInc');
+    if(e)e.classList.toggle('active',this._qfType==='expense');
+    if(n)n.classList.toggle('active',this._qfType==='income');
+    this._qfRenderCats();
+    this.haptic('light');
+  },
+  _qfRenderCats(){
+    const box=document.getElementById('qfCats');
+    if(!box)return;
+    const list=this._qfType==='income'?IC:EC;
+    box.innerHTML=list.map(k=>{
+      const c=this.getCatData(k);
+      return '<button type="button" data-k="'+k+'"'+(this._qfCat===k?' class="active"':'')+' onclick="App._qfPick(this,\''+k+'\')">'+c.i+' '+c.n+'</button>';
+    }).join('');
   },
   _qfPick(btn,k){
     this._qfCat=k;
@@ -3230,7 +3259,11 @@ const App={
     const items=this.getQuickItems();
     if(items.length>=12){this.showToast('最多 12 项固定开销');return}
     if(items.some(x=>x.name===name)){this.showToast('已经有同名的一项了');return}
-    items.push({id:'q_'+Date.now(),name:name,amt:Math.round(amt*100)/100,cat:this._qfCat||'',type:'expense'});
+    const type=this._qfType==='income'?'income':'expense';
+    // 分类必须属于当前收支类型的分类集，否则丢弃（避免收入挂上「餐饮」这类支出分类）
+    const allowed=type==='income'?IC:EC;
+    const cat=allowed.indexOf(this._qfCat)>=0?this._qfCat:'';
+    items.push({id:'q_'+Date.now(),name:name,amt:Math.round(amt*100)/100,cat:cat,type:type});
     this.saveQuickItems(items);
     this._qfCat='';
     this.closeModal();
@@ -4519,6 +4552,17 @@ const App={
       const c=dm[1]+'-'+('0'+dm[2]).slice(-2)+'-'+('0'+dm[3]).slice(-2);
       if(/^\d{4}-\d{2}-\d{2}$/.test(c)&&c<=today&&c>='2000-01-01')date=c;
     }
+    // —— 收支类型（构建 #28）——：收款/退款到账算收入；支付/扣款算支出。
+    // 旧版只靠分类反推方向，导致「微信收款到账」这类截图被记成支出
+    let type='expense';
+    const incomeRe=/(已收款|收款成功|收款到账|收款通知|到账通知|已入账|入账成功|退款成功|已退款|退回|红包(收款|入账)|收到.{0,6}(转账|红包|款项))/;
+    const expenseRe=/(支付成功|付款成功|已支付|已付款|扣款|消费成功|支出|付款金额|支付金额|实付)/;
+    if(/(收\/?支|资金方向|收支)[：:\s]*收入/.test(raw))type='income';
+    else if(incomeRe.test(raw)&&!expenseRe.test(raw))type='income';
+    // —— 时间 ——：截图常带 12:30 / 12:30:45，取第一个合法时间（日期用横杠，不会误命中）
+    let time='';
+    const tm0=raw.match(/(?:^|[^\d])([01]?\d|2[0-3])[:：]([0-5]\d)(?::[0-5]\d)?(?!\d)/);
+    if(tm0)time=('0'+tm0[1]).slice(-2)+':'+tm0[2];
     // —— 备注 ——：优先结构化字段，避免整段 OCR 噪声塞进备注
     let note='';
     const nm=raw.match(/(?:商品说明|商品名称|收款方全称|收款方|商户名称|交易说明|备注)[：:\s]*([^\n]{1,30})/);
@@ -4535,10 +4579,10 @@ const App={
       // 文本含交易语义（钱确实动过）→ 金额已可信，分类留空让用户选，
       // 也比为猜一个分类去跑 90 秒小模型划算（构建 #23）
       const strong=/(支付|转账|付款|交易|收款|消费|扣款|订单)/.test(raw);
-      if(strong)return {amount:Math.round(amt*100)/100,cat:'',date:date,note:''};
+      if(strong)return {amount:Math.round(amt*100)/100,cat:'',date:date,note:'',type:type,time:time};
       return null;   // 金额之外的字段一点没提到 → 交 LLM
     }
-    return {amount:Math.round(amt*100)/100,cat:cat,date:date,note:note};
+    return {amount:Math.round(amt*100)/100,cat:cat,date:date,note:note,type:type,time:time};
   },
   async _tryExtractFromImage(base64Data){
     // 双锁统一：OCR 与对话/会诊共用 _aiLlm 单例，并发会互相污染 KV cache，必须串行
@@ -4577,12 +4621,16 @@ const App={
   _aiShowResult(p,rawText){
     if(!p){this.showToast('未识别到内容');return;}
     const cat=(CATS||[]).find(c=>c.k===p.cat)||null;   // 没识别出分类就不显示分类，避免误标成「其他」
+    const isInc=p.type==='income';
+    const amtColor=isInc?'var(--green)':'var(--red)';
+    const dateTxt=(p.date&&/^\d{4}-\d{2}-\d{2}$/.test(p.date))?p.date:'未识别（默认今天）';
     const raw=String(rawText||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]));
     const short=raw.length>220?raw.slice(0,220)+'…':raw;
     const html='<h3>🔍 识别结果</h3>'+
       '<div style="display:grid;grid-template-columns:auto 1fr;gap:9px 14px;background:var(--glass-bg);border-radius:12px;padding:14px;font-size:14px;margin-bottom:12px">'+
-      '<span style="color:var(--t2)">金额</span><b style="color:var(--red);font-size:17px" class="tabnum">¥'+Number(p.amount||0).toFixed(2)+'</b>'+
-      '<span style="color:var(--t2)">日期</span><b>'+((p.date&&/^\d{4}-\d{2}-\d{2}$/.test(p.date))?p.date:'未识别（默认今天）')+'</b>'+
+      '<span style="color:var(--t2)">类型</span><b style="color:'+amtColor+'">'+(isInc?'＋ 收入':'－ 支出')+'</b>'+
+      '<span style="color:var(--t2)">金额</span><b style="color:'+amtColor+';font-size:17px" class="tabnum">'+(isInc?'+':'-')+'¥'+Number(p.amount||0).toFixed(2)+'</b>'+
+      '<span style="color:var(--t2)">日期</span><b>'+dateTxt+(p.time?' '+p.time:'')+'</b>'+
       '<span style="color:var(--t2)">分类</span><b>'+(cat?cat.i+' '+cat.n:'—')+'</b>'+
       '<span style="color:var(--t2)">备注</span><b>'+(p.note?this.escapeHtml(String(p.note).slice(0,40)):'—')+'</b>'+
       '</div>'+
@@ -4607,14 +4655,21 @@ const App={
       this.showToast('已回填到记账表单，请核对后点「记一笔」');
     }else{
       // 直接导入：写入账单并刷新当前页（与手动记一笔同样走 saveRecords）
-      const type=IC.indexOf(p.cat)>=0?'income':'expense';
-      const rec={id:'r_'+Date.now(),amt:p.amount,cat:p.cat,date:p.date||dstr(new Date()),
-        note:p.note||'',type,mood:null,ts:Date.now()};
+      const type=p.type==='income'?'income':(IC.indexOf(p.cat)>=0?'income':'expense');
+      const date=p.date||dstr(new Date());
+      const note=p.note||'';
+      // 去重：同日期+同金额+同备注+同方向已存在 → 跳过，防止同一张截图重复导入（构建 #28）
+      const dup=this.getRecords().some(r=>r.date===date&&r.type===type&&Math.abs(Number(r.amt)-Number(p.amount))<0.005&&(r.note||'')===note);
+      if(dup){this.showToast('这笔已经在账本里了，已跳过');return;}
+      const rec={id:'r_'+Date.now(),amt:p.amount,cat:p.cat||'',date:date,
+        note:note,type:type,mood:null,time:p.time||'',ts:Date.now()};
       const records=this.getRecords();
       records.push(rec);
       records.sort(recSort);
       this.saveRecords(records);
-      this.showToast('已导入 ¥'+Number(p.amount).toFixed(2)+' ✅');
+      // 商户分类记忆：识别出的备注 + 分类一并记住，下次同一商户直接归类
+      if(note&&p.cat)this.learnMerchant(note,p.cat);
+      this.showToast('已导入 '+(type==='income'?'+':'-')+'¥'+Number(p.amount).toFixed(2)+' ✅');
       if(this.curPage==='bills')this.renderBills();
       if(this.curPage==='stats')this.renderStats();
       if(this.curPage==='profile')this.renderProfile();
@@ -5067,7 +5122,7 @@ const App={
       if(rerun)rerun.style.display=hasResult?'':'none';
     }
   },
-  async _aiConsultRun(){
+  async _aiConsultRun(force){
     if(this._aiChatBusy){this.showToast('AI 正在会诊，请稍候…');return;}
     if(this._aiBusy){this.showToast('正在识别图片中，请稍候…');return;}
     this._aiChatBusy=true;
@@ -5093,7 +5148,16 @@ const App={
     if(sum)sum.style.display='none';
     const setSt=function(t,err){if(st){st.textContent=t;st.className='consult-status'+(err?' err':'');}};
     const t0=Date.now();
+    let tick=0;
     try{
+      const ctx=this._aiChatSummary();
+      // 构建 #28：账本一点没变时直接复用上次会诊结果（0 秒、不加载模型）。
+      // 「再会诊一次」按钮传 force=true 强制重新分析。
+      if(!force&&this._consultCache&&this._consultCache.ctx===ctx){
+        this._aiConsultRestore();
+        setSt('账本没有变化 · 已复用上次会诊（0 秒）');
+        return;
+      }
       // 0. 端侧模型（复用单例：仅首次真正加载，之后常驻内存直接推理）
       if(!this._aiLlm){
         setSt('首次加载端侧模型（469MB），之后常驻…');
@@ -5101,7 +5165,6 @@ const App={
       }else{
         setSt('模型已就绪（常驻内存）· 直接本地分析');
       }
-      const ctx=this._aiChatSummary();
       const roles=[
         '你是「碎银记」的记账师老周，作风严谨。只依据用户账本摘要核对账目，指出最多3条异常、可疑或可能漏记之处；摘要里没有的信息不要编造。口语化中文，60字以内。',
         '你是「碎银记」的数据分析师小析。只依据账本摘要做结构化分析：找出最大支出、占比与异常波动，给出2-3条数据结论。数字只能来自摘要，口语化中文，60字以内。',
@@ -5116,6 +5179,7 @@ const App={
         if(lane){lane.className='consult-lane running';if(lane.scrollIntoView)lane.scrollIntoView({block:'nearest'});}
         if(state)state.textContent='会诊中';
         setSt('第 '+(i+1)+'/3 位顾问会诊中…');
+        tick=setInterval(function(){setSt('第 '+(i+1)+'/3 位顾问会诊中… '+((Date.now()-t0)/1000).toFixed(0)+'s');},1000);
         const rt=Date.now();
         let full='',toks=0,rafId=0;
         const flush=function(){
@@ -5141,7 +5205,10 @@ const App={
         if(!full){
           full=((resp&&resp.choices&&resp.choices[0]&&resp.choices[0].message&&resp.choices[0].message.content)||'').trim();
         }
+        if(tick){clearInterval(tick);tick=0;}
         if(rafId){cancelAnimationFrame(rafId);rafId=0;}
+        // 小模型偶尔返回空内容：用账本数字生成兜底发言，泳道不至于一片空白
+        if(!full||!full.trim())full=this._consultFallback(i,ctx);
         if(body)body.textContent=full;
         results[i]=full;
         const secs=((Date.now()-rt)/1000).toFixed(1);
@@ -5151,6 +5218,7 @@ const App={
       }
       // 4. 主持人汇总（第 4 次短调用）
       setSt('汇总会诊结论…');
+      tick=setInterval(function(){setSt('汇总会诊结论… '+((Date.now()-t0)/1000).toFixed(0)+'s');},1000);
       const sumResp=await this._aiLlm.createChatCompletion({
         messages:[
           {role:'system',content:'你是碎银记的会诊主持人，把三位顾问的意见浓缩成3条可执行动作。'},
@@ -5159,6 +5227,7 @@ const App={
         ],
         max_tokens:80,temperature:0.3
       });
+      if(tick){clearInterval(tick);tick=0;}
       let sumTxt=((sumResp&&sumResp.choices&&sumResp.choices[0]&&sumResp.choices[0].message&&sumResp.choices[0].message.content)||'').trim();
       // 清洗小模型输出的 markdown 标记并去重（同质化行只保留一条）
       const seen={};
@@ -5193,6 +5262,8 @@ const App={
       const secs=((Date.now()-t0)/1000).toFixed(1);
       if(note)note.textContent='端侧模型单实例，三位顾问依次会诊 · 账本数据未离开本机 · 总耗时 '+secs+'s';
       setSt('会诊完成 · 总耗时 '+secs+'s');
+      // 缓存本次结果：账本不变时再进会诊页直接 0 秒呈现（构建 #28）
+      this._consultCache={ctx:ctx,results:results.slice(),lines:lines.slice(),at:new Date().toTimeString().slice(0,5)};
     }catch(e){
       const msg=(e&&e.message)?String(e.message):'未知错误';
       setSt('会诊中断：'+msg.slice(0,44),true);
@@ -5223,6 +5294,7 @@ const App={
         if(note)note.textContent='记账、统计、报告等不依赖模型的功能不受影响。';
       }
     }finally{
+      if(tick){clearInterval(tick);tick=0;}
       this._aiChatBusy=false;
       if(inp)inp.disabled=false;
       if(send)send.disabled=false;
@@ -5230,10 +5302,47 @@ const App={
       if(btn)btn.disabled=false;
     }
   },
+  // 渲染缓存的上次会诊结果（账本未变化时使用，不加载模型）
+  _aiConsultRestore(){
+    const c=this._consultCache;
+    if(!c)return;
+    for(let i=0;i<3;i++){
+      const lane=document.getElementById('consultLane'+i);
+      const state=document.getElementById('consultState'+i);
+      const body=document.getElementById('consultBody'+i);
+      const meta=document.getElementById('consultMeta'+i);
+      if(lane)lane.className='consult-lane done';
+      if(state)state.textContent='✓ 完成';
+      if(body)body.textContent=(c.results&&c.results[i])||'';
+      if(meta)meta.textContent='缓存';
+    }
+    const sum=document.getElementById('consultSum');
+    if(sum)sum.style.display='';
+    const ol=document.getElementById('consultSumList');
+    if(ol){
+      while(ol.firstChild)ol.removeChild(ol.firstChild);
+      (c.lines||[]).forEach(function(t){
+        const li=document.createElement('li');li.textContent=t;ol.appendChild(li);
+      });
+    }
+    const note=document.getElementById('consultSumNote');
+    if(note)note.textContent='账本没有变化，直接复用上次会诊（生成于 '+c.at+'）· 点「再会诊一次」可重新分析';
+  },
+  // 小模型返回空内容时的本地兜底发言：只用账本摘要里的数字，不编造
+  _consultFallback(i,ctx){
+    const t=String(ctx||'');
+    const mExp=/本月支出¥(\d+)\/(\d+)笔/.exec(t);
+    const mInc=/收入¥(\d+)/.exec(t);
+    const exp=mExp?mExp[1]:'0',n=mExp?mExp[2]:'0',inc=mInc?mInc[1]:'0';
+    if(i===0)return '本月共 '+n+' 笔支出，合计 ¥'+exp+'。暂未发现明显异常，建议核对大额与重复扣款。';
+    if(i===1)return '本月支出 ¥'+exp+'，收入 ¥'+inc+'。可重点看占比最高的那个分类。';
+    return '先把占比最高的分类设个上限，今天就能少花一笔。';
+  },
   _aiFillForm(p){
     // 只回填记账表单，由用户核对后手动点「记一笔」才写入 localStorage
     this.switchPage('record');
-    const type=IC.indexOf(p.cat)>=0?'income':'expense';
+    // 优先用识别出的收支方向；没有时再按分类反推（收入分类 → 收入）
+    const type=p.type==='income'?'income':(IC.indexOf(p.cat)>=0?'income':'expense');
     if(this.curType!==type)this.setType(type);
     const amt=document.getElementById('inputAmount');
     if(amt){amt.value=p.amount;this.onAmountInput();}
@@ -5241,6 +5350,11 @@ const App={
     if(note)note.value=p.note||'';
     const d=document.getElementById('inputDate');
     if(d&&p.date){d.value=p.date;d.dispatchEvent(new Event('change'));}
+    // 识别到交易时间就一并回填（构建 #28），没识别到保持当前时间
+    if(p.time){
+      const t=document.getElementById('inputTime');
+      if(t){t.value=p.time;this._timeManual=true;}
+    }
     this.selectCat(p.cat);   // p.cat 为空时即清空选中，保持"未分类"状态
   },
   _confirmScreenshotImport(){
@@ -6772,7 +6886,7 @@ const App={
       +'<div class="consult-sum-note" id="consultSumNote"></div></div>'
       +'<div class="consult-actions">'
       +'<button type="button" class="primary" id="consultStart" onclick="App._aiConsultRun()">🚀 开始会诊</button>'
-      +'<button type="button" class="primary" id="consultRerun" style="display:none" onclick="App._aiConsultRun()">🔄 再会诊一次</button>'
+      +'<button type="button" class="primary" id="consultRerun" style="display:none" onclick="App._aiConsultRun(true)">🔄 再会诊一次</button>'
       +'<button type="button" id="consultBack" onclick="App._aiConsultToggle()">← 返回对话</button>'
       +'</div></div>';
     html+='</div>';// 关闭 ai-chat-box
@@ -6954,7 +7068,7 @@ document.addEventListener('DOMContentLoaded',()=>App.init());
    2) 兜底：init 链中途抛错会让链尾的 initNavDrag/initTypeDrag 永远绑不上（Tab 内联 onclick 照常），
       这里独立轮询补齐（内部幂等标记防双绑）。800ms 首 tick 足够快，绑定成功即停 */
 (function(){
-  window.__sliderDiag={ver:27,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
+  window.__sliderDiag={ver:28,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
     pDown:0,pTouch:0,pMouse:0,pMove:0,bindErr:''};
   var d=window.__sliderDiag;
   // nav 元素缓存：探针挂在 document capture 上，每个 pointermove 都跑一次 querySelector 是纯浪费

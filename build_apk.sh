@@ -19,7 +19,7 @@ APP_ROOT="$(cd "$(dirname "$0")" && pwd)"
 PROJECT=$APP_ROOT/android
 OUTPUT=$APP_ROOT
 
-VERSION_CODE=27
+VERSION_CODE=28
 VERSION_NAME="3.0"
 
 # ====== 清理 ======
