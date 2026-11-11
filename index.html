@@ -1385,6 +1385,12 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
       <div class="menu-item" onclick="App.showShareAndExport()">
         <span class="menu-icon">📤</span><span class="menu-text">分享、报表与导出</span><span class="menu-arrow">›</span>
       </div>
+      <div class="menu-item" onclick="App.showPlatformLedger()">
+        <span class="menu-icon">🧾</span><span class="menu-text">跨平台账本</span><span class="menu-right" id="platLabel" style="font-size:12px;color:var(--t3)"></span><span class="menu-arrow">›</span>
+      </div>
+      <div class="menu-item" onclick="App.showAnnualReport()">
+        <span class="menu-icon">📅</span><span class="menu-text">年度账单</span><span class="menu-right" id="annualLabel" style="font-size:12px;color:var(--t3)"></span><span class="menu-arrow">›</span>
+      </div>
       <div class="menu-item" onclick="App.showImportMenu()">
         <span class="menu-icon">📥</span><span class="menu-text">导入数据</span><span class="menu-arrow">›</span>
       </div>
@@ -1394,7 +1400,7 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
       <div class="author-card">
         <div class="author-name">🎓 我不要芒果</div>
         <div class="author-bio" style="line-height:1.7;color:var(--t2)">大一计算机科学与技术专业在读，<br>用 Trae + DeepSeek 打磨的纯本地记账工具。<br>没有广告与会员，数据只存在你的设备里。</div>
-        <div class="author-ver">碎银记 v3.0 · 构建 #29 · 持续更新中</div>
+        <div class="author-ver">碎银记 v3.0 · 构建 #30 · 持续更新中</div>
         <div id="sliderDiagLine" style="font-size:11px;color:var(--t3);margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.6"></div>
       </div>
     </div>
@@ -2633,6 +2639,7 @@ const App={
     window._statImageDataUrl=null;
     window._reportText=null;
     window._importResults=null;
+    window._annualText=null;
     // 防御性清理：closeModal 可以被用户点遮罩、系统返回键、或任何地方触发，
     // 走不到 _cropCancel/_cropConfirm 时也要把裁切状态清干净，
     // 否则 body.crop-open 类会泄漏（裁切完毛玻璃永远不恢复）、
@@ -5402,6 +5409,19 @@ const App={
       const today=dstr(new Date());
       fl.textContent=s.fortuneDate===today?s.fortuneLevel:'未抽';
     }
+    // 跨平台账本 / 年度账单的右侧摘要（构建 #30）
+    const pl=document.getElementById('platLabel');
+    if(pl){
+      const st=this.platformStats();
+      const n=st.wechat.n+st.alipay.n;
+      pl.textContent=n>0?(n+' 笔来自账单'):'去导入账单';
+    }
+    const al=document.getElementById('annualLabel');
+    if(al){
+      const y=new Date().getFullYear();
+      const n=this.getRecords().filter(r=>r.date&&String(r.date).indexOf(y+'-')===0).length;
+      al.textContent=n>0?(y+' 年 '+n+' 笔'):'暂无记录';
+    }
     // 滑块拖拽诊断：探针=事件是否进页面，逻辑=主处理器是否收到，流=走的哪条输入流。
     // 真机按住滑一次再打开本页截图：探针 0 → 输入没到 WebView（模拟器/壳层）；
     // 探针有数逻辑 0 → 绑定层；都有数仍拖不动 → 拖拽逻辑层
@@ -5869,6 +5889,147 @@ const App={
       '<button class="btn-primary" style="background:var(--t2)" onclick="App._clipboardImport()">📋 剪贴板识别（复制支付通知即记）</button></div>';
     this.showModal(html);
   },
+  // ===== 跨平台账本（构建 #30）=====
+  // 评委说「这类功能只能银行/支付工具做」。但微信只看得见微信流水、支付宝只看得见支付宝流水，
+  // 银行只看得见银行卡进出——没有任何一家能把你在各平台花掉的钱合成一本账，也不会把数据交给对方。
+  // 「这个月到底一共花了多少」这件事，只能由一个第三方在本机汇总。这就是碎银记存在的理由。
+  platformStats(){
+    const m={wechat:{n:0,exp:0,inc:0},alipay:{n:0,exp:0,inc:0},other:{n:0,exp:0,inc:0}};
+    this.getRecords().forEach(r=>{
+      const k=r.plat==='wechat'?'wechat':(r.plat==='alipay'?'alipay':'other');
+      m[k].n++;
+      const a=Number(r.amt)||0;
+      if(r.type==='income')m[k].inc+=a;else m[k].exp+=a;
+    });
+    return m;
+  },
+  showPlatformLedger(){
+    const recs=this.getRecords();
+    const st=this.platformStats();
+    const totalExp=st.wechat.exp+st.alipay.exp+st.other.exp;
+    const totalInc=st.wechat.inc+st.alipay.inc+st.other.inc;
+    if(!recs.length){
+      this.showModal('<h3>🧾 跨平台账本</h3>'
+        +'<p style="font-size:12.5px;color:var(--t2);line-height:1.85;margin-bottom:14px">把微信账单、支付宝账单导进来，这里会把它们合成一本账——<b>看看到底在哪个 App 里花得多</b>。<br><br>微信只看得见微信的流水，支付宝只看得见支付宝的流水，银行只看得见银行卡。所以「我这个月一共花了多少」，只能由你自己（在本机）合起来算。</p>'
+        +'<button class="btn-primary" style="background:linear-gradient(135deg,#07c160,#059e4e)" onclick="App.closeModal();setTimeout(()=>App.showBillImport(),250)">🧾 去导入微信 / 支付宝账单</button>'
+        +'<button class="btn-primary" style="margin-top:8px;background:var(--t2)" onclick="App.closeModal()">知道了</button>','sheet');
+      return;
+    }
+    const rows=[
+      {k:'wechat',name:'微信支付',icon:'💚',color:'#07c160'},
+      {k:'alipay',name:'支付宝',icon:'💙',color:'#1677ff'},
+      {k:'other',name:'手动记账',icon:'✏️',color:'#8e8e93'}
+    ];
+    const rowsHtml=rows.map(function(R){
+      const v=st[R.k];
+      const pct=totalExp>0?Math.round(v.exp/totalExp*100):0;
+      return '<div style="padding:11px 12px;border:1px solid var(--border);border-radius:12px;margin-bottom:8px;color:'+R.color+'">'
+        +'<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text)">'
+        +'<span>'+R.icon+'</span><b>'+R.name+'</b>'
+        +'<span style="margin-left:auto;font-variant-numeric:tabular-nums;color:'+R.color+';font-weight:700">¥'+v.exp.toFixed(2)+'</span></div>'
+        +'<div style="height:7px;border-radius:6px;background:var(--card2);overflow:hidden;margin-top:6px">'
+        +'<div style="height:100%;width:'+pct+'%;border-radius:6px;background:currentColor"></div></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--t3);margin-top:5px">'
+        +'<span>'+v.n+' 笔'+(v.inc>0?' · 收入 ¥'+v.inc.toFixed(2):'')+'</span><span>支出占比 '+pct+'%</span></div>'
+        +'</div>';
+    }).join('');
+    const concl=(st.wechat.exp>0&&st.alipay.exp>0)
+      ?'微信花 ¥'+st.wechat.exp.toFixed(0)+'、支付宝花 ¥'+st.alipay.exp.toFixed(0)+'，合计 ¥'+totalExp.toFixed(0)+'。只看任意一个 App，你都看不到完整的自己。'
+      :'目前「'+(st.alipay.exp>0?'支付宝':(st.wechat.exp>0?'微信':'手动记账'))+'」占了支出的大头。把另一个平台的账单也导进来，账才完整。';
+    const html='<h3>🧾 跨平台账本</h3>'
+      +'<div style="background:var(--glass-bg-strong);border:1px solid var(--glass-border-strong);border-radius:12px;padding:12px 14px;margin-bottom:12px">'
+      +'<div style="font-size:11px;color:var(--t3);margin-bottom:3px">全平台支出合计</div>'
+      +'<div style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.5px">¥'+totalExp.toFixed(2)+'</div>'
+      +'<div style="font-size:11px;color:var(--t3);margin-top:4px">收入 ¥'+totalInc.toFixed(2)+' · 共 '+recs.length+' 笔 · 数据只在本机</div>'
+      +'</div>'
+      +rowsHtml
+      +'<div style="font-size:11.5px;color:var(--t2);line-height:1.8;margin-top:10px;padding:10px 12px;background:var(--card2);border-radius:10px">'+concl+'</div>'
+      +'<button class="btn-primary" style="margin-top:12px;background:var(--t2)" onclick="App.closeModal()">知道了</button>';
+    this.showModal(html,'sheet');
+  },
+  // ===== 年度账单（构建 #30）：跨平台合成，支付工具给不了 =====
+  showAnnualReport(){
+    const y=new Date().getFullYear();
+    const recs=this.getRecords().filter(r=>r.date&&String(r.date).indexOf(y+'-')===0);
+    if(!recs.length){this.showToast('今年还没有记账，先记几笔吧');return}
+    let exp=0,inc=0,expN=0;
+    const byCat={},byMerchant={},byMonth={},days={};
+    let maxRec=null;
+    recs.forEach(r=>{
+      days[r.date]=1;
+      const a=Number(r.amt)||0;
+      const mm=r.date.slice(5,7);
+      if(!byMonth[mm])byMonth[mm]=0;
+      if(r.type==='income'){inc+=a;return;}
+      exp+=a;expN++;
+      byMonth[mm]+=a;
+      if(r.cat)byCat[r.cat]=(byCat[r.cat]||0)+a;
+      if(r.note){const mk=this._merchantKey(r.note)||r.note.slice(0,8);byMerchant[mk]=(byMerchant[mk]||0)+a;}
+      if(!maxRec||a>Number(maxRec.amt))maxRec=r;
+    });
+    const dayCount=Object.keys(days).length||1;
+    const topCats=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]).slice(0,3).map(k=>{
+      const c=this.getCatData(k);return (c.n||k)+' ¥'+byCat[k].toFixed(0);
+    });
+    const topMerchants=Object.keys(byMerchant).sort((a,b)=>byMerchant[b]-byMerchant[a]).slice(0,3).map(k=>k+' ¥'+byMerchant[k].toFixed(0));
+    const bestMonth=Object.keys(byMonth).sort((a,b)=>byMonth[b]-byMonth[a])[0];
+    const st=this.platformStats();
+    const line=function(k,v){return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:6px 0;border-bottom:1px dashed var(--border)"><span style="color:var(--t2)">'+k+'</span><b style="text-align:right">'+v+'</b></div>';};
+    const body='<div style="font-size:11.5px;color:var(--t3);margin-bottom:8px">'+y+' 年 · 共 '+recs.length+' 笔 · 记账 '+dayCount+' 天</div>'
+      +'<div style="display:flex;gap:8px;margin-bottom:12px">'
+      +'<div style="flex:1;background:var(--card2);border-radius:10px;padding:9px 8px;text-align:center"><div style="font-size:10.5px;color:var(--t3)">支出</div><b style="color:var(--red);font-variant-numeric:tabular-nums">¥'+exp.toFixed(0)+'</b></div>'
+      +'<div style="flex:1;background:var(--card2);border-radius:10px;padding:9px 8px;text-align:center"><div style="font-size:10.5px;color:var(--t3)">收入</div><b style="color:var(--green);font-variant-numeric:tabular-nums">¥'+inc.toFixed(0)+'</b></div>'
+      +'<div style="flex:1;background:var(--card2);border-radius:10px;padding:9px 8px;text-align:center"><div style="font-size:10.5px;color:var(--t3)">结余</div><b style="font-variant-numeric:tabular-nums">¥'+(inc-exp).toFixed(0)+'</b></div>'
+      +'</div>'
+      +line('花钱最多的分类',topCats[0]||'—')
+      +line('第二 / 第三',(topCats[1]||'—')+' / '+(topCats[2]||'—'))
+      +line('常去的商户',topMerchants[0]||'—')
+      +line('最大一笔',maxRec?('¥'+Number(maxRec.amt).toFixed(2)+' · '+this.escapeHtml(maxRec.note||'无备注')+'（'+maxRec.date.slice(5)+'）'):'—')
+      +line('最费钱的月份',bestMonth?(parseInt(bestMonth,10)+' 月 ¥'+byMonth[bestMonth].toFixed(0)):'—')
+      +line('平台构成','微信 ¥'+st.wechat.exp.toFixed(0)+' · 支付宝 ¥'+st.alipay.exp.toFixed(0)+' · 手动 ¥'+st.other.exp.toFixed(0))
+      +line('平均每天',expN?('¥'+(exp/dayCount).toFixed(1)):'—');
+    const text='📅 碎银记 · '+y+' 年度账单\n\n'
+      +'支出 ¥'+exp.toFixed(2)+'（'+expN+' 笔）\n'
+      +'收入 ¥'+inc.toFixed(2)+'　结余 ¥'+(inc-exp).toFixed(2)+'\n'
+      +'记账 '+dayCount+' 天 · 平均每天 ¥'+(exp/dayCount).toFixed(1)+'\n\n'
+      +'Top 分类：'+(topCats.join(' / ')||'—')+'\n'
+      +'常去商户：'+(topMerchants.join(' / ')||'—')+'\n'
+      +(maxRec?'最大一笔：¥'+Number(maxRec.amt).toFixed(2)+' · '+(maxRec.note||'无备注')+'\n':'')
+      +'平台构成：微信 ¥'+st.wechat.exp.toFixed(0)+' / 支付宝 ¥'+st.alipay.exp.toFixed(0)+' / 手动 ¥'+st.other.exp.toFixed(0)+'\n\n'
+      +'—— 本账单由碎银记在本机生成，未上传任何数据';
+    window._annualText=text;
+    const html='<h3>📅 '+y+' 年度账单</h3>'+body
+      +'<div style="display:flex;gap:8px;margin-top:14px">'
+      +'<button class="btn-primary" style="flex:1" onclick="App.copyText(window._annualText,\'年度账单已复制\')">📋 复制全文</button>'
+      +'<button class="btn-primary" style="flex:1;background:var(--t2)" onclick="App.closeModal()">关闭</button></div>';
+    this.showModal(html,'sheet');
+  },
+  // 通用复制：APK 内页面跑在 http 本地源（非安全上下文），navigator.clipboard 不可用，
+  // 必须回退 textarea + execCommand，否则「复制」在真机上永远失败（构建 #30 修）
+  copyText(text,okMsg){
+    const done=()=>this.showToast(okMsg||'已复制');
+    try{
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done).catch(()=>this._copyFallback(text,done));
+        return;
+      }
+    }catch(e){}
+    this._copyFallback(text,done);
+  },
+  _copyFallback(text,done){
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=text;
+      ta.setAttribute('readonly','');
+      ta.style.cssText='position:fixed;left:-9999px;top:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      if(ta.setSelectionRange)ta.setSelectionRange(0,text.length);
+      const ok=document.execCommand('copy');
+      document.body.removeChild(ta);
+      if(ok)done();else this.showToast('复制失败，请长按文字手动复制');
+    }catch(e){this.showToast('复制失败，请长按文字手动复制')}
+  },
   copyShareText(){
     const records=this.getRecords();
     const totalRecords=records.length;
@@ -5883,12 +6044,8 @@ const App={
       '界面超好看，iOS风格，操作丝滑\n\n'+
       '记好每一笔碎银，从碎银记开始 🧋\n'+
       '#碎银记 #记账 #理财 #学生开发';
-    navigator.clipboard.writeText(text).then(()=>{
-      this.closeModal();
-      this.showToast('推荐语已复制');
-    }).catch(()=>{
-      this.showToast('复制失败，请手动复制');
-    });
+    this.closeModal();
+    this.copyText(text,'推荐语已复制');
   },
   generateShareCard(){
     this.closeModal();
@@ -6347,6 +6504,9 @@ const App={
         date:date,
         time:tm?tm[1]:'',
         note:note,
+        // 来源平台（构建 #30）：跨平台账本据此区分钱是从微信还是支付宝出去的。
+        // 这正是支付工具做不到的地方——它们各自只看得见自己的流水
+        plat:(kind==='wechat'?'wechat':(kind==='alipay'?'alipay':'')),
         ref:cRef>=0?String(raw[cRef]||'').trim():''
       });
     }
@@ -6395,7 +6555,7 @@ const App={
     const ts=Date.now();
     list.forEach((r,i)=>{
       all.push({id:'r_'+ts+'_b'+i,amt:r.amt,cat:r.cat||'',date:r.date,time:r.time||'',
-        note:r.note||'',type:r.type,mood:null,ts:ts+i,ref:r.ref||''});
+        note:r.note||'',type:r.type,mood:null,ts:ts+i,plat:r.plat||'',ref:r.ref||''});
     });
     all.sort(recSort);
     this.saveRecords(all);
@@ -7091,7 +7251,7 @@ document.addEventListener('DOMContentLoaded',()=>App.init());
    2) 兜底：init 链中途抛错会让链尾的 initNavDrag/initTypeDrag 永远绑不上（Tab 内联 onclick 照常），
       这里独立轮询补齐（内部幂等标记防双绑）。800ms 首 tick 足够快，绑定成功即停 */
 (function(){
-  window.__sliderDiag={ver:29,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
+  window.__sliderDiag={ver:30,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
     pDown:0,pTouch:0,pMouse:0,pMove:0,bindErr:''};
   var d=window.__sliderDiag;
   // nav 元素缓存：探针挂在 document capture 上，每个 pointermove 都跑一次 querySelector 是纯浪费
