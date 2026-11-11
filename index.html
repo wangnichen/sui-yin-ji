@@ -1394,7 +1394,7 @@ body.dk.lg .type-toggle::after{opacity:calc(var(--lg-rim) * .5)}
       <div class="author-card">
         <div class="author-name">🎓 我不要芒果</div>
         <div class="author-bio" style="line-height:1.7;color:var(--t2)">大一计算机科学与技术专业在读，<br>用 Trae + DeepSeek 打磨的纯本地记账工具。<br>没有广告与会员，数据只存在你的设备里。</div>
-        <div class="author-ver">碎银记 v3.0 · 构建 #28 · 持续更新中</div>
+        <div class="author-ver">碎银记 v3.0 · 构建 #29 · 持续更新中</div>
         <div id="sliderDiagLine" style="font-size:11px;color:var(--t3);margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.6"></div>
       </div>
     </div>
@@ -2612,6 +2612,9 @@ const App={
     const c=document.getElementById('modalContent');
     this._avatarSheet=false;
     o.className='modal-overlay show'+(type==='sheet'?' sheet':'');
+    // 清掉上一个弹窗的关闭定时器：closeModal 的 200ms 动画定时器若在开新弹窗后才到点，
+    // 会把刚 show 的新弹窗重新摘掉（点遮罩关闭后立刻弹新框的竞态，构建 #29 补齐）
+    if(this._modalTimer){clearTimeout(this._modalTimer);this._modalTimer=null;}
     // 提取 h3 作为标题（如果有的话），否则用默认
     const titleMatch=html.match(/<h3[^>]*>([\s\S]*?)<\/h3>/);
     const title=titleMatch?titleMatch[1].trim():'';
@@ -2641,6 +2644,10 @@ const App={
       this._cropDirty=false;
       document.body.classList.remove('crop-open');
     }
+    // 关闭即作废待确认结果（构建 #29）：识别结果 / 账单导入预览属于"带确认按钮的弹窗"，
+    // 用户点 ✕ 或遮罩关闭＝放弃，不清理会被下一次流程误消费旧数据
+    this._aiPending=null;
+    window._billImport=null;
     o.classList.add('closing');
     document.body.style.overflow='';
     if(this._modalTimer)clearTimeout(this._modalTimer); // 竞态：关闭后立刻开新弹窗时，旧定时器会把新弹窗的 show 类也摘掉
@@ -3140,6 +3147,13 @@ const App={
     const m=this.getMerchantCats();
     if(key&&m[key])return m[key];
     return catByKeywords(note);
+  },
+  // 分类与方向对齐（构建 #29）：收入记录只保留收入分类（IC 白名单）。
+  // 分类是按备注关键词猜出来的，「三江学院南区食堂」这类收入截图会猜成餐饮，
+  // 结果账单里出现"餐饮图标的收入"。只在新写入时规范化，不动历史数据。
+  alignCat(type,cat){
+    if(type==='income')return IC.indexOf(cat)>=0?cat:'';
+    return cat||'';
   },
   toggleQuickPad(){
     const pad=document.getElementById('quickPad');
@@ -4661,7 +4675,7 @@ const App={
       // 去重：同日期+同金额+同备注+同方向已存在 → 跳过，防止同一张截图重复导入（构建 #28）
       const dup=this.getRecords().some(r=>r.date===date&&r.type===type&&Math.abs(Number(r.amt)-Number(p.amount))<0.005&&(r.note||'')===note);
       if(dup){this.showToast('这笔已经在账本里了，已跳过');return;}
-      const rec={id:'r_'+Date.now(),amt:p.amount,cat:p.cat||'',date:date,
+      const rec={id:'r_'+Date.now(),amt:p.amount,cat:this.alignCat(type,p.cat||''),date:date,
         note:note,type:type,mood:null,time:p.time||'',ts:Date.now()};
       const records=this.getRecords();
       records.push(rec);
@@ -5355,7 +5369,9 @@ const App={
       const t=document.getElementById('inputTime');
       if(t){t.value=p.time;this._timeManual=true;}
     }
-    this.selectCat(p.cat);   // p.cat 为空时即清空选中，保持"未分类"状态
+    // 分类与方向对齐（构建 #29）：收入态下选中一个支出分类会高亮失败且提交出
+    // "餐饮图标的收入"，回填时先规范化（收入只留收入分类）
+    this.selectCat(this.alignCat(type,p.cat));
   },
   _confirmScreenshotImport(){
     const amt=parseFloat(document.getElementById('ssAmt').value);
@@ -6291,9 +6307,14 @@ const App={
       if(raw.length<=cAmt)continue;
       const io=String(raw[cIO]||'').trim();
       if(io!=='支出'&&io!=='收入'){skipped++;continue;}   // 不计收支（提现/充值等）跳过
+      const income=io==='收入';
       const status=cStatus>=0?String(raw[cStatus]||'').trim():'';
-      // 跳过未成功/已关闭/已全额退款；「已收款」「已存入零钱」是成功态，必须保留
-      if(status&&/关闭|失败|未付款|等待付款|全额退款/.test(status)){skipped++;continue;}
+      // 未成功交易（关闭/失败/待付款）一律跳过
+      if(status&&/关闭|失败|未付款|等待付款/.test(status)){skipped++;continue;}
+      // 「已全额退款」方向区分（构建 #29，修漏记）：
+      //   支出 + 已全额退款 → 跳过（钱已退回，不该算成支出）
+      //   收入 + 已全额退款 → 保留（这正是退款入账的钱，旧逻辑把它一起跳过了）
+      if(!income&&status&&/全额退款/.test(status)){skipped++;continue;}
       const amt=parseFloat(String(raw[cAmt]||'').replace(/[¥￥,\s]/g,''));
       if(!isFinite(amt)||amt<=0){skipped++;continue;}
       // 3. 交易时间：支付宝的付款时间可能为空，退回交易创建时间
@@ -6317,10 +6338,12 @@ const App={
       let note=peer||usefulGoods;
       if(usefulGoods&&usefulGoods!==peer)note=note?(note+'·'+usefulGoods):usefulGoods;
       if(note.length>40)note=note.slice(0,40);
+      const guessed=this.catForNote(note)||catByKeywords(note+' '+usefulGoods);
       recs.push({
         amt:Math.round(amt*100)/100,
-        type:io==='收入'?'income':'expense',
-        cat:this.catForNote(note)||catByKeywords(note+' '+usefulGoods),
+        type:income?'income':'expense',
+        // 收入只保留收入分类（构建 #29）：关键词可能把收入猜成餐饮等支出分类
+        cat:this.alignCat(income?'income':'expense',guessed),
         date:date,
         time:tm?tm[1]:'',
         note:note,
@@ -6546,7 +6569,7 @@ const App={
     let added=0;
     results.forEach((r,i)=>{
       if(checks[i]&&checks[i].classList.contains('checked')){
-        records.push({id:'r_'+Date.now()+'_'+i,amt:r.amt,cat:r.cat,date:dstr(new Date()),note:r.note,type:r.type,mood:null,ts:Date.now()});
+        records.push({id:'r_'+Date.now()+'_'+i,amt:r.amt,cat:this.alignCat(r.type,r.cat),date:dstr(new Date()),note:r.note,type:r.type,mood:null,ts:Date.now()});
         added++;
       }
     });
@@ -7068,7 +7091,7 @@ document.addEventListener('DOMContentLoaded',()=>App.init());
    2) 兜底：init 链中途抛错会让链尾的 initNavDrag/initTypeDrag 永远绑不上（Tab 内联 onclick 照常），
       这里独立轮询补齐（内部幂等标记防双绑）。800ms 首 tick 足够快，绑定成功即停 */
 (function(){
-  window.__sliderDiag={ver:28,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
+  window.__sliderDiag={ver:29,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
     pDown:0,pTouch:0,pMouse:0,pMove:0,bindErr:''};
   var d=window.__sliderDiag;
   // nav 元素缓存：探针挂在 document capture 上，每个 pointermove 都跑一次 querySelector 是纯浪费
