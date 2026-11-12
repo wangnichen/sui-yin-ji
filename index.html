@@ -50,48 +50,48 @@
   --t-page:.42s;
 }
 /* ===== CSS Variables ===== */
-/* 构建 #31「雾霭紫」：主色由高饱和 indigo/violet 降为带灰的雾紫，
-   背景改用 iOS 系统分组灰（F2F2F7），整体更克制、更高级；对比度全部重新校准过 */
+/* 构建 #32「紫曜」：主色回到有辨识度的靛紫（比 #31 更深、更饱和，但不刺眼），
+   背景保留 iOS 分组灰，紫只出现在需要被看见的地方 */
 :root{
-  --p:#6F6CD9;--p2:#9C93E0;
+  --p:#6259D6;--p2:#8B7BE8;
   --bg:#F2F2F7;--card:#FFFFFF;--card2:#F7F7FA;
   --text:#1D1D1F;--t2:#86868B;--t3:#AEAEB2;
   --red:#FF3B30;--green:#34C759;--blue:#007AFF;--orange:#FF9500;
-  --border:#E6E6EC;--r:16px;--g1:linear-gradient(135deg,#6F6CD9,#9C93E0);
+  --border:#E6E4F2;--r:16px;--g1:linear-gradient(135deg,#6259D6,#8B7BE8);
   --shadow:0 1px 2px rgba(16,16,32,.04),0 6px 20px rgba(16,16,32,.045);--safe:env(safe-area-inset-bottom,20px);
-  /* ===== 液态玻璃·雾紫主题（参考 AndroidLiquidGlass SDF 折射） ===== */
-  --glass-bg:rgba(122,118,190,.055);          /* 雾紫基底：比旧版更淡，让白色卡片自己说话 */
-  --glass-bg-strong:rgba(122,118,190,.085);   /* 稍强（弹层/输入框） */
-  --glass-blur:blur(14px) saturate(150%);     /* 基底模糊（收敛饱和度，避免背景被拉艳） */
-  --glass-edge-blur:blur(20px) saturate(180%);/* 边缘折射环备用 */
+  /* ===== 液态玻璃·紫曜主题（参考 AndroidLiquidGlass SDF 折射） ===== */
+  --glass-bg:rgba(112,106,210,.075);          /* 淡紫基底：比 #31 略强，让玻璃透出主题色 */
+  --glass-bg-strong:rgba(112,106,210,.115);   /* 稍强（弹层/输入框） */
+  --glass-blur:blur(14px) saturate(155%);     /* 基底模糊 */
+  --glass-edge-blur:blur(20px) saturate(185%);/* 边缘折射环备用 */
   --glass-edge:14px;                          /* 折射区域厚度（refractionHeight） */
-  --glass-border:rgba(122,118,190,.14);       /* 雾紫描边 */
-  --glass-border-strong:rgba(122,118,190,.22);/* 强化描边 */
+  --glass-border:rgba(112,106,210,.17);       /* 紫描边 */
+  --glass-border-strong:rgba(112,106,210,.26);/* 强化描边 */
   --glass-highlight:rgba(255,255,255,.72);    /* 顶部高光 */
-  --glass-shadow:0 8px 24px rgba(90,86,160,.08);
+  --glass-shadow:0 8px 24px rgba(88,80,190,.10);
   --glass-inset-top:inset 0 1px 0 rgba(255,255,255,.8);
-  --glass-inset-bottom:inset 0 -1px 0 rgba(122,118,190,.10);
-  --glass-contact:inset 0 0 0 1px rgba(111,108,217,.05);/* 边缘接触暗环，增加深度 */
+  --glass-inset-bottom:inset 0 -1px 0 rgba(112,106,210,.12);
+  --glass-contact:inset 0 0 0 1px rgba(98,89,214,.06);/* 边缘接触暗环，增加深度 */
 
   /* ===== 液态玻璃·光学参数（AndroidLiquidGlass SDF 折射 / 菲涅尔 / 色散） =====
      这几个变量统一驱动玻璃的"光学层"，降级时只需在 body 上去掉 .lg class，布局完全不变 */
-  --lg-rim:.55;             /* 菲涅尔边缘高光强度（0~1），越大边缘越亮 */
-  --lg-blur-sm:blur(9px) saturate(140%);  /* 低配设备用的更轻模糊 */
+  --lg-rim:.58;             /* 菲涅尔边缘高光强度（0~1），越大边缘越亮 */
+  --lg-blur-sm:blur(9px) saturate(145%);  /* 低配设备用的更轻模糊 */
 }
-/* 深色：对齐 iOS 深色体系（纯黑底 + 1C1C1E 卡片 + 38383A 分隔）。
-   玻璃层改为中性白而不是紫色——深色下紫玻璃会被 saturate 放大成蓝紫雾，显脏 */
-body.dk{--bg:#0B0B0F;--card:#1C1C1E;--card2:#2C2C2E;--text:#F2F2F7;--t2:#A1A1A8;--t3:#7C7C86;--border:#38383A;--shadow:0 1px 2px rgba(0,0,0,.5),0 8px 24px rgba(0,0,0,.35);
-  --glass-bg:rgba(255,255,255,.045);
-  --glass-bg-strong:rgba(255,255,255,.075);
-  --glass-edge-blur:blur(38px) saturate(160%);
+/* 深色：冷黑底 + 紫调卡片，主色提亮到 #8B82F0——深色下紫要能"发光"，但不能糊成一片雾 */
+body.dk{--bg:#0C0C12;--card:#1A1A21;--card2:#26262F;--text:#F2F2F7;--t2:#A6A6B0;--t3:#7E7E8A;--border:#34303F;--shadow:0 1px 2px rgba(0,0,0,.55),0 8px 26px rgba(0,0,0,.4);
+  --p:#8B82F0;--p2:#A99BF5;--g1:linear-gradient(135deg,#7B72E8,#A99BF5);
+  --glass-bg:rgba(139,132,230,.075);
+  --glass-bg-strong:rgba(139,132,230,.11);
+  --glass-edge-blur:blur(38px) saturate(170%);
   --glass-edge:14px;
-  --glass-border:rgba(255,255,255,.10);
-  --glass-border-strong:rgba(255,255,255,.16);
-  --glass-highlight:rgba(255,255,255,.10);
-  --glass-shadow:0 10px 30px rgba(0,0,0,.55);
-  --glass-inset-top:inset 0 1px 0 rgba(255,255,255,.07);
-  --glass-inset-bottom:inset 0 -1px 0 rgba(255,255,255,.04);
-  --glass-contact:inset 0 0 0 1px rgba(255,255,255,.03);
+  --glass-border:rgba(160,152,240,.16);
+  --glass-border-strong:rgba(160,152,240,.24);
+  --glass-highlight:rgba(255,255,255,.11);
+  --glass-shadow:0 10px 30px rgba(0,0,0,.6);
+  --glass-inset-top:inset 0 1px 0 rgba(255,255,255,.09);
+  --glass-inset-bottom:inset 0 -1px 0 rgba(160,152,240,.10);
+  --glass-contact:inset 0 0 0 1px rgba(160,152,240,.05);
 }
 
 /* ===== Reset & Base ===== */
@@ -178,7 +178,7 @@ body.dk .top-bar{background:var(--glass-bg);border-bottom-color:var(--glass-bord
    + 内阴影 + 半透明白底承担，视觉更干净 */
 .bottom-nav>*{position:relative;z-index:1}
 /* 深色模式：背景与页面底色同系且更通透、边框和高光环压到很淡——Dock 直接融进背景，不再是一条突兀的深色带 */
-body.dk .bottom-nav{background:rgba(28,28,30,.72);border-color:rgba(255,255,255,.10);box-shadow:0 8px 30px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08)}
+body.dk .bottom-nav{background:rgba(26,26,33,.78);border-color:rgba(160,152,240,.14);box-shadow:0 10px 34px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.09)}
 /* 液态玻璃：角落 specular 光斑（bloom）——浅深两层折射渐变 */
 .bottom-nav::after{content:'';position:absolute;inset:0;border-radius:26px;pointer-events:none;z-index:0;
   background:
@@ -242,7 +242,7 @@ body.dk .bottom-nav::before{background:radial-gradient(120px 78px at var(--lx,50
   box-shadow:
     0 10px 26px rgba(60,60,90,.22),
     inset 0 1px 0 rgba(255,255,255,1),
-    inset 0 -2px 5px rgba(111,108,217,.10);
+    inset 0 -2px 5px rgba(98,89,214,.10);
 }
 /* —— L3-mini 门控折射：SVG 置换折射只上 Dock 玻璃块这一个元素（~106x52px 小面积）。
       全页折射已实测掉帧被禁，但小元素成本差两个数量级；且 body.lg-refract-mini 由
@@ -265,28 +265,28 @@ body.dk .nav-indicator::before{box-shadow:inset 0 0 12px rgba(255,255,255,.25)}
 .bg-aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 .bg-aurora i{position:absolute;display:block;border-radius:50%;transform:translateZ(0);will-change:transform}
 .bg-aurora i:nth-child(1){width:80vmax;height:80vmax;left:-28vmax;top:-32vmax;
-  background:radial-gradient(closest-side,rgba(142,134,214,.22),rgba(142,134,214,.10) 42%,rgba(142,134,214,0) 73%);
+  background:radial-gradient(closest-side,rgba(139,128,230,.40),rgba(139,128,230,.19) 42%,rgba(139,128,230,0) 73%);
   animation:auroraA 34s ease-in-out infinite alternate}
 .bg-aurora i:nth-child(2){width:66vmax;height:66vmax;right:-26vmax;top:20vh;
-  background:radial-gradient(closest-side,rgba(150,170,225,.14),rgba(150,170,225,.06) 45%,rgba(150,170,225,0) 75%);
+  background:radial-gradient(closest-side,rgba(140,160,230,.20),rgba(140,160,230,.09) 45%,rgba(140,160,230,0) 75%);
   animation:auroraB 42s ease-in-out infinite alternate}
 .bg-aurora i:nth-child(3){width:60vmax;height:60vmax;left:-12vmax;bottom:-34vmax;
-  background:radial-gradient(closest-side,rgba(206,166,196,.07),rgba(206,166,196,.03) 46%,rgba(206,166,196,0) 75%);
+  background:radial-gradient(closest-side,rgba(200,160,210,.09),rgba(200,160,210,.04) 46%,rgba(200,160,210,0) 75%);
   animation:auroraC 38s ease-in-out infinite alternate}
 @keyframes auroraA{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(15vw,11vh,0) scale(1.15)}}
 @keyframes auroraB{from{transform:translate3d(0,0,0) scale(1.07)}to{transform:translate3d(-13vw,-9vh,0) scale(.92)}}
 /* 粉斑上飘幅度收窄：跑满一圈也不会飘到 Dock 下沿，否则会透过半透明 Dock
    被 saturate 拉成一条粉色长带（用户反馈的"渐变长方框"就是它） */
 @keyframes auroraC{from{transform:translate3d(0,0,0) scale(.94)}to{transform:translate3d(17vw,-6vh,0) scale(1.06)}}
-body.dk .bg-aurora i{opacity:.30}
+body.dk .bg-aurora i{opacity:.50}
 @media (prefers-reduced-motion:reduce){.bg-aurora i{animation:none}}
 
 /* 顶栏：下沿一道折射高光线（左亮→中紫→右亮），滚动时玻璃变实并浮起阴影 */
 .top-bar::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1.5px;pointer-events:none;z-index:2;
-  background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.9) 15%,rgba(142,134,214,.26) 48%,rgba(255,255,255,.9) 85%,rgba(255,255,255,0));
-  opacity:.5;transition:opacity .3s}
-.top-bar.scrolled{background:rgba(255,255,255,.72);box-shadow:var(--glass-inset-bottom),0 8px 24px rgba(111,108,217,.09),0 1px 0 rgba(255,255,255,.8)}
-body.dk .top-bar.scrolled{background:rgba(18,18,24,.78);box-shadow:var(--glass-inset-bottom),0 8px 22px rgba(0,0,0,.5)}
+  background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.9) 15%,rgba(139,128,230,.34) 48%,rgba(255,255,255,.9) 85%,rgba(255,255,255,0));
+  opacity:.55;transition:opacity .3s}
+.top-bar.scrolled{background:rgba(255,255,255,.72);box-shadow:var(--glass-inset-bottom),0 8px 24px rgba(98,89,214,.09),0 1px 0 rgba(255,255,255,.8)}
+body.dk .top-bar.scrolled{background:rgba(12,12,18,.82);box-shadow:var(--glass-inset-bottom),0 8px 22px rgba(0,0,0,.55)}
 /* 切页时顶栏扫过一道液态反光 */
 .top-bar::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:0;z-index:1;
   background:linear-gradient(100deg,transparent 28%,rgba(255,255,255,.72) 47%,rgba(200,196,240,.42) 56%,transparent 74%)}
@@ -300,8 +300,8 @@ body.dk .top-bar.scrolled{background:rgba(18,18,24,.78);box-shadow:var(--glass-i
 /* 分类选中：柔和的静态光晕 + 极轻呼吸（旧版脉冲过强，现在收成"高级的一点紫"） */
 .cat-item.selected{animation:catGlow 2.6s ease-in-out infinite}
 @keyframes catGlow{
-  0%,100%{box-shadow:0 3px 14px rgba(111,108,217,.13),0 0 0 0 rgba(142,134,214,.22)}
-  50%{box-shadow:0 6px 18px rgba(111,108,217,.20),0 0 0 5px rgba(142,134,214,0)}}
+  0%,100%{box-shadow:0 3px 14px rgba(98,89,214,.13),0 0 0 0 rgba(139,128,230,.22)}
+  50%{box-shadow:0 6px 18px rgba(98,89,214,.20),0 0 0 5px rgba(139,128,230,0)}}
 
 /* 次级卡 / 账单行：（原循环扫光横条已移除，只留静态玻璃底 + 折射环） */
 .card2>*,.bill-item>*{position:relative;z-index:1}
@@ -310,7 +310,7 @@ body.dk .top-bar.scrolled{background:rgba(18,18,24,.78);box-shadow:var(--glass-i
 /* 金额输入：聚焦时底部浮起一团紫色光晕 */
 .amount-input-wrap{position:relative}
 .amount-input-wrap::before{content:'';position:absolute;left:50%;top:50%;width:300px;height:150px;z-index:-1;pointer-events:none;
-  transform:translate(-50%,-50%);background:radial-gradient(closest-side,rgba(142,134,214,.22),rgba(142,134,214,0) 76%);
+  transform:translate(-50%,-50%);background:radial-gradient(closest-side,rgba(139,128,230,.22),rgba(139,128,230,0) 76%);
   opacity:.45;transition:opacity .35s var(--spring-soft),transform .35s var(--spring-soft)}
 .amount-input-wrap:focus-within::before{opacity:1;transform:translate(-50%,-50%) scale(1.16)}
 
@@ -361,8 +361,8 @@ body.dk .section-title{color:#8E8E93;background:none}
   box-shadow:0 2px 8px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04),inset 0 1px 0 rgba(255,255,255,.9);
   transition:transform .5s var(--spring-smooth);pointer-events:none;z-index:0}
 .type-toggle .tt-slider.dragging{transition:none}
-body.dk .type-toggle .tt-slider{background:#48484A;border-color:rgba(255,255,255,.06);
-  box-shadow:0 3px 10px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.12)}
+body.dk .type-toggle .tt-slider{background:#3C3C49;border-color:rgba(255,255,255,.07);
+  box-shadow:0 3px 10px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.13)}
 .type-toggle.income .tt-slider{transform:translateX(100%)}
 .type-toggle .tt-slider.jelly{animation:ttSquish .55s var(--spring-smooth)}
 @keyframes ttSquish{0%{scale:1 1}30%{scale:1.12 .84}60%{scale:.94 1.07}100%{scale:1 1}}
@@ -399,14 +399,14 @@ body.dk .amount-input-wrap input::placeholder{color:#48484C}
 .cat-item{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;border-radius:14px;background:var(--card);border:1px solid var(--border);transition:all .35s var(--spring-bounce);cursor:pointer;animation:catIn .35s var(--spring-soft) both;box-shadow:0 1px 2px rgba(0,0,0,.03)}
 .cat-item .cat-emoji{font-size:26px;line-height:1;transition:transform .35s var(--spring-bounce)}
 .cat-item:active .cat-emoji,.cat-item.selected .cat-emoji{transform:scale(1.15)}
-.cat-item:active,.cat-item.selected{background:var(--glass-bg-strong);border-color:var(--p);transform:scale(.95);box-shadow:0 2px 12px rgba(111,108,217,.15)}
+.cat-item:active,.cat-item.selected{background:var(--glass-bg-strong);border-color:var(--p);transform:scale(.95);box-shadow:0 2px 12px rgba(98,89,214,.15)}
 @keyframes catIn{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
 .cat-item .cat-name{font-size:11px;color:var(--t2);font-weight:500}
 
 .row{display:flex;gap:10px;align-items:center;margin-bottom:12px}
 .row label{font-size:14px;color:var(--t2);white-space:nowrap;min-width:40px}
 .row input[type="date"],.row input[type="time"],.row input[type="text"]{flex:1;padding:11px 12px;background:var(--card);border-radius:11px;font-size:15px;color:var(--text);border:1px solid var(--border);font-family:inherit;box-shadow:0 1px 2px rgba(0,0,0,.03)}
-.row input[type="date"]:focus,.row input[type="time"]:focus,.row input[type="text"]:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(111,108,217,.10)}
+.row input[type="date"]:focus,.row input[type="time"]:focus,.row input[type="text"]:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(98,89,214,.10)}
 .row input[type="date"],.row input[type="time"]{color-scheme:light}body.dk .row input[type="date"],body.dk .row input[type="time"]{color-scheme:dark}
 .row input[type="time"]::-webkit-calendar-picker-indicator{filter:invert(var(--inv,0));opacity:.6}body.dk .row input[type="time"]{--inv:1}
 .backfill-bar{display:none;align-items:center;justify-content:space-between;width:100%;padding:8px 12px;background:linear-gradient(135deg,#fff3cd,#ffe0b2);border-radius:10px;margin:10px 0;animation:fadeIn .25s var(--spring-soft)}
@@ -423,12 +423,12 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 .mood-selector button:active{transform:scale(.96)}
 
 
-.btn-primary{width:100%;padding:15px;background:var(--g1);color:#fff;border:none;border-radius:var(--r);font-size:17px;font-weight:600;letter-spacing:.3px;transition:transform .4s var(--spring-bounce),opacity .15s,box-shadow .2s;margin-top:4px;will-change:transform;box-shadow:0 6px 18px rgba(111,108,217,.22),inset 0 1px 0 rgba(255,255,255,.30);}
-.btn-primary:active{transform:scale(.97) translateY(1px);opacity:.9;box-shadow:0 2px 8px rgba(111,108,217,.18)}
+.btn-primary{width:100%;padding:15px;background:var(--g1);color:#fff;border:none;border-radius:var(--r);font-size:17px;font-weight:600;letter-spacing:.3px;transition:transform .4s var(--spring-bounce),opacity .15s,box-shadow .2s;margin-top:4px;will-change:transform;box-shadow:0 6px 18px rgba(98,89,214,.22),inset 0 1px 0 rgba(255,255,255,.30);}
+.btn-primary:active{transform:scale(.97) translateY(1px);opacity:.9;box-shadow:0 2px 8px rgba(98,89,214,.18)}
 
 /* ===== Page 2: Bills ===== */
 .search-box{display:flex;align-items:center;gap:8px;background:var(--card);border-radius:11px;padding:9px 14px;margin-bottom:12px;border:1px solid var(--border);box-shadow:0 1px 2px rgba(0,0,0,.03);transition:border-color .3s var(--spring-soft),box-shadow .3s var(--spring-soft)}
-.search-box:focus-within{border-color:var(--p);box-shadow:0 0 0 3px rgba(111,108,217,.12)}
+.search-box:focus-within{border-color:var(--p);box-shadow:0 0 0 3px rgba(98,89,214,.12)}
 .search-box input{flex:1;font-size:15px;color:var(--text);background:transparent}
 .search-box .search-icon{font-size:16px;color:var(--t3)}
 
@@ -446,6 +446,9 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
    contain-intrinsic-size 按「内容盒」算：45 + 24 padding + 2 border = 71px，和真实行高一致，
    跳过渲染的行不会把滚动条撑歪（曾试过 66 → 实际 92px，滚动几何会跳） */
 .bill-item .bill-emoji{font-size:28px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;flex-shrink:0;transition:transform var(--t-fast) var(--spring-bounce)}
+/* 深色：分类底色是浅色系，直接铺在深背景上会刺眼，压一点亮度与饱和度融入暗色 */
+body.dk .bill-item .bill-emoji{filter:brightness(.82) saturate(.85)}
+body.dk .cat-item{background:var(--card)}
 .bill-item .bill-emoji:active{transform:scale(.85) rotate(-12deg)}
 .bill-item .bill-info{flex:1;min-width:0}
 .bill-item .bill-cat{font-size:15px;font-weight:600}
@@ -454,7 +457,7 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 .bill-item .bill-amount.expense{color:var(--red)}
 .bill-item .bill-amount.income{color:var(--green)}
 .time-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:8px;background:var(--glass-bg);font-size:11px;font-variant-numeric:tabular-nums;color:var(--t2)}
-.time-badge.recent{color:var(--p);background:rgba(111,108,217,.12)}
+.time-badge.recent{color:var(--p);background:rgba(98,89,214,.12)}
 .bill-item .bill-actions{display:flex;gap:4px;flex-shrink:0}
 .bill-item .bill-actions button{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--t2);background:var(--glass-bg);transition:all .2s}
 .bill-item .bill-actions button:active{background:var(--glass-bg-strong)}
@@ -469,7 +472,7 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
 .widget-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px}
 .widget-view-toggle{display:flex;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:10px;padding:3px;backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);box-shadow:var(--glass-inset-top),var(--glass-inset-bottom)}
 .wvt-btn{padding:7px 14px;border:none;border-radius:8px;font-size:13px;font-weight:600;background:transparent;color:var(--t2);cursor:pointer;transition:all .25s var(--spring-bounce)}
-.wvt-btn.active{background:var(--g1);color:#fff;box-shadow:0 2px 8px rgba(111,108,217,.3)}
+.wvt-btn.active{background:var(--g1);color:#fff;box-shadow:0 2px 8px rgba(98,89,214,.3)}
 .widget-manage-btn{padding:7px 12px;border:1px solid var(--glass-border);border-radius:10px;font-size:12px;background:var(--glass-bg);color:var(--t2);cursor:pointer;transition:all .2s;backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);box-shadow:var(--glass-inset-top)}
 .widget-manage-btn:active{transform:scale(.95)}
 /* ===== 列表视图：全宽卡片堆叠，类似信息流 ===== */
@@ -493,7 +496,7 @@ body.dk .backfill-btn{background:rgba(255,255,255,.1);color:#ffc107}
   backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
   border-radius:16px;padding:0;display:flex;flex-direction:column;overflow:hidden;
   border:1px solid var(--glass-border);
-  box-shadow:var(--glass-inset-top),0 2px 12px rgba(111,108,217,.08);
+  box-shadow:var(--glass-inset-top),0 2px 12px rgba(98,89,214,.08);
   animation:widgetPop .35s var(--spring-bounce) both;
   transition:transform .2s var(--spring-bounce),box-shadow .2s;
   min-height:120px;
@@ -568,7 +571,7 @@ body.dk #statsWidgets.grid-view .widget-box{
 #statsWidgets.grid-view .widget-add-btn{min-height:120px;padding:0;margin:0}
 /* 组件管理弹窗 */
 .widget-mgr-list{display:flex;flex-direction:column;gap:8px}
-.widget-mgr-item{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:rgba(255,255,255,.65);border:1px solid rgba(111,108,217,.14);border-radius:12px;box-shadow:0 1px 4px rgba(60,60,90,.06)}
+.widget-mgr-item{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:rgba(255,255,255,.65);border:1px solid rgba(98,89,214,.14);border-radius:12px;box-shadow:0 1px 4px rgba(60,60,90,.06)}
 .widget-mgr-item .wm-name{font-size:14px;font-weight:600}
 .widget-mgr-item .wm-desc{font-size:11px;color:var(--t3);margin-top:2px}
 .wm-switch{width:44px;height:24px;border-radius:12px;background:rgba(120,120,128,.22);border:1px solid rgba(120,120,128,.18);position:relative;cursor:pointer;transition:background .25s;flex-shrink:0}
@@ -645,7 +648,7 @@ body.dk #statsWidgets.grid-view .widget-box{
    一圈"淡淡的框中框"（用户反馈）。质感改由上方与 .card 同款的定向渐变底承担，
    边界只留 1px 玻璃描边，与下方菜单项同语言 */
 .profile-card::after{content:none}
-.profile-card .avatar{width:56px;height:56px;border-radius:50%;background:var(--g1);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;flex-shrink:0;box-shadow:0 4px 12px rgba(111,108,217,.25);position:relative;cursor:pointer;overflow:hidden;transition:transform .2s var(--spring-bounce);background-size:cover;background-position:center}
+.profile-card .avatar{width:56px;height:56px;border-radius:50%;background:var(--g1);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff;flex-shrink:0;box-shadow:0 4px 12px rgba(98,89,214,.25);position:relative;cursor:pointer;overflow:hidden;transition:transform .2s var(--spring-bounce);background-size:cover;background-position:center}
 .profile-card .avatar:active{transform:scale(.94)}
 .profile-card .avatar.has-img{background-color:var(--glass-bg);color:transparent}
 /* 有头像时右下角显示小编辑点，提示可点击更换（放在内圈，避免被 overflow 裁掉） */
@@ -653,10 +656,10 @@ body.dk #statsWidgets.grid-view .widget-box{
 .profile-card .user-info{flex:1;min-width:0}
 .profile-card .user-name{font-size:18px;font-weight:700;color:var(--text)}
 .profile-card .user-email{font-size:12px;color:var(--t3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.profile-card .btn-sm{padding:7px 16px;border-radius:18px;font-size:13px;font-weight:600;background:var(--g1);color:#fff;border:none;transition:all .2s;box-shadow:0 2px 8px rgba(111,108,217,.2)}
-.profile-card .btn-sm:active{transform:scale(.95);box-shadow:0 1px 4px rgba(111,108,217,.15)}
+.profile-card .btn-sm{padding:7px 16px;border-radius:18px;font-size:13px;font-weight:600;background:var(--g1);color:#fff;border:none;transition:all .2s;box-shadow:0 2px 8px rgba(98,89,214,.2)}
+.profile-card .btn-sm:active{transform:scale(.95);box-shadow:0 1px 4px rgba(98,89,214,.15)}
 
-.ai-entry{position:relative;overflow:hidden;background:linear-gradient(135deg,#5F5CC9 0%,#7E79CE 58%,#938BD8 100%);border-radius:var(--r);padding:16px;color:#fff;display:flex;align-items:center;gap:13px;cursor:pointer;margin-bottom:14px;transition:transform .2s var(--spring-bounce),opacity .2s;box-shadow:0 6px 20px rgba(111,108,217,.32),inset 0 1px 0 rgba(255,255,255,.38),inset 0 -12px 26px rgba(28,18,88,.20);border:1px solid rgba(255,255,255,.22)}
+.ai-entry{position:relative;overflow:hidden;background:linear-gradient(135deg,#5A51CF 0%,#7E72DE 58%,#9587EA 100%);border-radius:var(--r);padding:16px;color:#fff;display:flex;align-items:center;gap:13px;cursor:pointer;margin-bottom:14px;transition:transform .2s var(--spring-bounce),opacity .2s;box-shadow:0 6px 20px rgba(98,89,214,.32),inset 0 1px 0 rgba(255,255,255,.38),inset 0 -12px 26px rgba(28,18,88,.20);border:1px solid rgba(255,255,255,.22)}
 /* 液态玻璃：两团角落高光（流动反光条已移除，避免卡片上出现生硬的长方形横条） */
 .ai-entry::before{content:'';position:absolute;inset:0;pointer-events:none;
   background:radial-gradient(120% 80% at 12% -25%,rgba(255,255,255,.45),transparent 55%),
@@ -677,7 +680,7 @@ body.dk #statsWidgets.grid-view .widget-box{
 
 .achievements{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px}
 .ach-item{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 4px;border-radius:12px;background:var(--glass-bg);border:1px solid var(--glass-border);text-align:center;transition:all .2s var(--spring-bounce)}
-.ach-item:not(.locked){background:linear-gradient(135deg,rgba(111,108,217,.08),rgba(140,132,214,.05));border:1px solid rgba(111,108,217,.15)}
+.ach-item:not(.locked){background:linear-gradient(135deg,rgba(98,89,214,.08),rgba(140,132,214,.05));border:1px solid rgba(98,89,214,.15)}
 .ach-item .ach-icon{font-size:26px}
 .ach-item .ach-name{font-size:10px;color:var(--t2);line-height:1.2}
 .ach-item.locked{opacity:.35}
@@ -710,7 +713,7 @@ body.dk #statsWidgets.grid-view .widget-box{
 .switch.on{background:var(--green);border-color:transparent}
 .dark-opt{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:10px;cursor:pointer;transition:background .15s}
 .dark-opt:active{background:var(--glass-bg-strong)}
-.dark-opt.active{background:rgba(111,108,217,.1)}
+.dark-opt.active{background:rgba(98,89,214,.1)}
 .dark-opt-icon{font-size:22px;width:32px;text-align:center}
 .dark-opt-info{flex:1}
 .dark-opt-title{font-size:14px;font-weight:500;color:var(--text)}
@@ -787,7 +790,7 @@ body.crop-open .modal::before,body.crop-open .modal::after{display:none}
 .modal-body{padding:6px 18px 18px;overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;animation:fadeIn .3s ease}
 /* 弹窗内输入框统一玻璃样式：圆角 12px + 聚焦光圈，全局一套 */
 .m-inp{width:100%;box-sizing:border-box;padding:12px 14px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;font-size:15px;color:var(--text);font-family:inherit;outline:none;transition:border-color .2s,box-shadow .2s}
-.m-inp:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(111,108,217,.12)}
+.m-inp:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(98,89,214,.12)}
 .m-inp::placeholder{color:var(--t3)}
 /* 弹窗内「字段组」：小标签 + 玻璃输入框对齐，让编辑表单整齐划一 */
 .m-field{display:flex;flex-direction:column;gap:6px}
@@ -862,7 +865,7 @@ body.crop-open .modal::before,body.crop-open .modal::after{display:none}
 /* Goal Form */
 .goal-form{display:flex;flex-direction:column;gap:10px}
 .goal-form input,.goal-form select{padding:12px 14px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;font-size:15px;color:var(--text);font-family:inherit;outline:none;transition:border-color .2s,box-shadow .2s}
-.goal-form input:focus,.goal-form select:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(111,108,217,.12)}
+.goal-form input:focus,.goal-form select:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(98,89,214,.12)}
 .goal-form .goal-emoji-pick{display:flex;gap:6px;flex-wrap:wrap}
 .goal-form .goal-emoji-pick button{width:36px;height:36px;border-radius:8px;font-size:18px;background:var(--glass-bg);border:2px solid var(--glass-border);transition:all .2s}
 .goal-form .goal-emoji-pick button.selected{border-color:var(--p)}
@@ -870,7 +873,7 @@ body.crop-open .modal::before,body.crop-open .modal::after{display:none}
 /* Budget */
 .budget-row{display:flex;align-items:center;gap:10px;margin:12px 0}
 .budget-row input{flex:1;padding:12px 14px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;font-size:15px;color:var(--text);min-width:0;font-family:inherit;outline:none;transition:border-color .2s,box-shadow .2s}
-.budget-row input:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(111,108,217,.12)}
+.budget-row input:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(98,89,214,.12)}
 .budget-row .budget-prefix{font-size:16px;color:var(--t2)}
 
 /* Text Import */
@@ -918,7 +921,7 @@ body.crop-open .modal::before,body.crop-open .modal::after{display:none}
 /* 碎银时钟：记账页顶部小彩蛋 */
 .coin-clock{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:16px;margin-bottom:12px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
 .coin-clock::before{content:'';position:absolute;right:-30px;top:-30px;width:100px;height:100px;background:radial-gradient(circle,rgba(255,215,0,.1),transparent 70%);pointer-events:none}
-.coin-clock-face{position:relative;width:50px;height:50px;border-radius:50%;background:var(--card);box-shadow:inset 0 0 0 2px var(--p),0 2px 10px rgba(111,108,217,.2);flex-shrink:0}
+.coin-clock-face{position:relative;width:50px;height:50px;border-radius:50%;background:var(--card);box-shadow:inset 0 0 0 2px var(--p),0 2px 10px rgba(98,89,214,.2);flex-shrink:0}
 .coin-clock-hand{position:absolute;left:50%;bottom:50%;width:2px;border-radius:1px;transform-origin:bottom center;background:var(--p)}
 .coin-clock-hand.hour{height:14px;margin-left:-1px;transition:transform .5s var(--spring-smooth)}
 .coin-clock-hand.minute{height:19px;margin-left:-1px;background:var(--p2);transition:transform .5s var(--spring-smooth)}
@@ -1041,7 +1044,7 @@ body.dk.lg .type-toggle::after{content:none;background:none;opacity:0}
       只把模糊半径按面积调大一档（大屏上小模糊会糊成一片）、加一点外发光把玻璃"托"起来 —— */
 @media (min-width:700px){
   :root{--glass-blur:blur(15px) saturate(175%);--lg-blur-sm:blur(11px) saturate(160%)}
-  #app{box-shadow:0 0 64px rgba(111,108,217,.10)}
+  #app{box-shadow:0 0 64px rgba(98,89,214,.10)}
   body.dk #app{box-shadow:0 0 64px rgba(0,0,0,.45)}
 }
 /* ===== 快捷记账：固定开销一键记（构建 #25） ===== */
@@ -1416,8 +1419,8 @@ body.dk.lg .type-toggle::after{content:none;background:none;opacity:0}
       </div>
       <div class="author-card">
         <div class="author-name">🎓 我不要芒果</div>
-        <div class="author-bio" style="line-height:1.7;color:var(--t2)">大一计算机科学与技术专业在读，<br>用 Trae + DeepSeek 打磨的纯本地记账工具。<br>没有广告与会员，数据只存在你的设备里。</div>
-        <div class="author-ver">碎银记 v3.0 · 构建 #31 · 持续更新中</div>
+        <div class="author-bio" style="line-height:1.7;color:var(--t2)">计算机科学与技术专业在读，<br>一个人写的纯本地记账工具。<br>没有广告与会员，数据只存在你的设备里。</div>
+        <div class="author-ver">碎银记 v3.0 · 构建 #32 · 持续更新中</div>
         <div id="sliderDiagLine" style="font-size:11px;color:var(--t3);margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.6"></div>
       </div>
     </div>
@@ -1754,7 +1757,7 @@ const App={
         '<div style="font-size:12px;color:var(--t2);margin-top:4px">从今天起，和你的钱好好相处 🌱</div>'+
         '</div>'+
 
-        '<div style="background:linear-gradient(135deg,rgba(111,108,217,.08),rgba(142,134,214,.08));border-radius:14px;padding:13px 14px;margin-bottom:12px;border:1px solid rgba(111,108,217,.12)">'+
+        '<div style="background:linear-gradient(135deg,rgba(98,89,214,.08),rgba(139,128,230,.08));border-radius:14px;padding:13px 14px;margin-bottom:12px;border:1px solid rgba(98,89,214,.12)">'+
         '<div style="font-size:13px;line-height:1.9">'+
         '我是 <b style="color:var(--p)">我不要芒果</b> 🥭<br>'+
         '大一计算机科学与技术专业在读，<br>'+
@@ -1783,7 +1786,7 @@ const App={
         '📅 消费日历 · 每日热力图'+
         '</div></div>'+
 
-        '<div style="background:linear-gradient(135deg,rgba(111,108,217,.1),rgba(142,134,214,.1));border-radius:12px;padding:11px 13px;margin-bottom:12px;border:1px solid rgba(111,108,217,.15)">'+
+        '<div style="background:linear-gradient(135deg,rgba(98,89,214,.1),rgba(139,128,230,.1));border-radius:12px;padding:11px 13px;margin-bottom:12px;border:1px solid rgba(98,89,214,.15)">'+
         '<div style="font-weight:700;color:var(--p);font-size:13px;margin-bottom:7px">🆕 v3.0 大版本更新</div>'+
         '<div style="font-size:12px;line-height:2;color:var(--t2)">'+
         '🩺 AI三师会诊 · 三位AI医生联合问诊<br>'+
@@ -3784,7 +3787,7 @@ const App={
         if(net>0){
           bg='background:rgba(52,199,89,'+(0.1+intensity*0.25)+')';
         }else if(net<0){
-          bg='background:rgba(111,108,217,'+(0.1+intensity*0.25)+')';
+          bg='background:rgba(98,89,214,'+(0.1+intensity*0.25)+')';
         }
       }
       let amtHtml='';
@@ -4288,7 +4291,7 @@ const App={
     const render=()=>{
       ctx.clearRect(0,0,w,h);
       const g=ctx.createRadialGradient(cx,cy,10,cx,cy,w*0.6);
-      g.addColorStop(0,'rgba(111,108,217,.12)');g.addColorStop(1,'rgba(11,16,38,0)');
+      g.addColorStop(0,'rgba(98,89,214,.12)');g.addColorStop(1,'rgba(11,16,38,0)');
       ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
       ctx.fillStyle='rgba(255,255,255,.25)';
       for(let i=0;i<40;i++){
@@ -4334,7 +4337,7 @@ const App={
     
     // Background
     const grd=ctx.createLinearGradient(0,0,0,H);
-    grd.addColorStop(0,'#6F6CD9');grd.addColorStop(0.5,'#9C93E0');grd.addColorStop(1,'#6F6CD9');
+    grd.addColorStop(0,'#6259D6');grd.addColorStop(0.5,'#8B7BE8');grd.addColorStop(1,'#6259D6');
     ctx.fillStyle=grd;
     ctx.fillRect(0,0,W,H);
     
@@ -5616,7 +5619,7 @@ const App={
       const cv=document.createElement('canvas');cv.width=S;cv.height=S;
       const g=cv.getContext('2d');
       // 兜底底色：铺满模式下基本用不到，万一图片没画上也不出现难看的黑块
-      const fg=g.createLinearGradient(0,0,S,S);fg.addColorStop(0,'#9C93E0');fg.addColorStop(1,'#6F6CD9');
+      const fg=g.createLinearGradient(0,0,S,S);fg.addColorStop(0,'#8B7BE8');fg.addColorStop(1,'#6259D6');
       g.fillStyle=fg;g.fillRect(0,0,S,S);
       // 裁剪窗中心在源图上的坐标 = 图片中心 - 偏移/缩放；半边长 = 窗宽/(2*缩放)
       const half=c.size/(2*c.s);
@@ -5650,8 +5653,8 @@ const App={
   showAvatarSheet(){
     const u=this.getUser();
     const prev=u.av
-      ? '<img src="'+u.av+'" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,.9);box-shadow:0 6px 18px rgba(111,108,217,.30)">'
-      : '<div style="width:96px;height:96px;border-radius:50%;background:var(--g1);color:#fff;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;box-shadow:0 6px 18px rgba(111,108,217,.30)">'+(u.name?u.name.charAt(0):'?')+'</div>';
+      ? '<img src="'+u.av+'" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,.9);box-shadow:0 6px 18px rgba(98,89,214,.30)">'
+      : '<div style="width:96px;height:96px;border-radius:50%;background:var(--g1);color:#fff;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;box-shadow:0 6px 18px rgba(98,89,214,.30)">'+(u.name?u.name.charAt(0):'?')+'</div>';
     const html='<h3>头像</h3>'+
       '<div style="display:flex;justify-content:center;padding:6px 0 10px">'+prev+'</div>'+
       '<p style="text-align:center;font-size:12px;color:var(--t3);margin:0 0 14px;line-height:1.7">点下方按钮会打开手机自带相册<br>选好图片后自动裁剪成圆形头像</p>'+
@@ -5681,8 +5684,8 @@ const App={
     const u=this.getUser();
     // 顶部圆形头像预览，与「头像」页/我的页同款圆环，点一下直接换头像
     const avPrev=u.av
-      ? '<img src="'+u.av+'" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,.9);box-shadow:0 6px 18px rgba(111,108,217,.30);display:block;flex-shrink:0">'
-      : '<div style="width:56px;height:56px;border-radius:50%;background:var(--g1);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0;box-shadow:0 6px 18px rgba(111,108,217,.30)">'+(u.name?u.name.charAt(0):'?')+'</div>';
+      ? '<img src="'+u.av+'" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,.9);box-shadow:0 6px 18px rgba(98,89,214,.30);display:block;flex-shrink:0">'
+      : '<div style="width:56px;height:56px;border-radius:50%;background:var(--g1);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0;box-shadow:0 6px 18px rgba(98,89,214,.30)">'+(u.name?u.name.charAt(0):'?')+'</div>';
     const html='<h3>编辑信息</h3>'+
       '<div style="display:flex;flex-direction:column;gap:12px">'+
       '<div class="m-avatar-row" onclick="App.pickAvatar()">'+avPrev+
@@ -5799,7 +5802,7 @@ const App={
     let g=null;
     if(editId)g=goals.find(x=>x.id===editId);
     const emojis=['🎯','🏠','🚗','✈️','💻','📱','🎓','💍','🏖️','🐱'];
-    const colors=['#6F6CD9','#ff3b30','#34c759','#ff9500','#007aff','#af52de','#ff2d55','#00c7be'];
+    const colors=['#6259D6','#ff3b30','#34c759','#ff9500','#007aff','#af52de','#ff2d55','#00c7be'];
     const html='<h3>'+(g?'编辑目标':'新建目标')+'</h3><div class="goal-form">'+
       '<input id="gfName" placeholder="目标名称" value="'+(g?App.escapeHtml(g.name):'')+'">'+
       '<div style="display:flex;gap:8px"><input id="gfTarget" type="number" placeholder="目标金额" value="'+(g?g.target:'')+'" style="flex:1"><input id="gfCurrent" type="number" placeholder="已存金额" value="'+(g?g.current:'')+'" style="flex:1"></div>'+
@@ -6082,13 +6085,13 @@ const App={
     };
     // Gradient bg
     const g=ctx.createLinearGradient(0,0,0,900);
-    g.addColorStop(0,'#6F6CD9');g.addColorStop(1,'#9C93E0');
+    g.addColorStop(0,'#6259D6');g.addColorStop(1,'#8B7BE8');
     ctx.fillStyle=g;ctx.fillRect(0,0,600,900);
     // Card
     ctx.fillStyle='rgba(255,255,255,0.95)';
     rrect(40,40,520,820,20);ctx.fill();
     // Title
-    ctx.fillStyle='#6F6CD9';ctx.font='bold 36px -apple-system,PingFang SC,sans-serif';ctx.textAlign='center';
+    ctx.fillStyle='#6259D6';ctx.font='bold 36px -apple-system,PingFang SC,sans-serif';ctx.textAlign='center';
     ctx.fillText('碎银记',300,110);
     ctx.fillStyle='#86868b';ctx.font='16px -apple-system,PingFang SC,sans-serif';
     ctx.fillText('每一笔都值得记录',300,140);
@@ -6125,16 +6128,16 @@ const App={
     const catTotals=this.sumByCat(records.filter(r=>r.date.startsWith(thisMonth)&&r.type==='expense'));
     const topCats=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).slice(0,3);
     if(topCats.length>0){
-      ctx.fillStyle='#6F6CD9';ctx.font='bold 15px -apple-system,PingFang SC,sans-serif';ctx.textAlign='left';
+      ctx.fillStyle='#6259D6';ctx.font='bold 15px -apple-system,PingFang SC,sans-serif';ctx.textAlign='left';
       ctx.fillText('支出 TOP 3',80,380);
       topCats.forEach(([k,amt],i)=>{
         const cat=this.getCatData(k);
         const pct=monthExp>0?(amt/monthExp*100).toFixed(0):'0';
         const y=398+i*44;
-        ctx.fillStyle='rgba(111,108,217,0.08)';rrect(80,y,440,36,8);ctx.fill();
+        ctx.fillStyle='rgba(98,89,214,0.08)';rrect(80,y,440,36,8);ctx.fill();
         ctx.fillStyle='#86868b';ctx.font='12px -apple-system,PingFang SC,sans-serif';ctx.textAlign='left';
         ctx.fillText(cat.i+' '+cat.n,96,y+22);
-        ctx.fillStyle='#6F6CD9';ctx.font='bold 14px -apple-system,PingFang SC,sans-serif';ctx.textAlign='right';
+        ctx.fillStyle='#6259D6';ctx.font='bold 14px -apple-system,PingFang SC,sans-serif';ctx.textAlign='right';
         ctx.fillText('¥'+amt.toFixed(0)+'  '+pct+'%',508,y+22);
       });
     }
@@ -6150,7 +6153,7 @@ const App={
     const topDay=Object.entries(dayTotals).sort((a,b)=>b[1]-a[1])[0];
     let insight='认真记账的你，闪闪发光 ✨';
     if(topDay)insight=dayNames[parseInt(topDay[0])+'']+'花得最多，花了 ¥'+topDay[1].toFixed(0);
-    ctx.fillStyle='#6F6CD9';ctx.font='13px -apple-system,PingFang SC,sans-serif';ctx.textAlign='center';
+    ctx.fillStyle='#6259D6';ctx.font='13px -apple-system,PingFang SC,sans-serif';ctx.textAlign='center';
     ctx.fillText('💡 '+insight,300,570);
     // Encouragement based on data
     const encouragements=['每一笔记录都是对生活的认真','坚持记账的你，未来一定不会差','小钱攒大钱，滴水成江河','理财从记账开始，你已经走在路上了'];
@@ -6388,7 +6391,7 @@ const App={
       try{Native.openFilePicker();this.showToast('请选择账单 CSV 文件');return;}catch(e){}
     }
     // 浏览器环境兜底：标准 input[type=file]，复用同一套解析流程，
-    // 评审/朋友不用装 APK 也能直接试账单导入
+    // 不用装 APK 也能直接试账单导入
     try{
       const inp=document.createElement('input');
       inp.type='file';inp.accept='.csv,.txt,text/csv,text/plain';inp.style.display='none';
@@ -6829,7 +6832,7 @@ const App={
   // theme='p' 用紫色系（浅色玻璃底上），默认白色系（紫色渐变卡上）
   gem(sz,theme){
     const s=sz||24;
-    const c=theme==='p'?['rgba(142,134,214,.16)','#7c3aed','rgba(124,58,237,.55)']:['rgba(255,255,255,.24)','rgba(255,255,255,.95)','rgba(255,255,255,.75)'];
+    const c=theme==='p'?['rgba(139,128,230,.16)','#7c3aed','rgba(124,58,237,.55)']:['rgba(255,255,255,.24)','rgba(255,255,255,.95)','rgba(255,255,255,.75)'];
     return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="display:block;flex-shrink:0">'+
       '<path d="M7.6 3.4h8.8l4.2 5.8L12 21 3.4 9.2l4.2-5.8Z" fill="'+c[0]+'" stroke="'+c[1]+'" stroke-width="1.5" stroke-linejoin="round"/>'+
       '<path d="M3.4 9.2h17.2M7.6 3.4 9 9.2l3 11.8 3-11.8 1.4-5.8" stroke="'+c[2]+'" stroke-width="1.2" stroke-linejoin="round"/></svg>';
@@ -7167,7 +7170,7 @@ const App={
     html+='<div class="capsule-create">';
     html+='<textarea id="capsuleMsg" placeholder="写给未来的自己...&#10;比如：希望这时候我已经攒够了旅行基金 ✈️" maxlength="200"></textarea>';
     html+='<select id="capsuleDate"><option value="30">30天后打开</option><option value="90">3个月后打开</option><option value="180">半年后打开</option><option value="365">一年后打开</option></select>';
-    html+='<button class="btn-primary" style="font-size:14px;padding:10px;background:linear-gradient(135deg,#6F6CD9,#A79BE8)" onclick="App.createCapsule()">📮 封存这个胶囊</button>';
+    html+='<button class="btn-primary" style="font-size:14px;padding:10px;background:linear-gradient(135deg,#6259D6,#A79BE8)" onclick="App.createCapsule()">📮 封存这个胶囊</button>';
     html+='</div>';
     this.showModal(html,'sheet');
   },
@@ -7223,7 +7226,7 @@ const App={
     const totalMood=happyMood+sadMood;
     // 生成人格
     let personality='',desc='',emoji='',color='';
-    if(nightPct>=50){personality='🌙 深夜消费星人';desc='你的消费活力在夜幕降临后才真正开始。深夜的外卖、凌晨的网购...建议试试"22点后不打开购物APP"的挑战';emoji='🌙';color='#9C93E0'}
+    if(nightPct>=50){personality='🌙 深夜消费星人';desc='你的消费活力在夜幕降临后才真正开始。深夜的外卖、凌晨的网购...建议试试"22点后不打开购物APP"的挑战';emoji='🌙';color='#8B7BE8'}
     else if(topCat&&topCat[0]==='food'&&topCat[1]/totalExp>0.5){personality='🍜 干饭人本干';desc='民以食为天，你是这句话的最佳代言人。餐饮支出占了半壁江山，试试每周做饭3次？';emoji='🍜';color='#ff6b35'}
     else if(topCat&&topCat[0]==='shopping'){personality='🛍️ 快乐购物派';desc='购物让你快乐，这一点数据不会说谎。试试"24小时冷静期"法则？';emoji='🛍️';color='#ff4081'}
     else if(topCat&&topCat[0]==='entertain'){personality='🎬 生活艺术家';desc='你把日子过成了诗，娱乐支出遥遥领先。会享受生活是一种能力';emoji='🎬';color='#9c27b0'}
@@ -7268,7 +7271,7 @@ document.addEventListener('DOMContentLoaded',()=>App.init());
    2) 兜底：init 链中途抛错会让链尾的 initNavDrag/initTypeDrag 永远绑不上（Tab 内联 onclick 照常），
       这里独立轮询补齐（内部幂等标记防双绑）。800ms 首 tick 足够快，绑定成功即停 */
 (function(){
-  window.__sliderDiag={ver:31,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
+  window.__sliderDiag={ver:32,navBound:false,downN:0,moveN:0,upN:0,heal:0,last:'-',
     pDown:0,pTouch:0,pMouse:0,pMove:0,bindErr:''};
   var d=window.__sliderDiag;
   // nav 元素缓存：探针挂在 document capture 上，每个 pointermove 都跑一次 querySelector 是纯浪费
