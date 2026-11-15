@@ -39,6 +39,19 @@
 - **跨平台账本（构建 #30）**：微信 / 支付宝 / 手动三类支出各自的金额、笔数与占比，一屏合成一本总账
 - **年度账单（构建 #30）**：本年支出/收入/结余、日均、Top 分类与商户、最大一笔、最费钱月份、平台构成，可复制分享
 
+## 交付材料索引
+
+| 材料 | 位置 | 说明 |
+| --- | --- | --- |
+| 网页版（可直接运行） | [`index.html`](index.html) | 单文件，双击或用本地 http 打开 |
+| Android 安装包 | Release 附件 `SuiYinJi_v3.0.apk` | versionCode 32，内置端侧模型，约 487MB |
+| 构建脚本 | [`build_apk.sh`](build_apk.sh) | 无 Gradle，aapt2 → javac → d8 → apksigner 四步完成 |
+| 开发过程记录 | [`PROMPT_HISTORY.md`](PROMPT_HISTORY.md) | 5 条完整链：需求快照 → 方案 → 纠偏 → 落地 → 实测 |
+| 版本记录 | [`CHANGELOG.md`](CHANGELOG.md) | 每轮改动的现象、根因、修复与实测结论 |
+| 技术文档 | [`docs/碎银记_技术文档_v3.0.pdf`](docs/碎银记_技术文档_v3.0.pdf) | 14 页：架构、核心实现、端侧 AI、工程质量、可复现性 |
+| 作品介绍文档 | [`docs/碎银记_作品介绍文档.docx`](docs/碎银记_作品介绍文档.docx) | 项目定位、亮点、技术要点与界面截图 |
+| 演示脚本 | [`VIDEO_STORYBOARD.md`](VIDEO_STORYBOARD.md) | 分镜与解说词，约 8 分钟 |
+
 ## 10 分钟复现指南
 
 ### 方式一：浏览器直接运行（约 1 分钟）
